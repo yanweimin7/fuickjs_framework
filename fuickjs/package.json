@@ -1,0 +1,30 @@
+{
+  "name": "fuickjs",
+  "version": "1.0.0",
+  "description": "Core framework for Fuick Dynamic Flutter",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-reconciler": "^0.29.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-reconciler": "^0.32.3",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "esbuild": "^0.27.2",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "prettier": "^3.8.1",
+    "typescript": "^5.0.0"
+  }
+}
