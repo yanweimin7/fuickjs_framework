@@ -59,6 +59,7 @@ export * from './ScaleTransition';
 export * from './SlideTransition';
 export * from './ConstrainedBox';
 export * from './FittedBox';
+export * from './RepaintBoundary';
 export * from './Visibility';
 export * from './CustomPaint';
 export * from './VideoPlayer';

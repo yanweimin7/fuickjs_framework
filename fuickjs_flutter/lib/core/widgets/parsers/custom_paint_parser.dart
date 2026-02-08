@@ -56,18 +56,20 @@ class FuickCustomPaint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: (painterCommands != null && painterCommands!.isNotEmpty)
-          ? FuickCustomPainter(painterCommands!)
-          : null,
-      foregroundPainter: (foregroundPainterCommands != null &&
-              foregroundPainterCommands!.isNotEmpty)
-          ? FuickCustomPainter(foregroundPainterCommands!)
-          : null,
-      size: size,
-      isComplex: isComplex,
-      willChange: willChange,
-      child: child,
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: (painterCommands != null && painterCommands!.isNotEmpty)
+            ? FuickCustomPainter(painterCommands!)
+            : null,
+        foregroundPainter: (foregroundPainterCommands != null &&
+                foregroundPainterCommands!.isNotEmpty)
+            ? FuickCustomPainter(foregroundPainterCommands!)
+            : null,
+        size: size,
+        isComplex: isComplex,
+        willChange: willChange,
+        child: child,
+      ),
     );
   }
 }

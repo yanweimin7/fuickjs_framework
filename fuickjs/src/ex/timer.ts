@@ -6,9 +6,23 @@ const timerMap = new Map<number, { fn: (...args: unknown[]) => unknown; type: 't
 
 export function setTimeout(fn: (...args: unknown[]) => unknown, ms?: number): number {
   const id = nextTimerId++;
+  const delay = ms || 0;
+
+  if (delay === 0) {
+    // Optimization: Use Promise.resolve() for zero delay to run in microtask
+    Promise.resolve().then(() => {
+      try {
+        fn();
+      } catch (e) {
+        console.error(`[Timer] Error in microtask timeout callback:`, e);
+        ErrorHandler.notify(e, 'timer', { id });
+      }
+    });
+    return id;
+  }
+
   timerMap.set(id, { fn, type: 'timeout' });
 
-  const delay = ms || 0;
   try {
     TimerService.createTimer(id, delay, false);
   } catch {

@@ -46,6 +46,7 @@ import 'parsers/padding_parser.dart';
 import 'parsers/page_view_parser.dart';
 import 'parsers/positioned_parser.dart';
 import 'parsers/refresh_indicator_parser.dart';
+import 'parsers/repaint_boundary_parser.dart';
 import 'parsers/rich_text_parser.dart';
 import 'parsers/row_parser.dart';
 import 'parsers/safe_area_parser.dart';
@@ -145,6 +146,7 @@ class WidgetFactory {
     register(CheckboxParser());
     register(TransformParser());
     register(ClipRRectParser());
+    register(RepaintBoundaryParser());
     register(RefreshIndicatorParser());
     register(RichTextParser());
   }
@@ -346,11 +348,11 @@ class _FuickNodeWidgetState extends State<_FuickNodeWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return widget.factory.buildInternal(
-      context,
-      _currentNode.type,
-      _currentNode.props,
-      _currentNode.children,
+    return  widget.factory.buildInternal(
+        context,
+        _currentNode.type,
+        _currentNode.props,
+        _currentNode.children,
     );
   }
 }
