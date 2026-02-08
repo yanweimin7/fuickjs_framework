@@ -1,4 +1,5 @@
 import 'BaseFuickService.dart';
+import 'clipboard_service.dart';
 import 'console_service.dart';
 import 'native_event_service.dart';
 import 'navigation_service.dart';
@@ -23,6 +24,7 @@ class NativeServiceManager {
     registerService(() => UIService());
     registerService(() => NetworkService());
     registerService(() => NativeEventService());
+    registerService(() => ClipboardService());
   }
 
   void registerService(ServiceBuilder serviceBuilder) {

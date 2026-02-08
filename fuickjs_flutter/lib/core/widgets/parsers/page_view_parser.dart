@@ -23,6 +23,7 @@ class PageViewParser extends WidgetParser {
   ) {
     final int? initialPage = asIntOrNull(props['initialPage']);
     final String? refId = props['refId']?.toString();
+    final ScrollPhysics? physics = WidgetUtils.physics(props['physics']);
 
     return WidgetUtils.wrapPadding(
       props,
@@ -33,6 +34,7 @@ class PageViewParser extends WidgetParser {
         scrollDirection: props['scrollDirection'] == 'vertical'
             ? Axis.vertical
             : Axis.horizontal,
+        physics: physics,
         onPageChanged: (index) {
           if (props['onPageChanged'] != null) {
             FuickAction.event(context, props['onPageChanged'], value: index);

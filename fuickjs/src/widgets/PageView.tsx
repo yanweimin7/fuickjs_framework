@@ -6,6 +6,7 @@ export interface PageViewProps extends WidgetProps {
   scrollDirection?: 'horizontal' | 'vertical';
   initialPage?: number;
   onPageChanged?: (index: number) => void;
+  physics?: 'never' | 'bouncing' | 'clamping' | 'always';
 }
 
 export class PageView extends BaseWidget<PageViewProps> {

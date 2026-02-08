@@ -1,3 +1,4 @@
+import './polyfills';
 export * from './components';
 export * from './renderer';
 export * from './router';
@@ -13,3 +14,4 @@ export * from './utils/ids';
 export * from './PageContext';
 export * from './Fuick';
 export * from './NativeEvent';
+export * from './services/ClipboardService';

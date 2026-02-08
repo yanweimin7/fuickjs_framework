@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { WidgetProps } from './types';
+import { FlutterProps } from './FlutterProps';
 
 export interface AlertDialogProps extends WidgetProps {
   title?: ReactNode;
@@ -14,7 +15,14 @@ export interface AlertDialogProps extends WidgetProps {
 
 export class AlertDialog extends React.Component<AlertDialogProps> {
   render(): ReactNode {
-    return React.createElement('AlertDialog', { ...this.props });
+    const { title, content, actions, ...otherProps } = this.props;
+    return React.createElement(
+      'AlertDialog',
+      { ...otherProps },
+      title && React.createElement(FlutterProps, { propsKey: 'title' }, title),
+      content && React.createElement(FlutterProps, { propsKey: 'content' }, content),
+      actions && React.createElement(FlutterProps, { propsKey: 'actions' }, actions),
+    );
   }
 }
 

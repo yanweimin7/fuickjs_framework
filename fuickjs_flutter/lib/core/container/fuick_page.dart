@@ -28,6 +28,7 @@ class _FuickAppPageState extends State<FuickPage> {
 
   @override
   Widget build(BuildContext context) {
+    widget.controller.registerPageContext(widget.pageId, context);
     return FuickPageView(
       pageId: widget.pageId,
       controller: widget.controller,

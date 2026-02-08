@@ -1,4 +1,4 @@
-import { useContext, useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { PageContext } from './PageContext';
 import * as PageRender from './page_render';
 
@@ -14,7 +14,17 @@ export function useNavigator() {
   return {
     push: (path: string, params?: unknown, rootNavigator?: boolean) =>
       NavigatorService.push(path, params, pageId, rootNavigator),
-    pop: (rootNavigator?: boolean, result?: unknown) => NavigatorService.pop(pageId, rootNavigator, result),
+    pushReplace: (path: string, params?: unknown, rootNavigator?: boolean) =>
+      NavigatorService.pushReplace(path, params, pageId, rootNavigator),
+    showModal: (path: string, params?: unknown, options?: { minHeight?: number, maxHeight?: number }, rootNavigator?: boolean) =>
+      NavigatorService.showModal(path, params, options, pageId, rootNavigator),
+    showDialog: (pathOrComponent: string | React.ReactNode, params?: unknown, rootNavigator?: boolean) =>
+      NavigatorService.showDialog(pathOrComponent, params, pageId, rootNavigator),
+    showComponentDialog: (path: string, component: React.ReactNode, params?: unknown, rootNavigator?: boolean) =>
+      NavigatorService.showComponentDialog(path, component, params, pageId, rootNavigator),
+    pop: (result?: unknown) => {
+      return NavigatorService.pop(pageId, false, result);
+    },
   };
 }
 

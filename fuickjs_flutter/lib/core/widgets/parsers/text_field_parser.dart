@@ -24,6 +24,14 @@ class TextFieldParser extends WidgetParser {
     final text = (props['text'] ?? '') as String;
     final refId = props['refId'] as String?;
     final border = props['border'] as String?;
+    final obscureText = props['obscureText'] == true;
+    final maxLines = asIntOrNull(props['maxLines']);
+    final keyboardType = _parseTextInputType(props['keyboardType'] as String?);
+    final textInputAction =
+        _parseTextInputAction(props['textInputAction'] as String?);
+    final autofocus = props['autofocus'] == true;
+    final textAlign = _parseTextAlign(props['textAlign'] as String?);
+    final readOnly = props['readOnly'] == true;
 
     final onChangedEvent = props['onChanged'];
     final onSubmittedEvent = props['onSubmitted'];
@@ -36,6 +44,13 @@ class TextFieldParser extends WidgetParser {
         text: text,
         hintText: hint,
         border: border,
+        obscureText: obscureText,
+        maxLines: maxLines ?? 1,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        autofocus: autofocus,
+        textAlign: textAlign ?? TextAlign.start,
+        readOnly: readOnly,
         props: props,
         onChanged: (v) {
           FuickAction.event(context, onChangedEvent, value: v);
@@ -46,6 +61,69 @@ class TextFieldParser extends WidgetParser {
       ),
     );
   }
+
+  TextInputType? _parseTextInputType(String? value) {
+    switch (value) {
+      case 'text':
+        return TextInputType.text;
+      case 'multiline':
+        return TextInputType.multiline;
+      case 'number':
+        return TextInputType.number;
+      case 'phone':
+        return TextInputType.phone;
+      case 'datetime':
+        return TextInputType.datetime;
+      case 'emailAddress':
+        return TextInputType.emailAddress;
+      case 'url':
+        return TextInputType.url;
+      case 'visiblePassword':
+        return TextInputType.visiblePassword;
+      default:
+        return null;
+    }
+  }
+
+  TextInputAction? _parseTextInputAction(String? value) {
+    switch (value) {
+      case 'done':
+        return TextInputAction.done;
+      case 'go':
+        return TextInputAction.go;
+      case 'next':
+        return TextInputAction.next;
+      case 'search':
+        return TextInputAction.search;
+      case 'send':
+        return TextInputAction.send;
+      case 'none':
+        return TextInputAction.none;
+      case 'unspecified':
+        return TextInputAction.unspecified;
+      default:
+        return null;
+    }
+  }
+
+  TextAlign? _parseTextAlign(String? value) {
+    switch (value) {
+      case 'left':
+        return TextAlign.left;
+      case 'right':
+        return TextAlign.right;
+      case 'center':
+        return TextAlign.center;
+      case 'justify':
+        return TextAlign.justify;
+      case 'start':
+        return TextAlign.start;
+      case 'end':
+        return TextAlign.end;
+      default:
+        return null;
+    }
+  }
 }
 
 class FuickTextField extends StatefulWidget implements FuickDslWidget {
@@ -54,6 +132,13 @@ class FuickTextField extends StatefulWidget implements FuickDslWidget {
   final String text;
   final String hintText;
   final String? border;
+  final bool obscureText;
+  final int maxLines;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final bool autofocus;
+  final TextAlign textAlign;
+  final bool readOnly;
   final Map<String, dynamic> props;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
@@ -66,6 +151,13 @@ class FuickTextField extends StatefulWidget implements FuickDslWidget {
     required this.text,
     required this.hintText,
     this.border,
+    this.obscureText = false,
+    this.maxLines = 1,
+    this.keyboardType,
+    this.textInputAction,
+    this.autofocus = false,
+    this.textAlign = TextAlign.start,
+    this.readOnly = false,
     required this.props,
     this.onChanged,
     this.onSubmitted,
@@ -164,6 +256,13 @@ class _FuickTextFieldState extends State<FuickTextField>
     return TextField(
       controller: _controller,
       focusNode: _focusNode,
+      obscureText: widget.obscureText,
+      maxLines: widget.maxLines,
+      keyboardType: widget.keyboardType,
+      textInputAction: widget.textInputAction,
+      autofocus: widget.autofocus,
+      textAlign: widget.textAlign,
+      readOnly: widget.readOnly,
       decoration: InputDecoration(
         hintText: widget.hintText,
         border: widget.border == 'none' ? InputBorder.none : null,

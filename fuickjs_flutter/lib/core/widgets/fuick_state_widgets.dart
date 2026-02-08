@@ -12,6 +12,7 @@ class FuickPageView extends StatefulWidget implements FuickDslWidget {
   final String? refId;
   final int initialPage;
   final Axis scrollDirection;
+  final ScrollPhysics? physics;
   final ValueChanged<int>? onPageChanged;
   final List<Widget> children;
   final ControllerCallback<PageController>? onControllerCreated;
@@ -22,6 +23,7 @@ class FuickPageView extends StatefulWidget implements FuickDslWidget {
     this.refId,
     required this.initialPage,
     required this.scrollDirection,
+    this.physics,
     this.onPageChanged,
     required this.children,
     this.onControllerCreated,
@@ -112,6 +114,7 @@ class _FuickPageViewState extends State<FuickPageView>
     return PageView(
       controller: _controller,
       scrollDirection: widget.scrollDirection,
+      physics: widget.physics,
       onPageChanged: widget.onPageChanged,
       children: widget.children,
     );

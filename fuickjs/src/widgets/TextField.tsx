@@ -8,6 +8,15 @@ export interface TextFieldProps extends WidgetProps {
   hint?: string;
   onChanged?: (value: string) => void;
   onSubmitted?: (value: string) => void;
+  maxLines?: number;
+  obscureText?: boolean;
+  keyboardType?: 'text' | 'multiline' | 'number' | 'phone' | 'datetime' | 'emailAddress' | 'url' | 'visiblePassword';
+  textInputAction?: 'done' | 'go' | 'next' | 'search' | 'send' | 'none' | 'unspecified';
+  autofocus?: boolean;
+  textAlign?: 'left' | 'right' | 'center' | 'justify' | 'start' | 'end';
+  readOnly?: boolean;
+  border?: 'none' | string;
+  decoration?: any;
 }
 
 export class TextField extends BaseWidget<TextFieldProps> {

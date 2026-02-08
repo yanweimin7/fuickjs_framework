@@ -194,6 +194,21 @@ class WidgetUtils {
     return Color(v);
   }
 
+  static ScrollPhysics? physics(String? v) {
+    switch (v) {
+      case 'never':
+        return const NeverScrollableScrollPhysics();
+      case 'bouncing':
+        return const BouncingScrollPhysics();
+      case 'clamping':
+        return const ClampingScrollPhysics();
+      case 'always':
+        return const AlwaysScrollableScrollPhysics();
+      default:
+        return null;
+    }
+  }
+
   static Curve parseCurve(String? name) {
     switch (name) {
       case 'ease':
