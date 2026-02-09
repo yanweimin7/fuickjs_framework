@@ -30,6 +30,7 @@ class FuickNode {
     Map<String, dynamic> rawProps,
     FuickNodeManager manager,
   ) {
+    if (rawProps.isEmpty) return rawProps;
     final Map<String, dynamic> processed = {};
     rawProps.forEach((key, value) {
       processed[key] = _findAndUpgradeNodes(value, manager);
@@ -38,38 +39,57 @@ class FuickNode {
   }
 
   dynamic _findAndUpgradeNodes(dynamic value, FuickNodeManager manager) {
-    if (value is Map && value.containsKey('id') && value.containsKey('type')) {
-      final String type = value['type'];
+    if (value == null) return null;
+    if (value is num || value is String || value is bool) return value;
 
-      ///挂载到属性上的节点要解析出来 ， 比如  appBar={<AppBar title={<Text text="title" />} />}
-      if (type == 'flutter-props' ||
-          type == 'FlutterProps' ||
-          type == 'Props') {
-        // Special handling for FlutterProps: extract and upgrade its children
-        final childrenDsl = value['children'] as List?;
-        if (childrenDsl == null || childrenDsl.isEmpty) return null;
+    if (value is Map) {
+      if (value.containsKey('id') && value.containsKey('type')) {
+        final String type = value['type'];
 
-        final upgradedChildren = childrenDsl
-            .map((c) => _findAndUpgradeNodes(c, manager))
-            .where((e) => e != null)
-            .toList();
+        ///挂载到属性上的节点要解析出来 ， 比如  appBar={<AppBar title={<Text text="title" />} />}
+        if (type == 'flutter-props' ||
+            type == 'FlutterProps' ||
+            type == 'Props') {
+          // Special handling for FlutterProps: extract and upgrade its children
+          final childrenDsl = value['children'] as List?;
+          if (childrenDsl == null || childrenDsl.isEmpty) return null;
 
-        if (upgradedChildren.isEmpty) return null;
-        return upgradedChildren.length == 1
-            ? upgradedChildren.first
-            : upgradedChildren;
+          final upgradedChildren = childrenDsl
+              .map((c) => _findAndUpgradeNodes(c, manager))
+              .where((e) => e != null)
+              .toList();
+
+          if (upgradedChildren.isEmpty) return null;
+          return upgradedChildren.length == 1
+              ? upgradedChildren.first
+              : upgradedChildren;
+        }
+
+        // 这是一个 DSL 节点，升级为 FuickNode
+        return manager.createNode(
+          Map<String, dynamic>.from(value),
+          manager,
+        );
       }
 
-      // 这是一个 DSL 节点，升级为 FuickNode
-      final node = manager.createNode(
-        Map<String, dynamic>.from(value),
-        manager,
-      );
-      return node;
-    } else if (value is Map) {
-      return value.map((k, v) => MapEntry(k, _findAndUpgradeNodes(v, manager)));
+      // Plain map, process its values
+      final Map<String, dynamic> processedMap = {};
+      bool changed = false;
+      value.forEach((k, v) {
+        final upgraded = _findAndUpgradeNodes(v, manager);
+        processedMap[k.toString()] = upgraded;
+        if (upgraded != v) changed = true;
+      });
+      return changed ? processedMap : value;
     } else if (value is List) {
-      return value.map((e) => _findAndUpgradeNodes(e, manager)).toList();
+      final List<dynamic> processedList = [];
+      bool changed = false;
+      for (final e in value) {
+        final upgraded = _findAndUpgradeNodes(e, manager);
+        processedList.add(upgraded);
+        if (upgraded != e) changed = true;
+      }
+      return changed ? processedList : value;
     }
     return value;
   }
@@ -106,15 +126,27 @@ class FuickNodeManager {
     final id = asInt(dsl['id']);
     final type = dsl['type'] as String;
     final isBoundary = dsl['isBoundary'] == true;
-    final props = Map<String, dynamic>.from(dsl['props'] as Map? ?? {});
+    final props = dsl['props'] as Map? ?? {};
     final childrenDsl = (dsl['children'] as List?) ?? [];
 
-    // 1. Recursively create children first
+    // 1. Recursively create/update children
     final List<FuickNode> children = childrenDsl
-        .map((c) => createNode(Map<String, dynamic>.from(c as Map), manager))
+        .map((c) => createNode(c as Map<String, dynamic>, manager))
         .toList();
 
-    // 2. Create new node
+    // 2. Check for existing node to reuse
+    final existingNode = _nodes[id];
+    if (existingNode != null && existingNode.type == type) {
+      existingNode.isBoundary = isBoundary;
+      existingNode.update(
+        Map<String, dynamic>.from(props),
+        children,
+        manager,
+      );
+      return existingNode;
+    }
+
+    // 3. Create new node if not found or type mismatch
     FuickNode node = FuickNode(
       id: id,
       type: type,
@@ -123,48 +155,26 @@ class FuickNodeManager {
       children: [],
     );
 
-    // 3. Update props and children
-    node.update(props, children, manager);
+    // 4. Update props and children
+    node.update(Map<String, dynamic>.from(props), children, manager);
 
-    // 4. Cache node
+    // 5. Cache node
     _nodes[id] = node;
 
     return node;
   }
 
-  ///为什么不采用dart端维护同样的vnode节点，js端只发送有更新的props的方案，因为js端可能触发节点顺序变化，一个listview，如果使用key，会造成key乱掉。维护逻辑变得很重。
-  ///现在比较简单，js端算出最高那一层需要刷新的id，将全量children数据都传递过来，触发刷新
   void applyPatches(List<dynamic> patches, FuickNodeManager manager) {
     for (final patch in patches) {
       if (patch is! Map) continue;
       final dsl = Map<String, dynamic>.from(patch);
       final id = asInt(dsl['id']);
 
-      if (_nodes.containsKey(id)) {
-        final existingNode = _nodes[id]!;
-        // If type matches, update in-place to preserve object reference
-        if (existingNode.type == dsl['type']) {
-          final props = Map<String, dynamic>.from(dsl['props'] as Map? ?? {});
-          final childrenDsl = (dsl['children'] as List?) ?? [];
+      // createNode now handles reuse internally
+      final node = createNode(dsl, manager);
 
-          // Recursively create new children (since children structure might change)
-          final List<FuickNode> newChildren = childrenDsl
-              .map(
-                (c) => createNode(Map<String, dynamic>.from(c as Map), manager),
-              )
-              .toList();
-
-          existingNode.update(props, newChildren, manager);
-          manager.notify(id, existingNode);
-          continue;
-        }
-      }
-
-      // Create new node from patch DSL
-      final newNode = createNode(dsl, manager);
-
-      // Trigger UI refresh for the patched node with NEW node data
-      manager.notify(id, newNode);
+      // Trigger UI refresh for the patched node
+      manager.notify(id, node);
     }
   }
 

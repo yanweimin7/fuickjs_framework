@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/fuick_node.dart';
-import '../widgets/widget_factory.dart';
 import 'fuick_app_controller.dart';
 
 class RouteInfo {
@@ -32,6 +31,19 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   FuickNode? rootNode;
   bool _hasRendered = false;
   bool _isVisible = false;
+
+  Widget? _cachedChild;
+  FuickNode? _lastBuiltNode;
+
+  @override
+  void didUpdateWidget(FuickPageView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.pageId != widget.pageId) {
+      _cachedChild = null;
+      _lastBuiltNode = null;
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -149,28 +161,34 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return rootNode == null
-        ? const Center(
-            child: SizedBox(
-              width: 100,
-              height: 100,
-              child: CircularProgressIndicator(),
+    if (rootNode == null) {
+      return const Center(
+        child: SizedBox(
+          width: 100,
+          height: 100,
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_cachedChild == null || _lastBuiltNode != rootNode) {
+      _lastBuiltNode = rootNode;
+      _cachedChild = FuickNodeManagerProvider(
+        manager: nodeManager,
+        child: FuickAppScope(
+          controller: widget.controller,
+          child: FuickPageScope(
+            pageId: widget.pageId,
+            child: widget.controller.widgetFactory.buildFromNode(
+              context,
+              rootNode!,
+              forceWrap: true,
             ),
-          )
-        : FuickNodeManagerProvider(
-            manager: nodeManager,
-            child: FuickAppScope(
-              controller: widget.controller,
-              child: FuickPageScope(
-                pageId: widget.pageId,
-                child: widget.controller.widgetFactory.buildFromNode(
-                  context,
-                  rootNode!,
-                  forceWrap: true,
-                ),
-              ),
-            ),
-          );
+          ),
+        ),
+      );
+    }
+    return _cachedChild!;
   }
 }
 
