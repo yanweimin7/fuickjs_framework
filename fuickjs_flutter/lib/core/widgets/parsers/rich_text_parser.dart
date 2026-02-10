@@ -13,48 +13,63 @@ class RichTextParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
+    final String? textAlignStr = props['textAlign'] as String?;
+    final String? textDirectionStr = props['textDirection'] as String?;
+    final bool softWrap = props['softWrap'] as bool? ?? true;
+    final String? overflowStr = props['overflow'] as String?;
+    final dynamic maxLinesProp = props['maxLines'];
+    final dynamic textProp = props['text'];
+
     return RichText(
-      textAlign: _textAlign(props['textAlign'] as String?) ?? TextAlign.start,
-      textDirection: _textDirection(props['textDirection'] as String?),
-      softWrap: props['softWrap'] as bool? ?? true,
-      overflow:
-          _textOverflow(props['overflow'] as String?) ?? TextOverflow.clip,
-      maxLines: asIntOrNull(props['maxLines']),
-      text: _parseInlineSpan(context, props['text']),
+      textAlign: _textAlign(textAlignStr) ?? TextAlign.start,
+      textDirection: _textDirection(textDirectionStr),
+      softWrap: softWrap,
+      overflow: _textOverflow(overflowStr) ?? TextOverflow.clip,
+      maxLines: asIntOrNull(maxLinesProp),
+      text: _parseInlineSpan(context, textProp),
     );
   }
 
   InlineSpan _parseInlineSpan(BuildContext context, dynamic map) {
     if (map is! Map) return const TextSpan(text: '');
-    final m = Map<String, dynamic>.from(map);
+    final Map<String, dynamic> m = map is Map<String, dynamic> ? map : Map<String, dynamic>.from(map);
     final String? text = m['text']?.toString();
+    final dynamic childrenProp = m['children'];
     final List<InlineSpan> children = [];
-    if (m['children'] is List) {
-      for (var c in m['children']) {
+    if (childrenProp is List) {
+      for (var c in childrenProp) {
         children.add(_parseInlineSpan(context, c));
       }
     }
 
     TextStyle? style;
-    final styleMap = m['style'];
+    final dynamic styleMap = m['style'];
     if (styleMap is Map) {
+      final String? colorStr = styleMap['color'] as String?;
+      final dynamic fontSizeProp = styleMap['fontSize'];
+      final String? fontWeightStr = styleMap['fontWeight'] as String?;
+      final String? fontStyleStr = styleMap['fontStyle'] as String?;
+      final dynamic decorationProp = styleMap['decoration'];
+      final dynamic heightProp = styleMap['height'];
+
       style = TextStyle(
-        color: WidgetUtils.colorFromHex(styleMap['color']),
-        fontSize: asDoubleOrNull(styleMap['fontSize']),
+        color: WidgetUtils.colorFromHex(colorStr),
+        fontSize: asDoubleOrNull(fontSizeProp),
         fontWeight:
-            styleMap['fontWeight'] == 'bold' ? FontWeight.bold : FontWeight.normal,
+            fontWeightStr == 'bold' ? FontWeight.bold : FontWeight.normal,
         fontStyle:
-            styleMap['fontStyle'] == 'italic' ? FontStyle.italic : FontStyle.normal,
-        decoration: _textDecoration(styleMap['decoration']),
-        height: asDoubleOrNull(styleMap['height']),
+            fontStyleStr == 'italic' ? FontStyle.italic : FontStyle.normal,
+        decoration: _textDecoration(decorationProp),
+        height: asDoubleOrNull(heightProp),
       );
     }
 
     GestureRecognizer? recognizer;
-    if (m['onTap'] != null) {
+    final dynamic onTapProp = m['onTap'];
+    if (onTapProp != null) {
       recognizer = TapGestureRecognizer()
         ..onTap = () {
-          FuickAction.event(context, m['onTap']);
+          FuickAction.event(context, onTapProp);
         };
     }
 

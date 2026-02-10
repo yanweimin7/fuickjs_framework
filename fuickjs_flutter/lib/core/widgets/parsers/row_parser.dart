@@ -8,13 +8,23 @@ class RowParser extends WidgetParser {
   String get type => 'Row';
 
   @override
-  Widget parse(BuildContext context, Map<String, dynamic> props, dynamic children, WidgetFactory factory) {
+  Widget parse(BuildContext context, Map<String, dynamic> props,
+      dynamic children, WidgetFactory factory) {
+    final String? mainAxisAlignmentStr = props['mainAxisAlignment'] as String?;
+    final String? crossAxisAlignmentStr =
+        props['crossAxisAlignment'] as String?;
+    final String? mainAxisSizeStr = props['mainAxisSize'] as String?;
+
+    final mainAxisAlignment = WidgetUtils.mainAxis(mainAxisAlignmentStr);
+    final crossAxisAlignment = WidgetUtils.crossAxis(crossAxisAlignmentStr);
+    final mainAxisSize = WidgetUtils.mainAxisSize(mainAxisSizeStr);
+
     return WidgetUtils.wrapPadding(
       props,
       Row(
-        mainAxisAlignment: WidgetUtils.mainAxis(props['mainAxisAlignment'] as String?),
-        crossAxisAlignment: WidgetUtils.crossAxis(props['crossAxisAlignment'] as String?),
-        mainAxisSize: WidgetUtils.mainAxisSize(props['mainAxisSize'] as String?),
+        mainAxisAlignment: mainAxisAlignment,
+        crossAxisAlignment: crossAxisAlignment,
+        mainAxisSize: mainAxisSize,
         children: factory.buildChildren(context, children),
       ),
     );

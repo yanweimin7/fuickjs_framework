@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../utils/extensions.dart';
-import 'BaseFuickService.dart';
+import 'base_fuick_service.dart';
 
 class TimerService extends BaseFuickService {
   @override

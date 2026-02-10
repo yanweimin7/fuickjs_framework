@@ -11,36 +11,41 @@ class GestureDetectorParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
+    final dynamic onTapProp = props['onTap'];
+    final dynamic onDoubleTapProp = props['onDoubleTap'];
+    final dynamic onLongPressProp = props['onLongPress'];
+    final dynamic onPanStartProp = props['onPanStart'];
+    final dynamic onPanUpdateProp = props['onPanUpdate'];
+    final dynamic onPanEndProp = props['onPanEnd'];
+
     return WidgetUtils.wrapPadding(
       props,
       GestureDetector(
-        onTap: props['onTap'] != null
+        onTap: onTapProp != null
             ? () {
-                FuickAction.event(context, props['onTap']);
+                FuickAction.event(context, onTapProp);
               }
             : null,
-        onDoubleTap: props['onDoubleTap'] != null
-            ? () => FuickAction.event(context, props['onDoubleTap'])
+        onDoubleTap: onDoubleTapProp != null
+            ? () => FuickAction.event(context, onDoubleTapProp)
             : null,
-        onLongPress: props['onLongPress'] != null
-            ? () => FuickAction.event(context, props['onLongPress'])
+        onLongPress: onLongPressProp != null
+            ? () => FuickAction.event(context, onLongPressProp)
             : null,
-        onPanStart: props['onPanStart'] != null
-            ? (details) => FuickAction.event(context, props['onPanStart'],
-                    value: {
-                      'dx': details.localPosition.dx,
-                      'dy': details.localPosition.dy
-                    })
+        onPanStart: onPanStartProp != null
+            ? (details) => FuickAction.event(context, onPanStartProp, value: {
+                  'dx': details.localPosition.dx,
+                  'dy': details.localPosition.dy
+                })
             : null,
-        onPanUpdate: props['onPanUpdate'] != null
-            ? (details) => FuickAction.event(context, props['onPanUpdate'],
-                    value: {
-                      'dx': details.localPosition.dx,
-                      'dy': details.localPosition.dy
-                    })
+        onPanUpdate: onPanUpdateProp != null
+            ? (details) => FuickAction.event(context, onPanUpdateProp, value: {
+                  'dx': details.localPosition.dx,
+                  'dy': details.localPosition.dy
+                })
             : null,
-        onPanEnd: props['onPanEnd'] != null
-            ? (details) => FuickAction.event(context, props['onPanEnd'])
+        onPanEnd: onPanEndProp != null
+            ? (details) => FuickAction.event(context, onPanEndProp)
             : null,
         child: factory.buildFirstChild(context, children, type),
       ),

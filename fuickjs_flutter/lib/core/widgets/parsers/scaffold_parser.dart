@@ -17,6 +17,7 @@ class ScaffoldParser extends WidgetParser {
     final endDrawerDsl = props['endDrawer'];
     final bottomNavigationBarDsl = props['bottomNavigationBar'];
     final bottomSheetDsl = props['bottomSheet'];
+    final String? backgroundColorProp = props['backgroundColor'] as String?;
 
     Widget? body = bodyDsl != null ? factory.build(context, bodyDsl) : null;
     if (body == null && children != null) {
@@ -36,8 +37,7 @@ class ScaffoldParser extends WidgetParser {
     }
 
     return Scaffold(
-      backgroundColor:
-          WidgetUtils.colorFromHex(props['backgroundColor'] as String?),
+      backgroundColor: WidgetUtils.colorFromHex(backgroundColorProp),
       appBar: appBar,
       body: body,
       floatingActionButton:

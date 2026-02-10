@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'fuick_app_controller.dart';
 
 class FuickPageDelegate {

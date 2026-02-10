@@ -44,7 +44,7 @@ class FuickCustomPaint extends StatelessWidget {
   final Widget? child;
 
   const FuickCustomPaint({
-    Key? key,
+    super.key,
     this.refId,
     this.painterCommands,
     this.foregroundPainterCommands,
@@ -52,7 +52,7 @@ class FuickCustomPaint extends StatelessWidget {
     this.isComplex = false,
     this.willChange = false,
     this.child,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/extensions.dart';
 import '../widget_factory.dart';
-import '../widget_utils.dart';
 import 'widget_parser.dart';
 
 class OpacityParser extends WidgetParser {
@@ -11,7 +10,8 @@ class OpacityParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
-    final opacity = asDoubleOrNull(props['opacity']) ?? 1.0;
+    final dynamic opacityProp = props['opacity'];
+    final double opacity = asDoubleOrNull(opacityProp) ?? 1.0;
     return Opacity(
       opacity: opacity,
       child: factory.buildFirstChild(context, children, type),

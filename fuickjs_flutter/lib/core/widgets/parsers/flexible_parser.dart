@@ -10,8 +10,8 @@ class FlexibleParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
-    final flex = asIntOrNull(props['flex']) ?? 1;
-    final fit = props['fit'] == 'tight' ? FlexFit.tight : FlexFit.loose;
+    final int flex = asIntOrNull(props['flex']) ?? 1;
+    final FlexFit fit = props['fit'] == 'tight' ? FlexFit.tight : FlexFit.loose;
     return Flexible(
       flex: flex,
       fit: fit,

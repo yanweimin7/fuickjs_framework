@@ -10,18 +10,21 @@ class InkWellParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
-    final onTapObj = props['onTap'];
+    final dynamic onTapProp = props['onTap'];
+    final dynamic onDoubleTapProp = props['onDoubleTap'];
+    final dynamic onLongPressProp = props['onLongPress'];
+
     return InkWell(
-      onTap: onTapObj != null
+      onTap: onTapProp != null
           ? () {
-              FuickAction.event(context, onTapObj);
+              FuickAction.event(context, onTapProp);
             }
           : null,
-      onDoubleTap: props['onDoubleTap'] != null
-          ? () => FuickAction.event(context, props['onDoubleTap'])
+      onDoubleTap: onDoubleTapProp != null
+          ? () => FuickAction.event(context, onDoubleTapProp)
           : null,
-      onLongPress: props['onLongPress'] != null
-          ? () => FuickAction.event(context, props['onLongPress'])
+      onLongPress: onLongPressProp != null
+          ? () => FuickAction.event(context, onLongPressProp)
           : null,
       child: factory.buildFirstChild(context, children, type),
     );

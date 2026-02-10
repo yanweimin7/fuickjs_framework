@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/fuick_node.dart';
+import '../widgets/widget_factory.dart';
 import 'fuick_app_controller.dart';
 
 class RouteInfo {
@@ -101,7 +102,6 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   @override
   void initState() {
     super.initState();
-    final startTime = DateTime.now();
     widget.controller.onPageRender[widget.pageId] = (dsl) {
       // final cost = DateTime.now().difference(startTime).inMilliseconds;
       // debugPrint(

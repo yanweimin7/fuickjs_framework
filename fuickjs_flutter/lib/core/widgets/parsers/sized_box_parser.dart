@@ -8,10 +8,17 @@ class SizedBoxParser extends WidgetParser {
   String get type => 'SizedBox';
 
   @override
-  Widget parse(BuildContext context, Map<String, dynamic> props, dynamic children, WidgetFactory factory) {
+  Widget parse(BuildContext context, Map<String, dynamic> props,
+      dynamic children, WidgetFactory factory) {
+    final dynamic widthProp = props['width'];
+    final dynamic heightProp = props['height'];
+
+    final width = WidgetUtils.sizeNum(widthProp);
+    final height = WidgetUtils.sizeNum(heightProp);
+
     return SizedBox(
-      width: WidgetUtils.sizeNum(props['width']),
-      height: WidgetUtils.sizeNum(props['height']),
+      width: width,
+      height: height,
       child: factory.buildFirstChild(context, children, type),
     );
   }

@@ -2,13 +2,114 @@ import 'package:flutter/material.dart';
 import '../utils/extensions.dart';
 
 class WidgetUtils {
+  static final Map<String, Color> _colorCache = {};
+
+  static Color? colorFromHex(String? hexString) {
+    if (hexString == null || hexString.isEmpty) return null;
+    final cached = _colorCache[hexString];
+    if (cached != null) return cached;
+
+    if (hexString == 'white') return Colors.white;
+    if (hexString == 'black') return Colors.black;
+    if (hexString == 'transparent') return Colors.transparent;
+    if (hexString == 'grey') return Colors.grey;
+    if (hexString == 'red') return Colors.red;
+    if (hexString == 'blue') return Colors.blue;
+    if (hexString == 'green') return Colors.green;
+    if (hexString == 'yellow') return Colors.yellow;
+    if (hexString == 'orange') return Colors.orange;
+
+    try {
+      final buffer = StringBuffer();
+      if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
+      buffer.write(hexString.replaceFirst('#', ''));
+      final color = Color(int.parse(buffer.toString(), radix: 16));
+      _colorCache[hexString] = color;
+      return color;
+    } catch (e) {
+      debugPrint('[WidgetUtils] Error parsing color: $hexString');
+      return null;
+    }
+  }
+
+  static double? asDoubleOrNull(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  static double asDouble(dynamic v, [double defaultValue = 0.0]) {
+    return asDoubleOrNull(v) ?? defaultValue;
+  }
+
+  static double? sizeNum(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    if (v is String) {
+      if (v.endsWith('%')) return null; // Percentage not supported here
+      return double.tryParse(v);
+    }
+    return null;
+  }
+
+  static EdgeInsets? edgeInsets(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return EdgeInsets.all(v.toDouble());
+    if (v is List) {
+      if (v.isEmpty) return EdgeInsets.zero;
+      if (v.length == 1) return EdgeInsets.all(asDouble(v[0]));
+      if (v.length == 2) {
+        return EdgeInsets.symmetric(
+          vertical: asDouble(v[0]),
+          horizontal: asDouble(v[1]),
+        );
+      }
+      if (v.length == 4) {
+        return EdgeInsets.fromLTRB(
+          asDouble(v[0]),
+          asDouble(v[1]),
+          asDouble(v[2]),
+          asDouble(v[3]),
+        );
+      }
+    }
+    if (v is Map) {
+      if (v.isEmpty) return EdgeInsets.zero;
+      final m = asMap(v);
+      if (m.containsKey('all')) {
+        return EdgeInsets.all(asDouble(m['all']));
+      }
+      final left = asDoubleOrNull(m['left']);
+      final top = asDoubleOrNull(m['top']);
+      final right = asDoubleOrNull(m['right']);
+      final bottom = asDoubleOrNull(m['bottom']);
+      final horizontal = asDoubleOrNull(m['horizontal']);
+      final vertical = asDoubleOrNull(m['vertical']);
+
+      if (horizontal != null || vertical != null) {
+        return EdgeInsets.symmetric(
+          horizontal: horizontal ?? 0.0,
+          vertical: vertical ?? 0.0,
+        );
+      }
+      if (left != null || top != null || right != null || bottom != null) {
+        return EdgeInsets.fromLTRB(
+          left ?? 0.0,
+          top ?? 0.0,
+          right ?? 0.0,
+          bottom ?? 0.0,
+        );
+      }
+    }
+    return null;
+  }
+
   static Widget wrapPadding(Map<String, dynamic> props, Widget child) {
     final p = props['padding'];
-    if (p is num) {
-      return Padding(padding: EdgeInsets.all(asDouble(p)), child: child);
-    }
+    if (p == null) return child;
     final ei = edgeInsets(p);
-    if (ei != null) {
+    if (ei != null && ei != EdgeInsets.zero) {
       return Padding(padding: ei, child: child);
     }
     return child;
@@ -18,10 +119,10 @@ class WidgetUtils {
     final margin = edgeInsets(props['margin']);
     final padding = edgeInsets(props['padding']);
     Widget c = child;
-    if (padding != null) {
+    if (padding != null && padding != EdgeInsets.zero) {
       c = Padding(padding: padding, child: c);
     }
-    if (margin != null) {
+    if (margin != null && margin != EdgeInsets.zero) {
       c = Padding(padding: margin, child: c);
     }
     return c;
@@ -81,6 +182,14 @@ class WidgetUtils {
         return Alignment.bottomLeft;
       case 'bottomRight':
         return Alignment.bottomRight;
+      case 'topCenter':
+        return Alignment.topCenter;
+      case 'bottomCenter':
+        return Alignment.bottomCenter;
+      case 'centerLeft':
+        return Alignment.centerLeft;
+      case 'centerRight':
+        return Alignment.centerRight;
       default:
         return null;
     }
@@ -119,7 +228,7 @@ class WidgetUtils {
 
   static BoxConstraints? boxConstraints(dynamic v) {
     if (v is Map) {
-      final m = Map<String, dynamic>.from(v);
+      final m = asMap(v);
       return BoxConstraints(
         minWidth: sizeNum(m['minWidth']) ?? 0.0,
         maxWidth: sizeNum(m['maxWidth']) ?? double.infinity,
@@ -147,51 +256,6 @@ class WidgetUtils {
 
   static Alignment stackAlignment(String? v) {
     return alignment(v) ?? Alignment.center;
-  }
-
-  static double? sizeNum(dynamic v) {
-    return asDoubleOrNull(v);
-  }
-
-  static EdgeInsets? edgeInsets(dynamic v) {
-    if (v is num) return EdgeInsets.all(asDouble(v));
-    if (v is Map) {
-      final m = Map<String, dynamic>.from(v);
-      if (m.containsKey('all')) {
-        return EdgeInsets.all(asDouble(m['all']));
-      }
-      final double vertical = asDouble(m['vertical']);
-      final double horizontal = asDouble(m['horizontal']);
-
-      return EdgeInsets.only(
-        left: asDoubleOrNull(m['left']) ?? horizontal,
-        top: asDoubleOrNull(m['top']) ?? vertical,
-        right: asDoubleOrNull(m['right']) ?? horizontal,
-        bottom: asDoubleOrNull(m['bottom']) ?? vertical,
-      );
-    }
-    return null;
-  }
-
-  static Color? colorFromHex(String? hex) {
-    if (hex == null || hex.isEmpty) return null;
-    if (hex == 'white') return Colors.white;
-    if (hex == 'black') return Colors.black;
-    if (hex == 'transparent') return Colors.transparent;
-    if (hex == 'grey') return Colors.grey;
-    if (hex == 'red') return Colors.red;
-    if (hex == 'blue') return Colors.blue;
-    if (hex == 'green') return Colors.green;
-    if (hex == 'yellow') return Colors.yellow;
-    if (hex == 'orange') return Colors.orange;
-
-    final s = hex.replaceFirst('#', '');
-    final v = int.tryParse(s, radix: 16);
-    if (v == null) return null;
-    if (s.length <= 6) {
-      return Color(0xFF000000 | v);
-    }
-    return Color(v);
   }
 
   static ScrollPhysics? physics(String? v) {
@@ -243,32 +307,28 @@ class WidgetUtils {
   }
 
   static BoxDecoration? boxDecorationFromProps(Map<String, dynamic> props) {
-    Color? color = colorFromHex(props['color'] as String?);
-    BorderRadius? borderRadius = getBorderRadius(props['borderRadius']);
-    Border? border = getBorder(props['border']);
-    List<BoxShadow>? boxShadow = getBoxShadow(props['boxShadow']);
-
     final decorationProp = props['decoration'];
-    if (decorationProp is Map) {
-      final m = Map<String, dynamic>.from(decorationProp);
-      if (m['color'] != null) {
-        color = colorFromHex(m['color'] as String?);
-      }
-      if (m['borderRadius'] != null) {
-        borderRadius = getBorderRadius(m['borderRadius']);
-      }
-      if (m['border'] != null) {
-        border = getBorder(m['border']);
-      }
-      if (m['boxShadow'] != null) {
-        boxShadow = getBoxShadow(m['boxShadow']);
-      }
-    }
+    final Map<String, dynamic>? dec =
+        decorationProp is Map ? asMap(decorationProp) : null;
+
+    final colorStr = (dec != null ? dec['color'] : props['color']) as String?;
+    final borderRadiusProp =
+        dec != null ? dec['borderRadius'] : props['borderRadius'];
+    final borderProp = dec != null ? dec['border'] : props['border'];
+    final boxShadowProp = dec != null ? dec['boxShadow'] : props['boxShadow'];
+
+    final color = colorFromHex(colorStr);
+    final borderRadius = getBorderRadius(borderRadiusProp);
+    final border = getBorder(borderProp);
+    final boxShadow = getBoxShadow(boxShadowProp);
 
     if (color == null &&
         borderRadius == null &&
         border == null &&
-        boxShadow == null) return null;
+        boxShadow == null) {
+      return null;
+    }
+
     return BoxDecoration(
       color: color,
       borderRadius: borderRadius,
@@ -278,8 +338,9 @@ class WidgetUtils {
   }
 
   static List<BoxShadow>? getBoxShadow(dynamic v) {
+    if (v == null) return null;
     if (v is Map) {
-      final m = Map<String, dynamic>.from(v);
+      final m = asMap(v);
       final color = colorFromHex(m['color'] as String?) ?? Colors.black26;
       final blurRadius = sizeNum(m['blurRadius']) ?? 0.0;
       final spreadRadius = sizeNum(m['spreadRadius']) ?? 0.0;
@@ -297,6 +358,7 @@ class WidgetUtils {
         )
       ];
     } else if (v is List) {
+      if (v.isEmpty) return null;
       return v
           .map((e) => getBoxShadow(e))
           .whereType<List<BoxShadow>>()
@@ -308,7 +370,7 @@ class WidgetUtils {
 
   static Border? getBorder(dynamic v) {
     if (v is Map) {
-      final m = Map<String, dynamic>.from(v);
+      final m = asMap(v);
       final color = colorFromHex(m['color'] as String?) ?? Colors.black;
       final width = sizeNum(m['width']) ?? 1.0;
       return Border.all(color: color, width: width);
@@ -317,10 +379,11 @@ class WidgetUtils {
   }
 
   static BorderRadius? getBorderRadius(dynamic br) {
+    if (br == null) return null;
     if (br is num) {
-      return BorderRadius.circular(asDouble(br));
+      return BorderRadius.circular(br.toDouble());
     } else if (br is Map) {
-      final m = Map<String, dynamic>.from(br);
+      final m = asMap(br);
       return BorderRadius.only(
         topLeft: Radius.circular(sizeNum(m['topLeft']) ?? 0),
         topRight: Radius.circular(sizeNum(m['topRight']) ?? 0),
@@ -332,42 +395,16 @@ class WidgetUtils {
   }
 
   static ScrollPhysics? scrollPhysics(String? v) {
-    switch (v) {
-      case 'never':
-        return const NeverScrollableScrollPhysics();
-      case 'bouncing':
-        return const BouncingScrollPhysics();
-      case 'clamping':
-        return const ClampingScrollPhysics();
-      case 'always':
-        return const AlwaysScrollableScrollPhysics();
-      default:
-        return null;
-    }
+    return physics(v);
   }
 
   static Curve curve(String? v) {
-    switch (v) {
-      case 'linear':
-        return Curves.linear;
-      case 'easeIn':
-        return Curves.easeIn;
-      case 'easeOut':
-        return Curves.easeOut;
-      case 'easeInOut':
-        return Curves.easeInOut;
-      case 'bounceIn':
-        return Curves.bounceIn;
-      case 'bounceOut':
-        return Curves.bounceOut;
-      default:
-        return Curves.easeInOut;
-    }
+    return parseCurve(v);
   }
 
   static SliverGridDelegate gridDelegate(dynamic v) {
     if (v is Map) {
-      final m = Map<String, dynamic>.from(v);
+      final m = asMap(v);
       final String? type = m['type']?.toString();
       if (type == 'fixedCrossAxisCount' || m['crossAxisCount'] != null) {
         return SliverGridDelegateWithFixedCrossAxisCount(

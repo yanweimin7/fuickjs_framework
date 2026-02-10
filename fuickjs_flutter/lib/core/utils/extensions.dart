@@ -31,24 +31,26 @@ double? asDoubleOrNull(dynamic value) {
 }
 
 Map<String, dynamic> asMap(dynamic value) {
-  if (value == null) return {};
+  if (value == null) return const <String, dynamic>{};
+  if (value is Map<String, dynamic>) return value;
   if (value is Map) {
     try {
-      return Map<String, dynamic>.from(value);
+      return value.cast<String, dynamic>();
     } catch (e) {
-      return {};
+      return value.map((key, value) => MapEntry(key.toString(), value));
     }
   }
-  return {};
+  return const <String, dynamic>{};
 }
 
 Map<String, dynamic>? asMapOrNull(dynamic value) {
   if (value == null) return null;
+  if (value is Map<String, dynamic>) return value;
   if (value is Map) {
     try {
-      return Map<String, dynamic>.from(value);
+      return value.cast<String, dynamic>();
     } catch (e) {
-      return null;
+      return value.map((key, value) => MapEntry(key.toString(), value));
     }
   }
   return null;
@@ -88,25 +90,19 @@ extension SafeConvert on dynamic {
   }
 
   Map<String, dynamic> get asMap {
-    if (this == null) return {};
+    if (this == null) return const {};
+    if (this is Map<String, dynamic>) return this as Map<String, dynamic>;
     if (this is Map) {
-      try {
-        return Map<String, dynamic>.from(this as Map);
-      } catch (e) {
-        return {};
-      }
+      return (this as Map).map((key, value) => MapEntry(key.toString(), value));
     }
-    return {};
+    return const {};
   }
 
   Map<String, dynamic>? get asMapOrNull {
     if (this == null) return null;
+    if (this is Map<String, dynamic>) return this as Map<String, dynamic>;
     if (this is Map) {
-      try {
-        return Map<String, dynamic>.from(this as Map);
-      } catch (e) {
-        return null;
-      }
+      return (this as Map).map((key, value) => MapEntry(key.toString(), value));
     }
     return null;
   }

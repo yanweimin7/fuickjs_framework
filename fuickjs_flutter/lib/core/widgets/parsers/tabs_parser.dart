@@ -68,8 +68,8 @@ class DefaultTabControllerParser extends WidgetParser {
     WidgetFactory factory,
   ) {
     return DefaultTabController(
-      length: asInt(props['length']) ?? 0,
-      initialIndex: asInt(props['initialIndex']) ?? 0,
+      length: asInt(props['length']),
+      initialIndex: asInt(props['initialIndex']),
       child: factory.buildFirstChild(context, children, type),
     );
   }

@@ -1,5 +1,5 @@
-import 'dart:ui';
-import 'BaseFuickService.dart';
+import 'package:flutter/foundation.dart';
+import 'base_fuick_service.dart';
 
 class NativeEventService extends BaseFuickService {
   @override
@@ -12,10 +12,10 @@ class NativeEventService extends BaseFuickService {
     // 注册供 JS 调用的 emit 方法
     registerMethod('emit', (args) {
       final List listArgs = args is List ? args : [args];
-      if (listArgs.length >= 1 && listArgs[0] is String) {
+      if (listArgs.isNotEmpty && listArgs[0] is String) {
         final event = listArgs[0] as String;
         final data = listArgs.length > 1 ? listArgs[1] : null;
-        
+
         // 触发 Flutter 端监听器
         _dispatchToFlutter(event, data);
         return true;
@@ -45,13 +45,13 @@ class NativeEventService extends BaseFuickService {
   void emit(String event, dynamic data) {
     // 调用 JS 端暴露的 NativeEvent.receive 方法
     // 我们约定通过 ctx.invoke('NativeEvent', 'receive', ...)
-    
+
     // 检查 BaseFuickService 的实现，看看是否有 context 访问权限
     if (!isDisposed) {
       try {
         ctx.invoke('NativeEvent', 'receive', [event, data]);
       } catch (e) {
-        print('Error emitting event to JS: $e');
+        debugPrint('Error emitting event to JS: $e');
       }
     }
   }
@@ -64,12 +64,12 @@ class NativeEventService extends BaseFuickService {
         try {
           callback(data);
         } catch (e) {
-          print('Error in NativeEvent listener for event $event: $e');
+          debugPrint('Error in NativeEvent listener for event $event: $e');
         }
       }
     }
   }
-  
+
   @override
   void dispose() {
     _listeners.clear();

@@ -8,11 +8,15 @@ class StackParser extends WidgetParser {
   String get type => 'Stack';
 
   @override
-  Widget parse(BuildContext context, Map<String, dynamic> props, dynamic children, WidgetFactory factory) {
+  Widget parse(BuildContext context, Map<String, dynamic> props,
+      dynamic children, WidgetFactory factory) {
+    final String? alignmentStr = props['alignment'] as String?;
+    final alignment = WidgetUtils.stackAlignment(alignmentStr);
+
     return WidgetUtils.wrapPadding(
       props,
       Stack(
-        alignment: WidgetUtils.stackAlignment(props['alignment'] as String?),
+        alignment: alignment,
         children: factory.buildChildren(context, children),
       ),
     );

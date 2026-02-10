@@ -1,6 +1,6 @@
 import '../fuick_config.dart';
 import '../utils/extensions.dart';
-import 'BaseFuickService.dart';
+import 'base_fuick_service.dart';
 
 class NavigationService extends BaseFuickService {
   @override

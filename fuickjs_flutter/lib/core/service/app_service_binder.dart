@@ -2,7 +2,7 @@ import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../container/fuick_app_controller.dart';
-import 'BaseFuickService.dart';
+import 'base_fuick_service.dart';
 import 'native_services.dart';
 
 class AppServiceBinder {

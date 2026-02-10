@@ -5,7 +5,6 @@ import '../../container/fuick_page_view.dart';
 import '../../utils/extensions.dart';
 import '../fuick_command_listener_mixin.dart';
 import '../fuick_dsl_cache_mixin.dart';
-import '../fuick_node.dart';
 import '../fuick_state_widgets.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
@@ -30,6 +29,10 @@ class GridViewParser extends WidgetParser {
   ) {
     final String? refId = props['refId']?.toString();
     final dynamic cacheKey = props['cacheKey'];
+    final bool shrinkWrap = props['shrinkWrap'] ?? true;
+    final String? physicsProp = props['physics'] as String?;
+    final dynamic paddingProp = props['padding'];
+    final String? scrollDirectionProp = props['scrollDirection'] as String?;
 
     final gridDelegate = WidgetUtils.gridDelegate(props);
 
@@ -40,10 +43,10 @@ class GridViewParser extends WidgetParser {
         gridDelegate: gridDelegate,
         cacheKey: cacheKey,
         itemCount: asIntOrNull(props['itemCount']),
-        shrinkWrap: props['shrinkWrap'] ?? true,
-        physics: WidgetUtils.scrollPhysics(props['physics'] as String?),
-        padding: WidgetUtils.edgeInsets(props['padding']),
-        scrollDirection: WidgetUtils.axis(props['scrollDirection'] as String?),
+        shrinkWrap: shrinkWrap,
+        physics: WidgetUtils.scrollPhysics(physicsProp),
+        padding: WidgetUtils.edgeInsets(paddingProp),
+        scrollDirection: WidgetUtils.axis(scrollDirectionProp),
         itemBuilder: (context, index) {
           final bool hasBuilder = props['hasBuilder'] ?? false;
           if (!hasBuilder || refId == null) return Container();
@@ -59,9 +62,7 @@ class GridViewParser extends WidgetParser {
             dslOrFuture = state.getCachedDsl(index);
           }
 
-          if (dslOrFuture == null) {
-            dslOrFuture = appScope.getItemDSL(pageScope.pageId, refId, index);
-          }
+          dslOrFuture ??= appScope.getItemDSL(pageScope.pageId, refId, index);
 
           return FuickItemDSLBuilder(
             dslOrFuture: dslOrFuture,
@@ -83,9 +84,9 @@ class GridViewParser extends WidgetParser {
 
   Widget _buildItem(BuildContext context, WidgetFactory factory, dynamic dsl) {
     final manager = FuickNodeManagerProvider.of(context);
-    if (manager != null && dsl is Map && dsl.containsKey('id')) {
+    if (dsl is Map && dsl.containsKey('id')) {
       // Create/Update node in manager to ensure it receives incremental updates
-      final node = manager.createNode(Map<String, dynamic>.from(dsl), manager);
+      final node = manager.createNode(asMap(dsl), manager);
       // Force wrap in _FuickNodeWidget to listen for updates
       return factory.buildFromNode(context, node, forceWrap: true);
     }

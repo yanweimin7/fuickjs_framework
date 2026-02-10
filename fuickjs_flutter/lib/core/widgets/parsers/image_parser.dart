@@ -12,25 +12,32 @@ class ImageParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
-    final url = (props['url'] ?? '') as String;
-    final fit = WidgetUtils.boxFit(props['fit'] as String?);
-    final borderRadius = WidgetUtils.getBorderRadius(props['borderRadius']);
+    final String url = (props['url'] ?? '') as String;
+    final dynamic widthProp = props['width'];
+    final dynamic heightProp = props['height'];
+    final String? fitStr = props['fit'] as String?;
+    final dynamic borderRadiusProp = props['borderRadius'];
+
+    final width = WidgetUtils.sizeNum(widthProp);
+    final height = WidgetUtils.sizeNum(heightProp);
+    final fit = WidgetUtils.boxFit(fitStr);
+    final borderRadius = WidgetUtils.getBorderRadius(borderRadiusProp);
 
     Widget image;
     if (url.startsWith('http')) {
       image = CachedNetworkImage(
         imageUrl: url,
-        width: WidgetUtils.sizeNum(props['width']),
-        height: WidgetUtils.sizeNum(props['height']),
+        width: width,
+        height: height,
         fit: fit,
         placeholder: (context, url) => Container(
-          width: WidgetUtils.sizeNum(props['width']),
-          height: WidgetUtils.sizeNum(props['height']),
+          width: width,
+          height: height,
           color: Colors.grey[100],
         ),
         errorWidget: (context, url, error) => Container(
-          width: WidgetUtils.sizeNum(props['width']),
-          height: WidgetUtils.sizeNum(props['height']),
+          width: width,
+          height: height,
           color: Colors.grey[300],
           child: const Icon(Icons.error_outline),
         ),
@@ -39,15 +46,15 @@ class ImageParser extends WidgetParser {
       final base64Str = url.split(',').last;
       image = Image.memory(
         base64Decode(base64Str),
-        width: WidgetUtils.sizeNum(props['width']),
-        height: WidgetUtils.sizeNum(props['height']),
+        width: width,
+        height: height,
         fit: fit,
       );
     } else {
       image = Image.asset(
         url,
-        width: WidgetUtils.sizeNum(props['width']),
-        height: WidgetUtils.sizeNum(props['height']),
+        width: width,
+        height: height,
         fit: fit,
       );
     }

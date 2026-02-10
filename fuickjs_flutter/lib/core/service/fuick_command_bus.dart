@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 typedef FuickCommandListener = void Function(String method, dynamic args);
 
 class FuickCommandBus {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
-import '../../utils/extensions.dart';
 import 'widget_parser.dart';
 
 class AlertDialogParser extends WidgetParser {

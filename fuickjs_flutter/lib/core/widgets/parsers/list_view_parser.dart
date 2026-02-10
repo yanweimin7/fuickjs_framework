@@ -5,7 +5,6 @@ import '../../container/fuick_page_view.dart';
 import '../../utils/extensions.dart';
 import '../fuick_command_listener_mixin.dart';
 import '../fuick_dsl_cache_mixin.dart';
-import '../fuick_node.dart';
 import '../fuick_state_widgets.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
@@ -30,9 +29,13 @@ class ListViewParser extends WidgetParser {
   ) {
     final String? refId = props['refId']?.toString();
     final dynamic cacheKey = props['cacheKey'];
-
     final bool hasBuilder = props['hasBuilder'] ?? false;
     final int? itemCount = asIntOrNull(props['itemCount']);
+    final bool shrinkWrap = props['shrinkWrap'] ?? true;
+    final String? physicsProp = props['physics'] as String?;
+    final dynamic paddingProp = props['padding'];
+    final String? scrollDirectionProp =
+        props['scrollDirection'] as String? ?? props['orientation'] as String?;
 
     return WidgetUtils.wrapPadding(
       props,
@@ -40,13 +43,10 @@ class ListViewParser extends WidgetParser {
         refId: refId,
         cacheKey: cacheKey,
         itemCount: itemCount,
-        shrinkWrap: props['shrinkWrap'] ?? true,
-        physics: WidgetUtils.scrollPhysics(props['physics'] as String?),
-        padding: WidgetUtils.edgeInsets(props['padding']),
-        scrollDirection: WidgetUtils.axis(
-          props['scrollDirection'] as String? ??
-              props['orientation'] as String?,
-        ),
+        shrinkWrap: shrinkWrap,
+        physics: WidgetUtils.scrollPhysics(physicsProp),
+        padding: WidgetUtils.edgeInsets(paddingProp),
+        scrollDirection: WidgetUtils.axis(scrollDirectionProp),
         itemBuilder: hasBuilder
             ? (context, index) {
                 if (refId == null) return Container();
@@ -87,9 +87,9 @@ class ListViewParser extends WidgetParser {
 
   Widget _buildItem(BuildContext context, WidgetFactory factory, dynamic dsl) {
     final manager = FuickNodeManagerProvider.of(context);
-    if (manager != null && dsl is Map && dsl.containsKey('id')) {
+    if (dsl is Map && dsl.containsKey('id')) {
       // Create/Update node in manager to ensure it receives incremental updates
-      final node = manager.createNode(Map<String, dynamic>.from(dsl), manager);
+      final node = manager.createNode(asMap(dsl), manager);
       // Force wrap in _FuickNodeWidget to listen for updates
       return factory.buildFromNode(context, node, forceWrap: true);
     }

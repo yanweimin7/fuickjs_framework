@@ -56,7 +56,7 @@ class FuickAppContextManager {
 
   /// 移除上下文
   void removeContext(String id) {
-    final context = _contexts.remove(id);
+    _contexts.remove(id);
     _refCounts.remove(id);
     // context?.dispose(); // Manager 是否负责销毁？通常由调用者决定，或者提供 destroyContext 方法
   }

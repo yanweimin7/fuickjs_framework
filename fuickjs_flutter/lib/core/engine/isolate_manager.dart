@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:fjs_engine/core/jscontext.dart';
+
+import 'package:flutter/foundation.dart';
 
 import '../service/app_service_binder.dart';
 import '../service/console_service.dart';
@@ -13,8 +14,6 @@ class IsolateHandler {
   final SendPort mainSendPort;
 
   final Map<String, QuickJsContext> contexts = {};
-  int _activeMessageCount = 0;
-  int _maxNestingLevel = 0;
 
   IsolateHandler(this.mainSendPort);
 
@@ -67,7 +66,7 @@ class IsolateHandler {
                   });
                   return _waitForResponse(responsePort);
                 } catch (e, s) {
-                  print("Isolate onCallNative error: $e\n$s");
+                  debugPrint("Isolate onCallNative error: $e\n$s");
                   rethrow;
                 }
               };
@@ -137,12 +136,10 @@ class IsolateHandler {
             'id': id,
             'payload': result,
           });
-        } finally {
-          _activeMessageCount--;
-        }
+        } finally {}
       },
       (e, s) {
-        print("Error in IsolateManager.handleMessage: $e\n$s");
+        debugPrint("Error in IsolateManager.handleMessage: $e\n$s");
         mainSendPort.send({
           'contextId': contextId,
           'type': 'response',

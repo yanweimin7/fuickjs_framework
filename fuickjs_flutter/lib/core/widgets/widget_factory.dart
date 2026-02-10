@@ -72,6 +72,9 @@ import 'parsers/widget_parser.dart';
 import 'parsers/wrap_parser.dart';
 
 class WidgetFactory {
+  /// 全局开关，用于控制是否启用 Widget 缓存
+  static bool enableWidgetCache = false;
+
   WidgetFactory() {
     _registerDefaultParsers();
   }
@@ -177,15 +180,15 @@ class WidgetFactory {
     if (dslOrNode is! Map) {
       return const SizedBox.shrink();
     }
-    final dsl = Map<String, dynamic>.from(dslOrNode);
+    final dsl = dslOrNode;
     final typeValue = dsl['type'];
     if (typeValue is! String) {
       debugPrint('[WidgetFactory] Error: invalid dsl type: $typeValue');
       return const SizedBox.shrink();
     }
     final String type = typeValue;
-    final props = Map<String, dynamic>.from(dsl['props'] as Map? ?? {});
-    final children = (dsl['children'] as List?) ?? [];
+    final props = (dsl['props'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final children = dsl['children'] ?? [];
     return buildInternal(context, type, props, children);
   }
 
@@ -197,14 +200,24 @@ class WidgetFactory {
     if (forceWrap || node.isBoundary) {
       return _FuickNodeWidget(node: node, factory: this);
     }
-    // Pass Key based on node ID to ensure state preservation for non-boundary nodes
-    return buildInternal(
+
+    if (enableWidgetCache) {
+      final cached = node.getCachedWidget(node.version);
+      if (cached != null) return cached;
+    }
+
+    final widget = buildInternal(
       context,
       node.type,
       node.props,
       node.children,
       key: ValueKey(node.id),
     );
+
+    if (enableWidgetCache) {
+      node.setCachedWidget(node.version, widget);
+    }
+    return widget;
   }
 
   Widget buildInternal(
@@ -214,7 +227,6 @@ class WidgetFactory {
     dynamic children, {
     Key? key,
   }) {
-    // debugPrint('[WidgetFactory] building $type with props: $props');
     Widget? widget;
     final parser = _parsers[type];
     if (parser != null) {
@@ -223,14 +235,10 @@ class WidgetFactory {
       throw Exception('Unknown widget type: $type');
     }
 
-    if (widget != null) {
-      if (key != null) {
-        return KeyedSubtree(key: key, child: widget);
-      }
-      return widget;
+    if (key != null) {
+      return KeyedSubtree(key: key, child: widget);
     }
-
-    return const SizedBox.shrink();
+    return widget;
   }
 
   List<Widget> buildChildren(BuildContext context, dynamic children) {
@@ -293,66 +301,78 @@ class _FuickNodeWidget extends StatefulWidget {
 
 class _FuickNodeWidgetState extends State<_FuickNodeWidget> {
   FuickNodeManager? _manager;
-  late FuickNode _currentNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentNode = widget.node;
-  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final newManager = FuickNodeManagerProvider.of(context);
     if (_manager != newManager) {
-      if (_manager != null) {
-        _manager!.removeListener(_currentNode.id, _onNodeChanged);
-      }
+      _manager?.removeListener(widget.node.id, _update);
       _manager = newManager;
-      if (_manager != null) {
-        _manager!.addListener(_currentNode.id, _onNodeChanged);
-      }
-    }
-  }
-
-  @override
-  void didUpdateWidget(_FuickNodeWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.node.id != widget.node.id) {
-      if (_manager != null) {
-        _manager!.removeListener(oldWidget.node.id, _onNodeChanged);
-        _manager!.addListener(widget.node.id, _onNodeChanged);
-      }
-    }
-    if (oldWidget.node != widget.node) {
-      _currentNode = widget.node;
+      _manager?.addListener(widget.node.id, _update);
     }
   }
 
   @override
   void dispose() {
-    if (_manager != null) {
-      _manager!.removeListener(_currentNode.id, _onNodeChanged);
-    }
+    _manager?.removeListener(widget.node.id, _update);
     super.dispose();
   }
 
-  void _onNodeChanged(FuickNode newNode) {
+  void _update(FuickNode node) {
     if (mounted) {
-      setState(() {
-        _currentNode = newNode;
-      });
+      setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return  widget.factory.buildInternal(
-        context,
-        _currentNode.type,
-        _currentNode.props,
-        _currentNode.children,
+    if (WidgetFactory.enableWidgetCache) {
+      final cached = widget.node.getCachedWidget(widget.node.version);
+      if (cached != null) return cached;
+    }
+
+    final child = widget.factory.buildInternal(
+      context,
+      widget.node.type,
+      widget.node.props,
+      widget.node.children,
     );
+
+    if (WidgetFactory.enableWidgetCache) {
+      widget.node.setCachedWidget(widget.node.version, child);
+    }
+    return child;
   }
+}
+
+class FuickNodeManagerProvider extends InheritedWidget {
+  final FuickNodeManager manager;
+
+  const FuickNodeManagerProvider({
+    super.key,
+    required this.manager,
+    required super.child,
+  });
+
+  static FuickNodeManager? maybeOf(BuildContext context) {
+    return context
+        .getInheritedWidgetOfExactType<FuickNodeManagerProvider>()
+        ?.manager;
+  }
+
+  static FuickNodeManager of(BuildContext context) {
+    final manager = maybeOf(context);
+    if (manager == null) {
+      throw FlutterError(
+        'FuickNodeManagerProvider.of() called with a context that does not contain a FuickNodeManagerProvider.\n'
+        'No FuickNodeManagerProvider ancestor could be found starting from the context that was passed to FuickNodeManagerProvider.of().',
+      );
+    }
+    return manager;
+  }
+
+  @override
+  bool updateShouldNotify(FuickNodeManagerProvider oldWidget) =>
+      manager != oldWidget.manager;
 }

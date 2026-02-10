@@ -8,9 +8,13 @@ class PaddingParser extends WidgetParser {
   String get type => 'Padding';
 
   @override
-  Widget parse(BuildContext context, Map<String, dynamic> props, dynamic children, WidgetFactory factory) {
+  Widget parse(BuildContext context, Map<String, dynamic> props,
+      dynamic children, WidgetFactory factory) {
+    final dynamic paddingProp = props['padding'];
+    final padding = WidgetUtils.edgeInsets(paddingProp) ?? EdgeInsets.zero;
+
     return Padding(
-      padding: WidgetUtils.edgeInsets(props['padding']) ?? EdgeInsets.zero,
+      padding: padding,
       child: factory.buildFirstChild(context, children, type),
     );
   }

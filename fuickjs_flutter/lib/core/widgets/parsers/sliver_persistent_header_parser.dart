@@ -38,7 +38,9 @@ class SliverPersistentHeaderParser extends WidgetParser {
 }
 
 class _FuickPersistentHeaderDelegate extends SliverPersistentHeaderDelegate {
+  @override
   final double minExtent;
+  @override
   final double maxExtent;
   final Widget child;
 

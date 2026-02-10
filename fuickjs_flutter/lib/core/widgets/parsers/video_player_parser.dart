@@ -169,9 +169,7 @@ class FuickVideoPlayerState extends State<FuickVideoPlayer>
         break;
       case 'seekTo':
         final position = asInt(args['position']); // in milliseconds
-        if (position != null) {
-          _controller!.seekTo(Duration(milliseconds: position));
-        }
+        _controller!.seekTo(Duration(milliseconds: position));
         break;
       case 'setVolume':
         final volume = asDouble(args['volume']);

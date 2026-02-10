@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../utils/extensions.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
 import 'widget_parser.dart';
@@ -12,9 +11,13 @@ class TextParser extends WidgetParser {
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
     final text = (props['text'] ?? '').toString();
-    final fontSize = asDoubleOrNull(props['fontSize']);
-    final color = WidgetUtils.colorFromHex(props['color'] as String?);
-    final fontWeight = props['fontWeight'] == 'bold' ? FontWeight.bold : null;
+    final dynamic fontSizeProp = props['fontSize'];
+    final String? colorProp = props['color'] as String?;
+    final String? fontWeightProp = props['fontWeight'] as String?;
+
+    final fontSize = WidgetUtils.asDoubleOrNull(fontSizeProp);
+    final color = WidgetUtils.colorFromHex(colorProp);
+    final fontWeight = fontWeightProp == 'bold' ? FontWeight.bold : null;
 
     return WidgetUtils.wrapPadding(
       props,

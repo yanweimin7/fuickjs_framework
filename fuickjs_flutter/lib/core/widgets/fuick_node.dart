@@ -8,6 +8,23 @@ class FuickNode {
   bool isBoundary;
   Map<String, dynamic> props;
   List<FuickNode> children;
+  int version = 0;
+  Widget? _cachedWidget;
+  int _cachedVersion = -1;
+  final Map<String, dynamic> _resolvedProps = {};
+  int _resolvedVersion = -1;
+
+  Widget? getCachedWidget(int currentVersion) {
+    if (_cachedVersion == currentVersion) {
+      return _cachedWidget;
+    }
+    return null;
+  }
+
+  void setCachedWidget(int version, Widget widget) {
+    _cachedVersion = version;
+    _cachedWidget = widget;
+  }
 
   FuickNode({
     required this.id,
@@ -22,76 +39,95 @@ class FuickNode {
     List<FuickNode> newChildren,
     FuickNodeManager manager,
   ) {
-    props = _processProps(newProps, manager);
-    children = newChildren;
+    bool changed = false;
+
+    // 1. Update children
+    if (children.length != newChildren.length) {
+      changed = true;
+    } else {
+      for (int i = 0; i < children.length; i++) {
+        if (children[i] != newChildren[i]) {
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    // 2. Update props
+    if (!changed && !identical(props, newProps)) {
+      if (props.length != newProps.length) {
+        changed = true;
+      } else {
+        for (final key in newProps.keys) {
+          if (props[key] != newProps[key]) {
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (changed) {
+      children = newChildren;
+      props = newProps;
+      version++;
+    }
   }
 
-  Map<String, dynamic> _processProps(
-    Map<String, dynamic> rawProps,
-    FuickNodeManager manager,
-  ) {
-    if (rawProps.isEmpty) return rawProps;
-    final Map<String, dynamic> processed = {};
-    rawProps.forEach((key, value) {
-      processed[key] = _findAndUpgradeNodes(value, manager);
-    });
-    return processed;
-  }
-
-  dynamic _findAndUpgradeNodes(dynamic value, FuickNodeManager manager) {
-    if (value == null) return null;
-    if (value is num || value is String || value is bool) return value;
-
+  /// 按需处理属性中的节点升级
+  dynamic _resolveValue(dynamic value, FuickNodeManager manager) {
     if (value is Map) {
-      if (value.containsKey('id') && value.containsKey('type')) {
-        final String type = value['type'];
-
-        ///挂载到属性上的节点要解析出来 ， 比如  appBar={<AppBar title={<Text text="title" />} />}
+      final type = value['type'];
+      if (type is String && value.containsKey('id')) {
         if (type == 'flutter-props' ||
             type == 'FlutterProps' ||
             type == 'Props') {
-          // Special handling for FlutterProps: extract and upgrade its children
           final childrenDsl = value['children'] as List?;
           if (childrenDsl == null || childrenDsl.isEmpty) return null;
-
           final upgradedChildren = childrenDsl
-              .map((c) => _findAndUpgradeNodes(c, manager))
+              .map((c) => _resolveValue(c, manager))
               .where((e) => e != null)
               .toList();
-
           if (upgradedChildren.isEmpty) return null;
           return upgradedChildren.length == 1
               ? upgradedChildren.first
               : upgradedChildren;
         }
-
-        // 这是一个 DSL 节点，升级为 FuickNode
-        return manager.createNode(
-          Map<String, dynamic>.from(value),
-          manager,
-        );
+        return manager.createNode(asMap(value), manager);
       }
-
-      // Plain map, process its values
-      final Map<String, dynamic> processedMap = {};
-      bool changed = false;
-      value.forEach((k, v) {
-        final upgraded = _findAndUpgradeNodes(v, manager);
-        processedMap[k.toString()] = upgraded;
-        if (upgraded != v) changed = true;
-      });
-      return changed ? processedMap : value;
-    } else if (value is List) {
-      final List<dynamic> processedList = [];
-      bool changed = false;
-      for (final e in value) {
-        final upgraded = _findAndUpgradeNodes(e, manager);
-        processedList.add(upgraded);
-        if (upgraded != e) changed = true;
-      }
-      return changed ? processedList : value;
+      return value;
     }
     return value;
+  }
+
+  T? getProp<T>(String key, {FuickNodeManager? manager}) {
+    if (_resolvedVersion != version) {
+      _resolvedProps.clear();
+      _resolvedVersion = version;
+    }
+
+    if (_resolvedProps.containsKey(key)) {
+      final cached = _resolvedProps[key];
+      if (cached is T) return cached;
+      return null;
+    }
+
+    final val = props[key];
+    if (val == null) return null;
+
+    // 如果是 Map 且可能是节点，尝试升级
+    if (val is Map && manager != null) {
+      final resolved = _resolveValue(val, manager);
+      _resolvedProps[key] = resolved;
+      if (resolved is T) return resolved;
+      return null;
+    }
+
+    if (val is T) {
+      _resolvedProps[key] = val;
+      return val;
+    }
+    return null;
   }
 }
 
@@ -126,23 +162,23 @@ class FuickNodeManager {
     final id = asInt(dsl['id']);
     final type = dsl['type'] as String;
     final isBoundary = dsl['isBoundary'] == true;
-    final props = dsl['props'] as Map? ?? {};
-    final childrenDsl = (dsl['children'] as List?) ?? [];
+    final props = (dsl['props'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final childrenDsl = (dsl['children'] as List?) ?? const [];
 
     // 1. Recursively create/update children
-    final List<FuickNode> children = childrenDsl
-        .map((c) => createNode(c as Map<String, dynamic>, manager))
-        .toList();
+    List<FuickNode> children;
+    if (childrenDsl.isEmpty) {
+      children = const [];
+    } else {
+      children = childrenDsl.map((c) => createNode(asMap(c), manager)).toList();
+    }
 
     // 2. Check for existing node to reuse
     final existingNode = _nodes[id];
     if (existingNode != null && existingNode.type == type) {
       existingNode.isBoundary = isBoundary;
-      existingNode.update(
-        Map<String, dynamic>.from(props),
-        children,
-        manager,
-      );
+      existingNode.update(props, children, manager);
       return existingNode;
     }
 
@@ -151,14 +187,11 @@ class FuickNodeManager {
       id: id,
       type: type,
       isBoundary: isBoundary,
-      props: {},
-      children: [],
+      props: props,
+      children: children,
     );
 
-    // 4. Update props and children
-    node.update(Map<String, dynamic>.from(props), children, manager);
-
-    // 5. Cache node
+    // 4. Cache node
     _nodes[id] = node;
 
     return node;
@@ -167,13 +200,9 @@ class FuickNodeManager {
   void applyPatches(List<dynamic> patches, FuickNodeManager manager) {
     for (final patch in patches) {
       if (patch is! Map) continue;
-      final dsl = Map<String, dynamic>.from(patch);
+      final dsl = patch.cast<String, dynamic>();
       final id = asInt(dsl['id']);
-
-      // createNode now handles reuse internally
       final node = createNode(dsl, manager);
-
-      // Trigger UI refresh for the patched node
       manager.notify(id, node);
     }
   }
@@ -185,101 +214,45 @@ class FuickNodeManager {
       if (opCode == 1) {
         // UPDATE: id, props
         final id = asInt(ops[i++]);
-        final props = ops[i++] as Map;
+        final newProps = ops[i++] as Map;
         final node = _nodes[id];
         if (node != null) {
-          final processed = node._processProps(
-            Map<String, dynamic>.from(props),
-            manager,
-          );
-          node.props.addAll(processed);
+          // 增量更新 props
+          final mergedProps = Map<String, dynamic>.from(node.props);
+          newProps.forEach((k, v) => mergedProps[k.toString()] = v);
+          node.update(mergedProps, node.children, manager);
           manager.notify(id, node);
-        } else {
-          debugPrint(
-              '[FuickNodeManager] UPDATE op failed: Node $id not found. Props: $props');
         }
       } else if (opCode == 2) {
         // INSERT: parentId, childId, index, childDsl
         final parentId = asInt(ops[i++]);
-        final childId = asInt(ops[i++]);
+        i++; // skip childId as it is in childDsl
         final index = asInt(ops[i++]);
         final childDsl = ops[i++];
 
         final parent = _nodes[parentId];
         if (parent != null) {
-          // Ensure child is removed from old location/nodes if it existed (handled by explicit REMOVE op usually, but safety check?)
-          // Usually REMOVE op comes before INSERT for moves.
-          // But createNode will overwrite _nodes[childId].
-          final childNode = createNode(
-            Map<String, dynamic>.from(childDsl),
-            manager,
-          );
-
+          final childNode = createNode(asMap(childDsl), manager);
           if (index >= 0 && index <= parent.children.length) {
             parent.children.insert(index, childNode);
           } else {
             parent.children.add(childNode);
           }
+          parent.version++;
           manager.notify(parentId, parent);
-        } else {
-          debugPrint(
-              '[FuickNodeManager] INSERT op failed: Parent $parentId not found. Child: $childId');
         }
       } else if (opCode == 3) {
-        // REMOVE: parentId, childId
+        // DELETE: parentId, childId
         final parentId = asInt(ops[i++]);
         final childId = asInt(ops[i++]);
 
         final parent = _nodes[parentId];
         if (parent != null) {
           parent.children.removeWhere((c) => c.id == childId);
-          _removeNodeRecursive(childId);
+          parent.version++;
           manager.notify(parentId, parent);
-        } else {
-          debugPrint(
-              '[FuickNodeManager] REMOVE op failed: Parent $parentId not found. Child: $childId');
         }
-      } else {
-        debugPrint(
-            '[FuickNodeManager] Unknown OpCode: $opCode at index ${i - 1}');
       }
     }
-  }
-
-  void _removeNodeRecursive(int id) {
-    final node = _nodes[id];
-    if (node != null) {
-      for (final child in node.children) {
-        _removeNodeRecursive(child.id);
-      }
-      _nodes.remove(id);
-      _listeners.remove(id);
-    }
-  }
-
-  void clear() {
-    _listeners.clear();
-    _nodes.clear();
-  }
-}
-
-class FuickNodeManagerProvider extends InheritedWidget {
-  final FuickNodeManager manager;
-
-  const FuickNodeManagerProvider({
-    super.key,
-    required this.manager,
-    required super.child,
-  });
-
-  static FuickNodeManager? of(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<FuickNodeManagerProvider>()
-        ?.manager;
-  }
-
-  @override
-  bool updateShouldNotify(FuickNodeManagerProvider oldWidget) {
-    return manager != oldWidget.manager;
   }
 }

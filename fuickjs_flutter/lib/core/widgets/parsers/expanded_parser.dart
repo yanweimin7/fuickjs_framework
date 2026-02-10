@@ -10,7 +10,7 @@ class ExpandedParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
-    final flex = asIntOrNull(props['flex']) ?? 1;
+    final int flex = asIntOrNull(props['flex']) ?? 1;
     return Expanded(
       flex: flex,
       child: factory.buildFirstChild(context, children, type),

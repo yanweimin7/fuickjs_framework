@@ -11,18 +11,28 @@ class WrapParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
+    final String? directionStr = props['direction'] as String?;
+    final String? alignmentStr = props['alignment'] as String?;
+    final dynamic spacingProp = props['spacing'];
+    final String? runAlignmentStr = props['runAlignment'] as String?;
+    final dynamic runSpacingProp = props['runSpacing'];
+    final String? crossAxisAlignmentStr = props['crossAxisAlignment'] as String?;
+    final String? textDirectionStr = props['textDirection'] as String?;
+    final String? verticalDirectionStr = props['verticalDirection'] as String?;
+    final String? clipBehaviorStr = props['clipBehavior'] as String?;
+
     return Wrap(
-      direction: WidgetUtils.axis(props['direction'] as String?),
-      alignment: _wrapAlignment(props['alignment'] as String?),
-      spacing: asDouble(props['spacing']),
-      runAlignment: _wrapAlignment(props['runAlignment'] as String?),
-      runSpacing: asDouble(props['runSpacing']),
+      direction: WidgetUtils.axis(directionStr),
+      alignment: _wrapAlignment(alignmentStr),
+      spacing: asDouble(spacingProp),
+      runAlignment: _wrapAlignment(runAlignmentStr),
+      runSpacing: asDouble(runSpacingProp),
       crossAxisAlignment:
-          _wrapCrossAlignment(props['crossAxisAlignment'] as String?),
-      textDirection: _textDirection(props['textDirection'] as String?),
+          _wrapCrossAlignment(crossAxisAlignmentStr),
+      textDirection: _textDirection(textDirectionStr),
       verticalDirection:
-          _verticalDirection(props['verticalDirection'] as String?),
-      clipBehavior: _clipBehavior(props['clipBehavior'] as String?),
+          _verticalDirection(verticalDirectionStr),
+      clipBehavior: _clipBehavior(clipBehaviorStr),
       children: factory.buildChildren(context, children),
     );
   }

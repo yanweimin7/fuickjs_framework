@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   fjs_engine: #^0.0.2
     path: ../../fuickjs_core
+  easy_isolate: ^1.0.1
   cached_network_image: ^3.4.1
   web_socket_channel: ^3.0.1
   http: ^1.6.0

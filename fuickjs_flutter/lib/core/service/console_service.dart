@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'BaseFuickService.dart';
+import 'base_fuick_service.dart';
 
 class ConsoleService extends BaseFuickService {
   @override

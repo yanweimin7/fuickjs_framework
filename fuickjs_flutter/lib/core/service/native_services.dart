@@ -1,4 +1,4 @@
-import 'BaseFuickService.dart';
+import 'base_fuick_service.dart';
 import 'clipboard_service.dart';
 import 'console_service.dart';
 import 'native_event_service.dart';

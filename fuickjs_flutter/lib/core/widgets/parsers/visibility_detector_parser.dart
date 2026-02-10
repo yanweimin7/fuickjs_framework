@@ -19,7 +19,7 @@ class VisibilityDetectorParser extends WidgetParser {
       // For now, if no key, we can't use VisibilityDetector effectively as it loses state/tracking.
       // But maybe we return a warning or just a unique key (which might cause issues).
       // Let's assume the user MUST provide a key or refId.
-      return factory.buildFirstChild(context, children, type) ?? SizedBox();
+      return factory.buildFirstChild(context, children, type);
     }
 
     return VisibilityDetector(
@@ -38,7 +38,7 @@ class VisibilityDetectorParser extends WidgetParser {
           });
         }
       },
-      child: factory.buildFirstChild(context, children, type) ?? SizedBox(),
+      child: factory.buildFirstChild(context, children, type),
     );
   }
 }

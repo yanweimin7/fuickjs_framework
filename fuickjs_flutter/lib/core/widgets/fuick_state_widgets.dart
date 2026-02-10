@@ -60,7 +60,7 @@ class _FuickPageViewState extends State<FuickPageView>
   @override
   void initState() {
     super.initState();
-    print(
+    debugPrint(
         '[FuickPageView] initState refId=${widget.refId} initialPage=${widget.initialPage}');
     _controller = PageController(initialPage: widget.initialPage);
     widget.onControllerCreated?.call(_controller);
@@ -102,7 +102,7 @@ class _FuickPageViewState extends State<FuickPageView>
 
   @override
   void dispose() {
-    print('[FuickPageView] dispose refId=${widget.refId}');
+    debugPrint('[FuickPageView] dispose refId=${widget.refId}');
     widget.onDispose?.call(_controller);
     _controller.dispose();
     super.dispose();

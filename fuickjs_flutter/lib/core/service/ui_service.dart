@@ -1,8 +1,5 @@
-import 'package:flutter/foundation.dart';
-import '../widgets/widget_factory.dart';
 import '../utils/extensions.dart';
-import 'BaseFuickService.dart';
-import 'fuick_command_bus.dart';
+import 'base_fuick_service.dart';
 
 class UIService extends BaseFuickService {
   @override
@@ -14,8 +11,7 @@ class UIService extends BaseFuickService {
       if (listArgs.length == 1 && listArgs[0] is Map) {
         final m = listArgs[0] as Map;
         final pageId = asIntOrNull(m['pageId']);
-        final renderData = (m['renderData'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{};
+        final renderData = asMap(m['renderData']);
         if (pageId != null) {
           controller?.render(pageId, renderData);
           return true;

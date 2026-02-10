@@ -7,7 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'fuick_app_view.dart';
 
-const DebugRouteName = '/dev';
+const debugRouteName = '/dev';
 
 /// 调试专用的 FuickApp 页面
 /// 负责处理 WebSocket 连接、接收重载信号并管理 [FuickAppView] 的生命周期
@@ -110,10 +110,12 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
       if (_isShowingPreview) {
         Navigator.of(
           context,
-        ).popUntil((e) => (e.settings.name) == DebugRouteName);
+        ).popUntil((e) => (e.settings.name) == debugRouteName);
         // 给一点点时间让 pop 动画执行或状态重置
         await Future.delayed(const Duration(milliseconds: 500));
       }
+
+      if (!mounted) return;
 
       // 2. 自动打开一个新页面加载 FuickAppView
       Navigator.of(context).push(

@@ -8,15 +8,30 @@ class ContainerParser extends WidgetParser {
   String get type => 'Container';
 
   @override
-  Widget parse(BuildContext context, Map<String, dynamic> props, dynamic children, WidgetFactory factory) {
+  Widget parse(BuildContext context, Map<String, dynamic> props,
+      dynamic children, WidgetFactory factory) {
+    final widthProp = props['width'];
+    final heightProp = props['height'];
+    final constraintsProp = props['constraints'];
+    final alignmentStr = props['alignment'] as String?;
+    final paddingProp = props['padding'];
+    final marginProp = props['margin'];
+
+    final width = WidgetUtils.sizeNum(widthProp);
+    final height = WidgetUtils.sizeNum(heightProp);
+    final constraints = WidgetUtils.boxConstraints(constraintsProp);
+    final alignment = WidgetUtils.alignment(alignmentStr);
+    final padding = WidgetUtils.edgeInsets(paddingProp);
+    final margin = WidgetUtils.edgeInsets(marginProp);
     final decoration = WidgetUtils.boxDecorationFromProps(props);
+
     return Container(
-      width: WidgetUtils.sizeNum(props['width']),
-      height: WidgetUtils.sizeNum(props['height']),
-      constraints: WidgetUtils.boxConstraints(props['constraints']),
-      alignment: WidgetUtils.alignment(props['alignment'] as String?),
-      padding: WidgetUtils.edgeInsets(props['padding']),
-      margin: WidgetUtils.edgeInsets(props['margin']),
+      width: width,
+      height: height,
+      constraints: constraints,
+      alignment: alignment,
+      padding: padding,
+      margin: margin,
       decoration: decoration,
       child: factory.buildFirstChild(context, children, type),
     );

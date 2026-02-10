@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/services.dart';

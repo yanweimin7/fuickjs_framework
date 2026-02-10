@@ -20,6 +20,9 @@ class SingleChildScrollViewParser extends WidgetParser {
     WidgetFactory factory,
   ) {
     final String? refId = props['refId']?.toString();
+    final String? physicsStr = props['physics'] as String?;
+    final dynamic paddingProp = props['padding'];
+    final String? scrollDirectionStr = props['scrollDirection'] as String?;
 
     return WidgetUtils.wrapPadding(
       props,
@@ -29,11 +32,9 @@ class SingleChildScrollViewParser extends WidgetParser {
         builder: (context, controller) {
           return SingleChildScrollView(
             controller: controller,
-            physics: WidgetUtils.scrollPhysics(props['physics'] as String?),
-            padding: WidgetUtils.edgeInsets(props['padding']),
-            scrollDirection: WidgetUtils.axis(
-              props['scrollDirection'] as String?,
-            ),
+            physics: WidgetUtils.scrollPhysics(physicsStr),
+            padding: WidgetUtils.edgeInsets(paddingProp),
+            scrollDirection: WidgetUtils.axis(scrollDirectionStr),
             child: factory.buildFirstChild(context, children, type),
           );
         },

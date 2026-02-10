@@ -16,10 +16,15 @@ class IconParser extends WidgetParser {
     dynamic children,
     WidgetFactory factory,
   ) {
-    final cp = asIntOrNull(props['codePoint']);
-    final name = props['name']?.toString();
-    final color = WidgetUtils.colorFromHex(props['color'] as String?);
-    final size = WidgetUtils.sizeNum(props['size']);
+    final dynamic cpProp = props['codePoint'];
+    final dynamic nameProp = props['name'];
+    final String? colorProp = props['color'] as String?;
+    final dynamic sizeProp = props['size'];
+
+    final int? cp = asIntOrNull(cpProp);
+    final String? name = nameProp?.toString();
+    final Color? color = WidgetUtils.colorFromHex(colorProp);
+    final double? size = WidgetUtils.sizeNum(sizeProp);
 
     IconData data;
     if (cp != null) {

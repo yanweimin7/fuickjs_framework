@@ -19,6 +19,10 @@ class AppBarParser extends WidgetParser {
     final leadingDsl = props['leading'];
     final actionsDsl = props['actions'];
     final bottomDsl = props['bottom'];
+    final String? backgroundColorProp = props['backgroundColor'] as String?;
+    final String? foregroundColorProp = props['foregroundColor'] as String?;
+    final bool? centerTitleProp = props['centerTitle'] as bool?;
+    final dynamic elevationProp = props['elevation'];
 
     List<Widget>? actions;
     if (actionsDsl is List) {
@@ -50,14 +54,10 @@ class AppBarParser extends WidgetParser {
               : null),
       actions: actions,
       bottom: bottom,
-      backgroundColor: WidgetUtils.colorFromHex(
-        props['backgroundColor'] as String?,
-      ),
-      foregroundColor: WidgetUtils.colorFromHex(
-        props['foregroundColor'] as String?,
-      ),
-      centerTitle: props['centerTitle'] as bool?,
-      elevation: WidgetUtils.sizeNum(props['elevation']),
+      backgroundColor: WidgetUtils.colorFromHex(backgroundColorProp),
+      foregroundColor: WidgetUtils.colorFromHex(foregroundColorProp),
+      centerTitle: centerTitleProp,
+      elevation: WidgetUtils.sizeNum(elevationProp),
     );
   }
 
@@ -82,10 +82,10 @@ class AppBarParser extends WidgetParser {
 
 class _PreferredSizeKeyedSubtree extends KeyedSubtree
     implements PreferredSizeWidget {
-  _PreferredSizeKeyedSubtree({
-    required Key? key,
-    required PreferredSizeWidget child,
-  }) : super(key: key, child: child);
+  const _PreferredSizeKeyedSubtree({
+    super.key,
+    required PreferredSizeWidget super.child,
+  });
 
   @override
   Size get preferredSize => (child as PreferredSizeWidget).preferredSize;

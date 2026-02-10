@@ -48,9 +48,9 @@ mixin FuickDslCacheMixin<T extends FuickDslWidget>
     if (!mounted) return false;
 
     if (method == 'updateItem') {
-      final int? index = asInt(args['index']);
+      final int index = asInt(args['index']);
       final dynamic dsl = args['dsl'];
-      if (index != null && dsl != null) {
+      if (dsl != null) {
         setCachedDsl(index, dsl);
         forceUpdate();
         return true;
@@ -61,9 +61,9 @@ mixin FuickDslCacheMixin<T extends FuickDslWidget>
         bool changed = false;
         for (final item in items) {
           if (item is Map) {
-            final int? index = asInt(item['index']);
+            final int index = asInt(item['index']);
             final dynamic dsl = item['dsl'];
-            if (index != null && dsl != null) {
+            if (dsl != null) {
               _dslCache[index] = dsl;
               changed = true;
             }

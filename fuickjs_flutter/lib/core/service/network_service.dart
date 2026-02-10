@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'BaseFuickService.dart';
+import 'base_fuick_service.dart';
 
 class NetworkService extends BaseFuickService {
   @override

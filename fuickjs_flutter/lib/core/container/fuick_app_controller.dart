@@ -1,7 +1,7 @@
 import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
 
-import '../service/BaseFuickService.dart';
+import '../service/base_fuick_service.dart';
 import '../service/app_service_binder.dart';
 import '../service/fuick_command_bus.dart';
 import '../widgets/widget_factory.dart';
