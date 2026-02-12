@@ -61,17 +61,24 @@ export function createRenderer(): Renderer {
   return {
     update(element: React.ReactNode, pageId: number) {
       const root = ensureRoot(pageId);
+      let retryCount = 0;
+      const maxRetries = 100; // Prevent infinite loop
 
       const performUpdate = () => {
         try {
           reconciler.updateContainer(element, root, null, () => {
             // Success
           });
+          retryCount = 0; // Reset on success
         } catch (e: unknown) {
           const msg = (e as Error).message || String(e);
-          if (msg.includes('327') || msg.includes('working')) {
+          if ((msg.includes('327') || msg.includes('working')) && retryCount < maxRetries) {
+            retryCount++;
             globalThis.setTimeout(performUpdate, 16);
           } else {
+            if (retryCount >= maxRetries) {
+              console.error(`[Renderer] Max retries exceeded for page ${pageId}`);
+            }
             console.error(`[Renderer] Error updating page ${pageId}:`, e);
             ErrorHandler.notify(e, 'render', { pageId });
           }
@@ -84,6 +91,9 @@ export function createRenderer(): Renderer {
     destroy(pageId: number) {
       const root = roots[pageId];
       if (root) {
+        let retryCount = 0;
+        const maxRetries = 100; // Prevent infinite loop
+
         const performDestroy = () => {
           try {
             reconciler.updateContainer(null, root, null, () => {
@@ -93,9 +103,13 @@ export function createRenderer(): Renderer {
             delete containers[pageId];
           } catch (e: unknown) {
             const msg = (e as Error).message || String(e);
-            if (msg.includes('327') || msg.includes('working')) {
+            if ((msg.includes('327') || msg.includes('working')) && retryCount < maxRetries) {
+              retryCount++;
               globalThis.setTimeout(performDestroy, 16);
             } else {
+              if (retryCount >= maxRetries) {
+                console.error(`[Renderer] Max retries exceeded for destroying page ${pageId}`);
+              }
               console.error(`[Renderer] Error destroying page ${pageId}:`, e);
               ErrorHandler.notify(e, 'render', { pageId });
               delete roots[pageId];

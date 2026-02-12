@@ -44,14 +44,28 @@ class IsolateWorker {
     final id = '${_requestId++}';
     final completer = Completer<dynamic>();
     _pendingRequests[id] = completer;
-    _worker.sendMessage({
-      'contextId': contextId,
-      'type': type,
-      'id': id,
-      'payload': payload,
-    });
+    
+    try {
+      _worker.sendMessage({
+        'contextId': contextId,
+        'type': type,
+        'id': id,
+        'payload': payload,
+      });
+    } catch (e) {
+      // If send fails, remove the pending request and complete with error
+      _pendingRequests.remove(id);
+      completer.completeError(e);
+    }
 
-    return completer.future;
+    // Add timeout to prevent indefinite waiting
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        _pendingRequests.remove(id);
+        throw TimeoutException('Request $type timed out after 30 seconds');
+      },
+    );
   }
 
   /// Main isolate handler for messages from child isolate

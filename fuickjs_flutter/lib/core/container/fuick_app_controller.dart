@@ -92,9 +92,16 @@ class FuickAppController {
       page.getItemDSL(pageId, refId, index);
 
   void dispose() {
-    Future.delayed(const Duration(seconds: 10), () {
-      ctx.dispose();
-      serviceBinder.dispose(ctx);
+    // Store context locally to avoid race conditions
+    final currentCtx = ctx;
+    final currentServiceBinder = serviceBinder;
+    
+    // Use a shorter delay and add cleanup tracking
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!currentCtx.isDisposed) {
+        currentCtx.dispose();
+      }
+      currentServiceBinder.dispose(currentCtx);
     });
   }
 }

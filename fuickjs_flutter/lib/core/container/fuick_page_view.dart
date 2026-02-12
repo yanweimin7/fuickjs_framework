@@ -32,6 +32,8 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   FuickNode? rootNode;
   bool _hasRendered = false;
   bool _isVisible = false;
+  DateTime? _receiveDataTime;
+  bool _isFirstRender = true;
 
   Widget? _cachedChild;
   FuickNode? _lastBuiltNode;
@@ -103,10 +105,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   void initState() {
     super.initState();
     widget.controller.onPageRender[widget.pageId] = (dsl) {
-      // final cost = DateTime.now().difference(startTime).inMilliseconds;
-      // debugPrint(
-      //   '[Performance] First render (pageId: ${widget.pageId}) cost: ${cost}ms from initState',
-      // );
+      _receiveDataTime = DateTime.now();
 
       // Initial render completed. If the page is currently visible, we need to notify JS again.
       // The initial 'visible' event from didPush might have been missed because the JS container
@@ -172,6 +171,27 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     }
 
     if (_cachedChild == null || _lastBuiltNode != rootNode) {
+      if (_isFirstRender && _receiveDataTime != null) {
+        _isFirstRender = false;
+        final buildTime = DateTime.now();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final renderTime = DateTime.now();
+          final totalCost =
+              renderTime.difference(_receiveDataTime!).inMilliseconds;
+          final buildCost =
+              buildTime.difference(_receiveDataTime!).inMilliseconds;
+          final paintCost = renderTime.difference(buildTime).inMilliseconds;
+
+          debugPrint(
+              '[Performance] Page First Render (ID: ${widget.pageId}, Path: ${widget.routeInfo.path}):');
+          debugPrint('  - Total Cost: ${totalCost}ms');
+          debugPrint(
+              '  - Build Cost: ${buildCost}ms (UI Data -> Widget Build)');
+          debugPrint(
+              '  - Layout/Paint Cost: ${paintCost}ms (Post Frame Callback)');
+        });
+      }
+
       _lastBuiltNode = rootNode;
       _cachedChild = FuickNodeManagerProvider(
         manager: nodeManager,

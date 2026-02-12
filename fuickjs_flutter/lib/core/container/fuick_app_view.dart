@@ -68,12 +68,18 @@ class _FuickAppViewState extends State<FuickAppView> {
     }
 
     // 2. 此时 context 已经不为空 (要么是外部传入，要么是 Manager 获取/创建)
-    if (appContext!.isReady.value) {
-      _setupWithContext(appContext!);
+    final currentContext = appContext;
+    if (currentContext == null) {
+      debugPrint('[FuickAppView] Context is null after initialization');
+      return;
+    }
+
+    if (currentContext.isReady.value) {
+      _setupWithContext(currentContext);
     } else {
-      appContext!.isReady.addListener(() {
-        if (mounted && appContext!.isReady.value) {
-          _setupWithContext(appContext!);
+      currentContext.isReady.addListener(() {
+        if (mounted && currentContext.isReady.value) {
+          _setupWithContext(currentContext);
         }
       });
     }
