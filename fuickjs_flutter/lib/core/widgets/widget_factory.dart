@@ -198,7 +198,10 @@ class WidgetFactory {
     bool forceWrap = false,
   }) {
     if (forceWrap || node.isBoundary) {
-      return _FuickNodeWidget(node: node, factory: this);
+      // isBoundary 节点使用 RepaintBoundary 减少重绘区域
+      return RepaintBoundary(
+        child: _FuickNodeWidget(node: node, factory: this),
+      );
     }
 
     if (enableWidgetCache) {
