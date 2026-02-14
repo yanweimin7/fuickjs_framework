@@ -72,9 +72,6 @@ import 'parsers/widget_parser.dart';
 import 'parsers/wrap_parser.dart';
 
 class WidgetFactory {
-  /// 全局开关，用于控制是否启用 Widget 缓存
-  static bool enableWidgetCache = false;
-
   WidgetFactory() {
     _registerDefaultParsers();
   }
@@ -204,23 +201,13 @@ class WidgetFactory {
       );
     }
 
-    if (enableWidgetCache) {
-      final cached = node.getCachedWidget(node.version);
-      if (cached != null) return cached;
-    }
-
-    final widget = buildInternal(
+    return buildInternal(
       context,
       node.type,
       node.props,
       node.children,
       key: ValueKey(node.id),
     );
-
-    if (enableWidgetCache) {
-      node.setCachedWidget(node.version, widget);
-    }
-    return widget;
   }
 
   Widget buildInternal(
@@ -330,22 +317,12 @@ class _FuickNodeWidgetState extends State<_FuickNodeWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (WidgetFactory.enableWidgetCache) {
-      final cached = widget.node.getCachedWidget(widget.node.version);
-      if (cached != null) return cached;
-    }
-
-    final child = widget.factory.buildInternal(
+    return widget.factory.buildInternal(
       context,
       widget.node.type,
       widget.node.props,
       widget.node.children,
     );
-
-    if (WidgetFactory.enableWidgetCache) {
-      widget.node.setCachedWidget(widget.node.version, child);
-    }
-    return child;
   }
 }
 
