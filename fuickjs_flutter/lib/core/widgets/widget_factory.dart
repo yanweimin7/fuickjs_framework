@@ -69,6 +69,7 @@ import 'parsers/video_player_parser.dart';
 import 'parsers/visibility_detector_parser.dart';
 import 'parsers/visibility_parser.dart';
 import 'parsers/widget_parser.dart';
+import 'parsers/pointer_listener_parser.dart';
 import 'parsers/wrap_parser.dart';
 
 class WidgetFactory {
@@ -83,6 +84,7 @@ class WidgetFactory {
 
   void _registerDefaultParsers() {
     register(VisibilityParser());
+    register(PointerListenerParser());
     register(ColumnParser());
     register(RowParser());
     register(TextParser());

@@ -65,3 +65,5 @@ export * from './CustomPaint';
 export * from './VideoPlayer';
 export * from './VisibilityDetector';
 export * from './GenericPage';
+export * from './PointerListener';
+
