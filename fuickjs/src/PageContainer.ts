@@ -246,8 +246,16 @@ export class PageContainer {
   }
 
   commitTextUpdate(node: Node, text: string) {
-    node.props.text = String(text);
-    this.markChanged(node);
+    const oldText = node.props.text;
+    const newText = String(text);
+    if (oldText === newText) return;
+
+    node.props.text = newText;
+    if (this.incrementalMode) {
+      this.recordUpdate(node, ['text', newText]);
+    } else {
+      this.markChanged(node);
+    }
   }
 
   public commit() {

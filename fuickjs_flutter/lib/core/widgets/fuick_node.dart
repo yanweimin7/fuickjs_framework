@@ -9,8 +9,22 @@ class FuickNode {
   Map<String, dynamic> props;
   List<FuickNode> children;
   int version = 0;
+  Widget? _cachedWidget;
+  int _cachedVersion = -1;
   final Map<String, dynamic> _resolvedProps = {};
   int _resolvedVersion = -1;
+
+  Widget? getCachedWidget(int currentVersion) {
+    if (_cachedVersion == currentVersion) {
+      return _cachedWidget;
+    }
+    return null;
+  }
+
+  void setCachedWidget(int version, Widget widget) {
+    _cachedVersion = version;
+    _cachedWidget = widget;
+  }
 
   FuickNode({
     required this.id,

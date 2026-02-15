@@ -22,6 +22,7 @@ class ImageParser extends WidgetParser {
     final height = WidgetUtils.sizeNum(heightProp);
     final fit = WidgetUtils.boxFit(fitStr);
     final borderRadius = WidgetUtils.getBorderRadius(borderRadiusProp);
+    final bool? gaplessPlayback = props['gaplessPlayback'] as bool?;
 
     Widget image;
     if (url.startsWith('http')) {
@@ -30,6 +31,7 @@ class ImageParser extends WidgetParser {
         width: width,
         height: height,
         fit: fit,
+        useOldImageOnUrlChange: gaplessPlayback ?? false,
         placeholder: (context, url) => Container(
           width: width,
           height: height,
@@ -48,6 +50,7 @@ class ImageParser extends WidgetParser {
         base64Decode(base64Str),
         width: width,
         height: height,
+        gaplessPlayback: gaplessPlayback ?? true,
         fit: fit,
       );
     } else {
@@ -55,6 +58,7 @@ class ImageParser extends WidgetParser {
         url,
         width: width,
         height: height,
+        gaplessPlayback: gaplessPlayback ?? false,
         fit: fit,
       );
     }

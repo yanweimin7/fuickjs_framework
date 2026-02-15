@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { WidgetProps } from './types';
 import { BaseWidget } from './BaseWidget';
+import { FlutterProps } from './FlutterProps';
 
 export interface SliverAppBarProps extends WidgetProps {
   title?: ReactNode;
@@ -24,11 +25,16 @@ export class SliverAppBar extends BaseWidget<SliverAppBarProps> {
       {
         ...rest,
         isBoundary: true,
-        title: title,
-        leading: leading,
-        actions: actions,
-        bottom: bottom,
       },
+      title && React.createElement(FlutterProps, { propsKey: 'title' }, title),
+      leading && React.createElement(FlutterProps, { propsKey: 'leading' }, leading),
+      actions &&
+        actions.map((action, index) => (
+          <FlutterProps key={`action-${index}`} propsKey="actions">
+            {action}
+          </FlutterProps>
+        )),
+      bottom && React.createElement(FlutterProps, { propsKey: 'bottom' }, bottom),
       children,
     );
   }

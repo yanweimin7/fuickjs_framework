@@ -71,7 +71,9 @@ class FuickAppController {
 
   Map<int, Function(Map<String, dynamic>)> get onPageRender =>
       page.onPageRender;
+
   Map<int, Function(List<dynamic>)> get onPagePatch => page.onPagePatch;
+
   Map<int, Function(List<dynamic>)> get onPagePatchOps => page.onPagePatchOps;
 
   void render(int pageId, Map<String, dynamic> dsl) => page.render(pageId, dsl);
@@ -95,12 +97,10 @@ class FuickAppController {
     // Store context locally to avoid race conditions
     final currentCtx = ctx;
     final currentServiceBinder = serviceBinder;
-    
+
     // Use a shorter delay and add cleanup tracking
     Future.delayed(const Duration(seconds: 2), () {
-      if (!currentCtx.isDisposed) {
-        currentCtx.dispose();
-      }
+      currentCtx.dispose();
       currentServiceBinder.dispose(currentCtx);
     });
   }
