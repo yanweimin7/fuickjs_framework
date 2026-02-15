@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../../container/fuick_action.dart';
+import '../../container/fuick_app_controller.dart';
 import '../widget_factory.dart';
 import 'widget_parser.dart';
 
@@ -22,20 +23,25 @@ class VisibilityDetectorParser extends WidgetParser {
       return factory.buildFirstChild(context, children, type);
     }
 
+    // Capture the controller to use it in the callback even if the widget is unmounted.
+    final controller = FuickAppScope.of(context);
+
     return VisibilityDetector(
       key: Key(keyStr.toString()),
       onVisibilityChanged: (VisibilityInfo info) {
         if (props['onVisibilityChanged'] != null) {
-          FuickAction.event(context, props['onVisibilityChanged'], value: {
-            'visibleFraction': info.visibleFraction,
-            'size': {'width': info.size.width, 'height': info.size.height},
-            'visibleBounds': {
-              'left': info.visibleBounds.left,
-              'top': info.visibleBounds.top,
-              'width': info.visibleBounds.width,
-              'height': info.visibleBounds.height,
-            }
-          });
+          FuickAction.event(context, props['onVisibilityChanged'],
+              value: {
+                'visibleFraction': info.visibleFraction,
+                'size': {'width': info.size.width, 'height': info.size.height},
+                'visibleBounds': {
+                  'left': info.visibleBounds.left,
+                  'top': info.visibleBounds.top,
+                  'width': info.visibleBounds.width,
+                  'height': info.visibleBounds.height,
+                }
+              },
+              controller: controller);
         }
       },
       child: factory.buildFirstChild(context, children, type),
