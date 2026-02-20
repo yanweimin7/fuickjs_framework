@@ -10,12 +10,6 @@ import 'parsers/animated_positioned_parser.dart';
 import 'parsers/animated_rotation_parser.dart';
 import 'parsers/animated_scale_parser.dart';
 import 'parsers/animated_slide_parser.dart';
-import 'parsers/rotation_transition_parser.dart';
-import 'parsers/constrained_box_parser.dart';
-import 'parsers/fitted_box_parser.dart';
-import 'parsers/floating_action_button_parser.dart';
-import 'parsers/scale_transition_parser.dart';
-import 'parsers/slide_transition_parser.dart';
 import 'parsers/app_bar_parser.dart';
 import 'parsers/bottom_navigation_bar_parser.dart';
 import 'parsers/button_parser.dart';
@@ -25,12 +19,15 @@ import 'parsers/checkbox_parser.dart';
 import 'parsers/circular_progress_indicator_parser.dart';
 import 'parsers/clip_r_rect_parser.dart';
 import 'parsers/column_parser.dart';
+import 'parsers/constrained_box_parser.dart';
 import 'parsers/container_parser.dart';
 import 'parsers/custom_paint_parser.dart';
 import 'parsers/custom_scroll_view_parser.dart';
 import 'parsers/divider_parser.dart';
 import 'parsers/expanded_parser.dart';
+import 'parsers/fitted_box_parser.dart';
 import 'parsers/flexible_parser.dart';
+import 'parsers/floating_action_button_parser.dart';
 import 'parsers/gesture_detector_parser.dart';
 import 'parsers/grid_view_parser.dart';
 import 'parsers/icon_parser.dart';
@@ -44,15 +41,19 @@ import 'parsers/list_view_parser.dart';
 import 'parsers/opacity_parser.dart';
 import 'parsers/padding_parser.dart';
 import 'parsers/page_view_parser.dart';
+import 'parsers/pointer_listener_parser.dart';
 import 'parsers/positioned_parser.dart';
 import 'parsers/refresh_indicator_parser.dart';
 import 'parsers/repaint_boundary_parser.dart';
 import 'parsers/rich_text_parser.dart';
+import 'parsers/rotation_transition_parser.dart';
 import 'parsers/row_parser.dart';
 import 'parsers/safe_area_parser.dart';
 import 'parsers/scaffold_parser.dart';
+import 'parsers/scale_transition_parser.dart';
 import 'parsers/single_child_scroll_view_parser.dart';
 import 'parsers/sized_box_parser.dart';
+import 'parsers/slide_transition_parser.dart';
 import 'parsers/sliver_app_bar_parser.dart';
 import 'parsers/sliver_grid_parser.dart';
 import 'parsers/sliver_list_parser.dart';
@@ -69,7 +70,6 @@ import 'parsers/video_player_parser.dart';
 import 'parsers/visibility_detector_parser.dart';
 import 'parsers/visibility_parser.dart';
 import 'parsers/widget_parser.dart';
-import 'parsers/pointer_listener_parser.dart';
 import 'parsers/wrap_parser.dart';
 
 class WidgetFactory {
@@ -162,14 +162,6 @@ class WidgetFactory {
 
   bool hasWidget(String type) {
     return _parsers.containsKey(type);
-  }
-
-  void disposeNode(int id, String type) {
-    _parsers[type]?.dispose(id);
-  }
-
-  void dispatchCommand(String type, String refId, String method, dynamic args) {
-    _parsers[type]?.onCommand(refId, method, args);
   }
 
   Widget build(BuildContext context, dynamic dslOrNode) {

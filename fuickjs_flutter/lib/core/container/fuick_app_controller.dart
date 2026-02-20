@@ -1,8 +1,9 @@
 import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
 
-import '../service/base_fuick_service.dart';
+import '../engine/bundle_preloader.dart';
 import '../service/app_service_binder.dart';
+import '../service/base_fuick_service.dart';
 import '../service/fuick_command_bus.dart';
 import '../widgets/widget_factory.dart';
 import 'fuick_navigation_delegate.dart';
@@ -14,6 +15,8 @@ int get nextPageId {
   return ++pageId;
 }
 
+WidgetFactory widgetFactory = WidgetFactory();
+
 class FuickAppController {
   final IQuickJsContext ctx;
 
@@ -24,9 +27,12 @@ class FuickAppController {
       RouteObserver<ModalRoute<void>>();
 
   final FuickCommandBus commandBus = FuickCommandBus();
-  final WidgetFactory widgetFactory = WidgetFactory();
   final serviceBinder = AppServiceBinder();
   final ValueNotifier<bool> isBundleLoaded = ValueNotifier<bool>(false);
+
+  static Future<void> preloadBundle(String bundleName) {
+    return BundlePreloader().preloadBundle(bundleName);
+  }
 
   FuickAppController(this.ctx) {
     navigation = FuickNavigationDelegate(this);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../widget_factory.dart';
 import '../widget_utils.dart';
 import 'widget_parser.dart';
@@ -9,9 +10,6 @@ class CustomScrollViewParser extends WidgetParser {
 
   @override
   void dispose(int nodeId) {}
-
-  @override
-  void onCommand(String refId, String method, dynamic args) {}
 
   @override
   Widget parse(

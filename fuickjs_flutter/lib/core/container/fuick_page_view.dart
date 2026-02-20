@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide widgetFactory;
 
 import '../widgets/fuick_node.dart';
 import '../widgets/widget_factory.dart';
@@ -199,7 +199,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
           controller: widget.controller,
           child: FuickPageScope(
             pageId: widget.pageId,
-            child: widget.controller.widgetFactory.buildFromNode(
+            child: widgetFactory.buildFromNode(
               context,
               rootNode!,
               forceWrap: true,

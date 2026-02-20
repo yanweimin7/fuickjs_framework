@@ -4,6 +4,7 @@ import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../container/fuick_app_controller.dart';
+import 'bundle_preloader.dart';
 import 'engine.dart';
 import 'jscontext_delegate.dart';
 
@@ -23,23 +24,45 @@ class FuickAppContext {
     this.debugBusinessCode,
   });
 
-  Future<void> init() async {
+  Future<void>? _initFuture;
+
+  Future<void> init() {
+    _initFuture ??= _doInit();
+    return _initFuture!;
+  }
+
+  Future<void> _doInit() async {
     final stopwatch = Stopwatch()..start();
 
-    final contextId = '${appName}_${DateTime.now().microsecondsSinceEpoch}';
-    await EngineInit.initIsolate();
-    debugPrint(
-      '[Performance] initIsolate cost: ${stopwatch.elapsedMilliseconds}ms',
-    );
-    final delegate = JsContextDelegate(contextId);
-    await delegate.init();
-    debugPrint(
-      '[Performance] JsContextDelegate.init cost: ${stopwatch.elapsedMilliseconds}ms',
-    );
-    ctx = delegate;
-    appController = FuickAppController(ctx);
-    isReady.value = true;
-    await _loadBundle();
+    // Start bundle preloading in parallel with engine initialization
+    final frameworkPreload =
+        BundlePreloader().preloadBundle('framework.bundle');
+    final appPreload = (debugBusinessCode == null)
+        ? BundlePreloader().preloadBundle(appName)
+        : Future.value();
+
+    try {
+      final contextId = '${appName}_${DateTime.now().microsecondsSinceEpoch}';
+      await EngineInit.initIsolate();
+      debugPrint(
+        '[Performance] initIsolate cost: ${stopwatch.elapsedMilliseconds}ms',
+      );
+      final delegate = JsContextDelegate(contextId);
+      await delegate.init();
+      debugPrint(
+        '[Performance] JsContextDelegate.init cost: ${stopwatch.elapsedMilliseconds}ms',
+      );
+      ctx = delegate;
+      appController = FuickAppController(ctx);
+
+      // Wait for preloading to finish
+      await Future.wait([frameworkPreload, appPreload]);
+
+      isReady.value = true;
+      await _loadBundle();
+    } catch (e, s) {
+      debugPrint('FuickAppContext init failed: $e\n$s');
+    }
   }
 
   Future<void> _loadBundle() async {
@@ -63,13 +86,29 @@ class FuickAppContext {
       );
 
       appController.isBundleLoaded.value = true;
-    } catch (e) {
-      debugPrint('加载 React bundle 失败: $e');
+    } catch (e, s) {
+      debugPrint('加载 React bundle 失败: $e\n$s');
     }
   }
 
   Future<void> _loadSingleBundle(String bundleName) async {
     try {
+      final preloader = BundlePreloader();
+      // Try using preloaded bytecode
+      final bytecode = preloader.getByteCode(bundleName);
+      if (bytecode != null && useAotCode) {
+        await ctx.evalBinary(bytecode);
+        return;
+      }
+
+      // Try using preloaded source code
+      final sourceCode = preloader.getSourceCode(bundleName);
+      if (sourceCode != null) {
+        await ctx.eval(sourceCode);
+        return;
+      }
+
+      // Fallback to file loading if not preloaded (though it should be)
       try {
         if (useAotCode) {
           await ctx.evalBinaryFile('assets/js/$bundleName.qjc');

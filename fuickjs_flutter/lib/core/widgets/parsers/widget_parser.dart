@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../widget_factory.dart';
 
 abstract class WidgetParser {
@@ -10,8 +11,4 @@ abstract class WidgetParser {
     dynamic children,
     WidgetFactory factory,
   );
-
-  void dispose(int nodeId) {}
-
-  void onCommand(String refId, String method, dynamic args) {}
 }
