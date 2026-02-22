@@ -15,3 +15,4 @@ export * from './PageContext';
 export * from './Fuick';
 export * from './NativeEvent';
 export * from './services/ClipboardService';
+export * from './services/FileSystemService';

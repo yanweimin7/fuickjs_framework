@@ -18,8 +18,7 @@ class BundlePreloader {
   /// Preload a bundle by name.
   /// It tries to load .qjc (bytecode) first, then .js (source code).
   Future<void> preloadBundle(String bundleName) async {
-    if (_byteCodeCache.containsKey(bundleName) ||
-        _sourceCodeCache.containsKey(bundleName)) {
+    if (_byteCodeCache.containsKey(bundleName) || _sourceCodeCache.containsKey(bundleName)) {
       return;
     }
 
@@ -71,11 +70,10 @@ class BundlePreloader {
   String? getSourceCode(String bundleName) {
     return _sourceCodeCache[bundleName];
   }
-
+  
   /// Check if a bundle is cached
   bool isCached(String bundleName) {
-    return _byteCodeCache.containsKey(bundleName) ||
-        _sourceCodeCache.containsKey(bundleName);
+    return _byteCodeCache.containsKey(bundleName) || _sourceCodeCache.containsKey(bundleName);
   }
 
   /// Clear all caches
