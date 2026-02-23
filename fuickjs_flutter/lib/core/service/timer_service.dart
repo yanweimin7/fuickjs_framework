@@ -57,7 +57,7 @@ class TimerService extends BaseFuickService {
           try {
             // 在 Isolate 模式下 controller 为空，直接通过 ctx 调用
             // controller?.jsProxy.handleTimer(id);
-            ctx.invoke('fuickjs', 'handleTimer', [id]);
+            proxy.handleTimer(id);
           } catch (e) {
             logger.e('Error calling handleTimer: $e');
           }
