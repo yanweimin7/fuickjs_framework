@@ -1,11 +1,14 @@
 import 'base_fuick_service.dart';
 import 'clipboard_service.dart';
 import 'console_service.dart';
+import 'device_info_service.dart';
 import 'file_system_service.dart';
 import 'native_event_service.dart';
 import 'navigation_service.dart';
 import 'network_service.dart';
+import 'local_storage_service.dart';
 import 'timer_service.dart';
+import 'toast_service.dart';
 import 'ui_service.dart';
 
 typedef ServiceBuilder = BaseFuickService Function();
@@ -27,6 +30,9 @@ class NativeServiceManager {
     registerService(() => NativeEventService());
     registerService(() => ClipboardService());
     registerService(() => FileSystemService());
+    registerService(() => LocalStorageService());
+    registerService(() => DeviceInfoService());
+    registerService(() => ToastService());
   }
 
   void registerService(ServiceBuilder serviceBuilder) {

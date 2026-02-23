@@ -11,6 +11,8 @@ class FuickNavigationDelegate {
   final Map<int, BuildContext> _pageContexts = {};
   final Map<int, Function(dynamic)> onCloseContainer = {};
 
+  List<BuildContext> get pageContexts => _pageContexts.values.toList();
+
   FuickNavigationDelegate(this.controller);
 
   void registerNavigator(int pageId, GlobalKey<NavigatorState> key) {

@@ -16,3 +16,6 @@ export * from './Fuick';
 export * from './NativeEvent';
 export * from './services/ClipboardService';
 export * from './services/FileSystemService';
+export * from './services/LocalStorage';
+export * from './services/DeviceInfo';
+export * from './services/Toast';
