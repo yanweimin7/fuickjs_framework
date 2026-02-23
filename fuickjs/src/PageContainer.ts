@@ -68,7 +68,7 @@ export class PageContainer {
   public getCallback(nodeId: number | string, eventKey: string): ((...args: unknown[]) => unknown) | undefined {
     return this.eventCallbacks.get(nodeId)?.get(eventKey);
   }
-  
+
   /**
    * 清除指定节点的所有回调（用于节点销毁时）
    */
@@ -257,6 +257,9 @@ export class PageContainer {
   appendChildToContainer(child: Node) {
     this.root = child;
     this.markChanged(child);
+    // Force a full render since the root has changed.
+    // This ensures that even in incremental mode, the new root is sent to Flutter via renderUI.
+    this.diffStrategy.rendered = false;
   }
 
   removeChildFromContainer(child: Node) {

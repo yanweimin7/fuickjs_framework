@@ -1,7 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
+import 'package:fjs_engine/core/jscontext_interface.dart';
+import 'package:fuickjs_flutter/core/engine/fuick_js_proxy.dart';
 
+import '../container/fuick_app_controller.dart';
 import '../logger.dart';
 import '../utils/extensions.dart';
 import 'base_fuick_service.dart';
@@ -11,6 +13,14 @@ class TimerService extends BaseFuickService {
   String get name => 'Timer';
 
   final Map<int, Timer> timers = {};
+
+  late FuickJsProxy proxy;
+
+  @override
+  void init(IQuickJsContext context, FuickAppController? appController) {
+    super.init(context, appController);
+    proxy = FuickJsProxy(context);
+  }
 
   TimerService() {
     registerMethod('createTimer', (args) {
@@ -32,7 +42,9 @@ class TimerService extends BaseFuickService {
             return;
           }
           try {
-            ctx.invoke(null, '__handleTimer', [id]);
+            // 在 Isolate 模式下 controller 为空，直接通过 ctx 调用
+            // controller?.jsProxy.handleTimer(id);
+            proxy.handleTimer(id);
           } catch (e) {
             timer.cancel();
             timers.remove(id);
@@ -43,9 +55,11 @@ class TimerService extends BaseFuickService {
           if (isDisposed) return;
           timers.remove(id);
           try {
-            ctx.invoke(null, '__handleTimer', [id]);
+            // 在 Isolate 模式下 controller 为空，直接通过 ctx 调用
+            // controller?.jsProxy.handleTimer(id);
+            ctx.invoke('fuickjs', 'handleTimer', [id]);
           } catch (e) {
-            logger.e('Error calling __handleTimer: $e');
+            logger.e('Error calling handleTimer: $e');
           }
         });
       }

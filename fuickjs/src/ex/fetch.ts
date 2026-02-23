@@ -25,9 +25,3 @@ export async function fetch(url: string, options: FetchOptions = {}): Promise<Fe
     json: async () => JSON.parse(result.body),
   };
 }
-
-if (typeof globalThis !== 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  globalThis.fetch = fetch;
-}

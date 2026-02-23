@@ -2,6 +2,7 @@ import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../engine/bundle_preloader.dart';
+import '../engine/fuick_js_proxy.dart';
 import '../service/app_service_binder.dart';
 import '../service/base_fuick_service.dart';
 import '../service/fuick_command_bus.dart';
@@ -19,6 +20,7 @@ WidgetFactory widgetFactory = WidgetFactory();
 
 class FuickAppController {
   final IQuickJsContext ctx;
+  late final FuickJsProxy jsProxy;
 
   late final FuickNavigationDelegate navigation;
   late final FuickPageDelegate page;
@@ -35,6 +37,7 @@ class FuickAppController {
   }
 
   FuickAppController(this.ctx) {
+    jsProxy = FuickJsProxy(ctx);
     navigation = FuickNavigationDelegate(this);
     page = FuickPageDelegate(this);
     serviceBinder.init(ctx, this);

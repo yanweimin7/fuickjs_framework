@@ -21,24 +21,18 @@ class FuickPageDelegate {
   }
 
   void renderPage(int pageId, String path, Map<String, dynamic> params) {
-    controller.ctx
-        .invoke('FuickAppController', 'render', [pageId, path, params]);
+    controller.jsProxy.render(pageId, path, params);
   }
 
   void destroyPage(int pageId) {
-    controller.ctx.invoke('FuickAppController', 'destroy', [pageId]);
+    controller.jsProxy.destroy(pageId);
   }
 
   void notifyLifecycle(int pageId, String type) {
-    controller.ctx
-        .invoke('FuickAppController', 'notifyLifecycle', [pageId, type]);
+    controller.jsProxy.notifyLifecycle(pageId, type);
   }
 
   dynamic getItemDSL(int pageId, String refId, int index) {
-    return controller.ctx.invoke('FuickAppController', 'getItemDSL', [
-      pageId,
-      refId,
-      index,
-    ]);
+    return controller.jsProxy.getItemDSL(pageId, refId, index);
   }
 }

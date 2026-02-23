@@ -1,3 +1,5 @@
+import * as Widgets from './widgets';
+
 declare module 'react-reconciler';
 
 declare global {
@@ -6,73 +8,72 @@ declare global {
   function dartCallNativeAsync<T = unknown>(method: string, args: unknown): Promise<T>;
 
   // Global polyfills and managers
-  interface FuickAppController {
+  interface FuickJS {
     render: (pageId: number, path: string, params: unknown) => void;
     destroy: (pageId: number) => void;
     getItemDSL: (pageId: number, refId: string, index: number) => unknown;
     notifyLifecycle: (pageId: number, type: string) => void;
     dispatchEvent: (eventObj: unknown, payload: unknown) => void;
-    __dispatchEvent: (id: string, payload: unknown) => void;
+    handleTimer: (id: number) => void;
   }
 
-  var FuickAppController: FuickAppController;
+  var fuickjs: FuickJS;
   var queueMicrotask: (fn: () => void) => void;
-  var __handleTimer: (id: number) => void;
 
   // Extend globalThis
   interface Object {
-    FuickAppController: FuickAppController;
+    fuickjs: FuickJS;
     dartCallNative: <T = unknown>(method: string, args: unknown) => T;
     dartCallNativeAsync: <T = unknown>(method: string, args: unknown) => Promise<T>;
   }
 
   namespace JSX {
     interface IntrinsicElements {
-      Text: import('./widgets/Text').TextProps;
-      Column: import('./widgets/Column').ColumnProps;
-      Row: import('./widgets/Row').RowProps;
-      Container: import('./widgets/Container').ContainerProps;
-      Button: import('./widgets/Button').ButtonProps;
-      TextField: import('./widgets/TextField').TextFieldProps;
-      Switch: import('./widgets/Switch').SwitchProps;
-      SizedBox: import('./widgets/SizedBox').SizedBoxProps;
-      Image: import('./widgets/Image').ImageProps;
-      ListView: import('./widgets/ListView').ListViewProps;
-      Padding: import('./widgets/Padding').PaddingProps;
-      Stack: import('./widgets/Stack').StackProps;
-      Positioned: import('./widgets/Positioned').PositionedProps;
-      Icon: import('./widgets/Icon').IconProps;
-      Opacity: import('./widgets/Opacity').OpacityProps;
-      Center: import('./widgets/Center').CenterProps;
-      Expanded: import('./widgets/Expanded').ExpandedProps;
-      Flexible: import('./widgets/Flexible').FlexibleProps;
-      GestureDetector: import('./widgets/GestureDetector').GestureDetectorProps;
-      InkWell: import('./widgets/InkWell').InkWellProps;
-      Divider: import('./widgets/Divider').DividerProps;
-      SingleChildScrollView: import('./widgets/SingleChildScrollView').SingleChildScrollViewProps;
-      CircularProgressIndicator: import('./widgets/CircularProgressIndicator').CircularProgressIndicatorProps;
-      SafeArea: import('./widgets/SafeArea').SafeAreaProps;
-      Scaffold: import('./widgets/Scaffold').ScaffoldProps;
-      AppBar: import('./widgets/AppBar').AppBarProps;
-      ListTile: import('./widgets/ListTile').ListTileProps;
-      BottomNavigationBar: import('./widgets/BottomNavigationBar').BottomNavigationBarProps;
-      BottomNavigationBarItem: import('./widgets/BottomNavigationBar').BottomNavigationBarItemProps;
-      FlutterProps: { propsKey: string; children?: import('react').ReactNode };
-      AnimatedPadding: import('./widgets/AnimatedPadding').AnimatedPaddingProps;
-      AnimatedScale: import('./widgets/AnimatedScale').AnimatedScaleProps;
-      AnimatedRotation: import('./widgets/AnimatedRotation').AnimatedRotationProps;
-      AnimatedSlide: import('./widgets/AnimatedSlide').AnimatedSlideProps;
-      RotationTransition: import('./widgets/RotationTransition').RotationTransitionProps;
-      ScaleTransition: import('./widgets/ScaleTransition').ScaleTransitionProps;
-      SlideTransition: import('./widgets/SlideTransition').SlideTransitionProps;
-      ConstrainedBox: import('./widgets/ConstrainedBox').ConstrainedBoxProps;
-      FittedBox: import('./widgets/FittedBox').FittedBoxProps;
-      Visibility: import('./widgets/Visibility').VisibilityProps;
-      AlertDialog: import('./widgets/AlertDialog').AlertDialogProps;
+      Text: Widgets.TextProps;
+      Column: Widgets.ColumnProps;
+      Row: Widgets.RowProps;
+      Container: Widgets.ContainerProps;
+      Button: Widgets.ButtonProps;
+      TextField: Widgets.TextFieldProps;
+      Switch: Widgets.SwitchProps;
+      SizedBox: Widgets.SizedBoxProps;
+      Image: Widgets.ImageProps;
+      ListView: Widgets.ListViewProps;
+      Padding: Widgets.PaddingProps;
+      Stack: Widgets.StackProps;
+      Positioned: Widgets.PositionedProps;
+      Icon: Widgets.IconProps;
+      Opacity: Widgets.OpacityProps;
+      Center: Widgets.CenterProps;
+      Expanded: Widgets.ExpandedProps;
+      Flexible: Widgets.FlexibleProps;
+      GestureDetector: Widgets.GestureDetectorProps;
+      InkWell: Widgets.InkWellProps;
+      Divider: Widgets.DividerProps;
+      SingleChildScrollView: Widgets.SingleChildScrollViewProps;
+      CircularProgressIndicator: Widgets.CircularProgressIndicatorProps;
+      SafeArea: Widgets.SafeAreaProps;
+      Scaffold: Widgets.ScaffoldProps;
+      AppBar: Widgets.AppBarProps;
+      ListTile: Widgets.ListTileProps;
+      BottomNavigationBar: Widgets.BottomNavigationBarProps;
+      BottomNavigationBarItem: Widgets.BottomNavigationBarItemProps;
+      FlutterProps: Widgets.FlutterPropsProps;
+      AnimatedPadding: Widgets.AnimatedPaddingProps;
+      AnimatedScale: Widgets.AnimatedScaleProps;
+      AnimatedRotation: Widgets.AnimatedRotationProps;
+      AnimatedSlide: Widgets.AnimatedSlideProps;
+      RotationTransition: Widgets.RotationTransitionProps;
+      ScaleTransition: Widgets.ScaleTransitionProps;
+      SlideTransition: Widgets.SlideTransitionProps;
+      ConstrainedBox: Widgets.ConstrainedBoxProps;
+      FittedBox: Widgets.FittedBoxProps;
+      Visibility: Widgets.VisibilityProps;
+      AlertDialog: Widgets.AlertDialogProps;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       [elemName: string]: any;
     }
   }
 }
 
-export {};
+export { };

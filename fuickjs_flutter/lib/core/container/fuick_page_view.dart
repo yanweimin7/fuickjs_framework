@@ -162,11 +162,13 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   @override
   Widget build(BuildContext context) {
     if (rootNode == null) {
-      return const Center(
-        child: SizedBox(
-          width: 100,
-          height: 100,
-          child: CircularProgressIndicator(),
+      return Scaffold(
+        body: const Center(
+          child: SizedBox(
+            width: 100,
+            height: 100,
+            child: CircularProgressIndicator(),
+          ),
         ),
       );
     }

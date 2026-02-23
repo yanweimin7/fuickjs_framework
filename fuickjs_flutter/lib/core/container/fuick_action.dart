@@ -13,9 +13,6 @@ class FuickAction {
       // Just ignore in that case.
       return;
     }
-    ctrl.ctx.invoke('FuickAppController', 'dispatchEvent', [
-      eventObj,
-      value,
-    ]);
+    ctrl.jsProxy.dispatchEvent(eventObj, value);
   }
 }

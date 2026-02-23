@@ -2,9 +2,9 @@ import { TimerService } from '../services/TimerService';
 import { ErrorHandler } from '../ErrorHandler';
 
 let nextTimerId = 1;
-const timerMap = new Map<number, { fn: (...args: unknown[]) => unknown; type: 'timeout' | 'interval' }>();
+const timerMap = new Map<number, { fn: (...args: any[]) => unknown; type: 'timeout' | 'interval' }>();
 
-export function setTimeout(fn: (...args: unknown[]) => unknown, ms?: number): number {
+export function setTimeout(fn: (...args: any[]) => unknown, ms?: number): number {
   const id = nextTimerId++;
   const delay = ms || 0;
 
@@ -42,7 +42,7 @@ export function clearTimeout(id: number) {
   TimerService.deleteTimer(id);
 }
 
-export function setInterval(fn: (...args: unknown[]) => unknown, ms?: number): number {
+export function setInterval(fn: (...args: any[]) => unknown, ms?: number): number {
   const id = nextTimerId++;
   timerMap.set(id, { fn, type: 'interval' });
   TimerService.createTimer(id, ms || 0, true);
@@ -54,8 +54,7 @@ export function clearInterval(id: number) {
   TimerService.deleteTimer(id);
 }
 
-(globalThis as unknown as { __handleTimer: (id: number) => void }).__handleTimer = (id: number) => {
-  // console.log('wine __handleTimer', id);
+export function handleTimer(id: number) {
   const entry = timerMap.get(id);
   if (entry) {
     if (entry.type === 'timeout') {
@@ -72,4 +71,4 @@ export function clearInterval(id: number) {
       ErrorHandler.notify(e, 'timer', { id });
     }
   }
-};
+}

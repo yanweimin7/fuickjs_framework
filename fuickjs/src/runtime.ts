@@ -9,7 +9,7 @@ export function bindGlobals() {
 
   // 显式挂载到 globalThis，确保 Flutter 侧可以访问到
   Object.assign(globalThis, {
-    FuickAppController: {
+    fuickjs: {
       render: PageRender.render,
       destroy: PageRender.destroy,
       getItemDSL: PageRender.getItemDSL,
@@ -18,6 +18,7 @@ export function bindGlobals() {
         const r = PageRender.ensureRenderer();
         r.dispatchEvent(eventObj, payload);
       },
+      handleTimer: Timer.handleTimer,
     },
   });
 }
