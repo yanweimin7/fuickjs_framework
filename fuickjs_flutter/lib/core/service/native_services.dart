@@ -10,6 +10,7 @@ import 'local_storage_service.dart';
 import 'timer_service.dart';
 import 'toast_service.dart';
 import 'ui_service.dart';
+import 'overlay_service.dart';
 
 typedef ServiceBuilder = BaseFuickService Function();
 
@@ -33,6 +34,7 @@ class NativeServiceManager {
     registerService(() => LocalStorageService());
     registerService(() => DeviceInfoService());
     registerService(() => ToastService());
+    registerService(() => OverlayService());
   }
 
   void registerService(ServiceBuilder serviceBuilder) {
