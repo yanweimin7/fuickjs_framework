@@ -38,6 +38,7 @@ import 'parsers/intrinsic_width_parser.dart';
 import 'parsers/keep_alive_parser.dart';
 import 'parsers/list_tile_parser.dart';
 import 'parsers/list_view_parser.dart';
+import 'parsers/material_parser.dart';
 import 'parsers/opacity_parser.dart';
 import 'parsers/padding_parser.dart';
 import 'parsers/page_view_parser.dart';
@@ -98,6 +99,7 @@ class WidgetFactory {
     register(ImageParser());
     register(PaddingParser());
     register(SizedBoxParser());
+    register(MaterialParser());
     register(DividerParser());
     register(SingleChildScrollViewParser());
     register(IconParser());

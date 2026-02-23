@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide widgetFactory;
 
 import '../container/fuick_app_controller.dart';
 import '../container/fuick_page_view.dart';
+import '../utils/extensions.dart';
 import '../widgets/fuick_node.dart';
 import '../widgets/widget_factory.dart';
 import 'base_fuick_service.dart';
@@ -24,7 +25,7 @@ class OverlayService extends BaseFuickService {
     final Map params = listArgs[0] as Map;
     final String key = params['key'];
     final Map<String, dynamic> dsl = Map<String, dynamic>.from(params['dsl']);
-    final int? pageId = params['pageId'];
+    final int? pageId = asIntOrNull(params['pageId']);
 
     if (controller == null) return false;
 
