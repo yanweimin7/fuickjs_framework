@@ -199,8 +199,10 @@ class WidgetUtils {
   static Axis axis(String? v) {
     switch (v) {
       case 'horizontal':
+      case 'row':
         return Axis.horizontal;
       case 'vertical':
+      case 'column':
       default:
         return Axis.vertical;
     }

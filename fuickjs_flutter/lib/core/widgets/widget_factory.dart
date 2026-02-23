@@ -27,6 +27,7 @@ import 'parsers/custom_scroll_view_parser.dart';
 import 'parsers/divider_parser.dart';
 import 'parsers/expanded_parser.dart';
 import 'parsers/fitted_box_parser.dart';
+import 'parsers/flex_parser.dart';
 import 'parsers/flexible_parser.dart';
 import 'parsers/floating_action_button_parser.dart';
 import 'parsers/gesture_detector_parser.dart';
@@ -89,6 +90,7 @@ class WidgetFactory {
     register(PointerListenerParser());
     register(ColumnParser());
     register(RowParser());
+    register(FlexParser());
     register(TextParser());
     register(ContainerParser());
     register(ScaffoldParser());

@@ -15,6 +15,7 @@ export * from './Image';
 export * from './SizedBox';
 export * from './Center';
 export * from './Icon';
+export * from './Flex';
 export * from './Flexible';
 export * from './GestureDetector';
 export * from './InkWell';
