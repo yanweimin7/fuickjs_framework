@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../container/fuick_action.dart';
+import '../../logger.dart';
 import '../../utils/extensions.dart';
 import '../fuick_command_listener_mixin.dart';
 import '../widget_factory.dart';
@@ -120,7 +121,7 @@ class FuickVideoPlayerState extends State<FuickVideoPlayer>
         }
       }
     } catch (e) {
-      debugPrint('Error initializing video player: $e');
+      logger.e('Error initializing video player: $e');
       if (widget.onError != null && mounted) {
         FuickAction.event(context, widget.onError,
             value: {'error': e.toString()});

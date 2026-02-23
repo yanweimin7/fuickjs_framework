@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../logger.dart';
 import 'base_fuick_service.dart';
 
 class LocalStorageService extends BaseFuickService {
@@ -17,9 +18,8 @@ class LocalStorageService extends BaseFuickService {
   LocalStorageService() {
     registerAsyncMethod('getItem', (args) async {
       await _ensureInitialized();
-      final key = args is List && args.isNotEmpty
-          ? args[0] as String
-          : args as String;
+      final key =
+          args is List && args.isNotEmpty ? args[0] as String : args as String;
       return _cache[key];
     });
 
@@ -37,9 +37,8 @@ class LocalStorageService extends BaseFuickService {
 
     registerAsyncMethod('removeItem', (args) async {
       await _ensureInitialized();
-      final key = args is List && args.isNotEmpty
-          ? args[0] as String
-          : args as String;
+      final key =
+          args is List && args.isNotEmpty ? args[0] as String : args as String;
       if (_cache.containsKey(key)) {
         _cache.remove(key);
         await _flush();
@@ -68,7 +67,7 @@ class LocalStorageService extends BaseFuickService {
         }
       }
     } catch (e) {
-      debugPrint('Error initializing storage: $e');
+      logger.e('Error initializing storage: $e');
     } finally {
       _initialized = true;
     }
@@ -79,7 +78,7 @@ class LocalStorageService extends BaseFuickService {
     try {
       await _file!.writeAsString(jsonEncode(_cache));
     } catch (e) {
-      debugPrint('Error writing storage: $e');
+      logger.e('Error writing storage: $e');
     }
   }
 }

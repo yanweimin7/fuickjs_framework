@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../engine/fuick_app_context.dart';
 import '../engine/fuick_app_context_manager.dart';
+import '../logger.dart';
 import 'fuick_app_controller.dart';
 import 'fuick_page_view.dart';
 
@@ -70,7 +71,7 @@ class _FuickAppViewState extends State<FuickAppView> {
     // 2. 此时 context 已经不为空 (要么是外部传入，要么是 Manager 获取/创建)
     final currentContext = appContext;
     if (currentContext == null) {
-      debugPrint('[FuickAppView] Context is null after initialization');
+      logger.e('[FuickAppView] Context is null after initialization');
       return;
     }
 

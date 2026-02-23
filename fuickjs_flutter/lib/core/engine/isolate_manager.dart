@@ -5,6 +5,7 @@ import 'package:fjs_engine/core/jscontext.dart';
 
 import 'package:flutter/foundation.dart';
 
+import '../logger.dart';
 import '../service/app_service_binder.dart';
 import '../service/console_service.dart';
 import '../service/timer_service.dart';
@@ -66,7 +67,7 @@ class IsolateHandler {
                   });
                   return _waitForResponse(responsePort);
                 } catch (e, s) {
-                  debugPrint("Isolate onCallNative error: $e\n$s");
+                  logger.e("Isolate onCallNative error: $e\n$s");
                   rethrow;
                 }
               };
@@ -139,7 +140,7 @@ class IsolateHandler {
         } finally {}
       },
       (e, s) {
-        debugPrint("Error in IsolateManager.handleMessage: $e\n$s");
+        logger.e("Error in IsolateManager.handleMessage: $e\n$s");
         mainSendPort.send({
           'contextId': contextId,
           'type': 'response',

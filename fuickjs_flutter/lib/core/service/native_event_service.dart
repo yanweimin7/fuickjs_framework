@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../logger.dart';
 import 'base_fuick_service.dart';
 
 class NativeEventService extends BaseFuickService {
@@ -51,7 +52,7 @@ class NativeEventService extends BaseFuickService {
       try {
         ctx.invoke('NativeEvent', 'receive', [event, data]);
       } catch (e) {
-        debugPrint('Error emitting event to JS: $e');
+        logger.e('Error emitting event to JS: $e');
       }
     }
   }
@@ -64,7 +65,7 @@ class NativeEventService extends BaseFuickService {
         try {
           callback(data);
         } catch (e) {
-          debugPrint('Error in NativeEvent listener for event $event: $e');
+          logger.e('Error in NativeEvent listener for event $event: $e');
         }
       }
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../logger.dart';
 import 'base_fuick_service.dart';
 
 class NetworkService extends BaseFuickService {
@@ -55,7 +56,7 @@ class NetworkService extends BaseFuickService {
           'headers': response.headers,
         };
       } catch (e, s) {
-        debugPrint('[NetworkService] Error in fetch: $e\n$s');
+        logger.e('[NetworkService] Error in fetch: $e\n$s');
         rethrow;
       }
     });

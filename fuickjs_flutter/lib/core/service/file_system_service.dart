@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../logger.dart';
 import 'base_fuick_service.dart';
 
 class FileSystemService extends BaseFuickService {
@@ -26,7 +27,7 @@ class FileSystemService extends BaseFuickService {
         final libDir = await getLibraryDirectory();
         dirs['library'] = libDir.path;
       } catch (e) {
-        debugPrint('Error getting directories: $e');
+        logger.e('Error getting directories: $e');
       }
       return dirs;
     });

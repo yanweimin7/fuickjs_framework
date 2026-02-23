@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../logger.dart';
 import '../utils/extensions.dart';
 import 'fuick_command_listener_mixin.dart';
 import 'fuick_dsl_cache_mixin.dart';
@@ -60,7 +61,7 @@ class _FuickPageViewState extends State<FuickPageView>
   @override
   void initState() {
     super.initState();
-    debugPrint(
+    logger.d(
         '[FuickPageView] initState refId=${widget.refId} initialPage=${widget.initialPage}');
     _controller = PageController(initialPage: widget.initialPage);
     widget.onControllerCreated?.call(_controller);
@@ -102,7 +103,7 @@ class _FuickPageViewState extends State<FuickPageView>
 
   @override
   void dispose() {
-    debugPrint('[FuickPageView] dispose refId=${widget.refId}');
+    logger.d('[FuickPageView] dispose refId=${widget.refId}');
     widget.onDispose?.call(_controller);
     _controller.dispose();
     super.dispose();

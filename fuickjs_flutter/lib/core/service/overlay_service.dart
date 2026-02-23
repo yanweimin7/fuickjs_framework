@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide widgetFactory;
 
 import '../container/fuick_app_controller.dart';
 import '../container/fuick_page_view.dart';
+import '../logger.dart';
 import '../utils/extensions.dart';
 import '../widgets/fuick_node.dart';
 import '../widgets/widget_factory.dart';
@@ -36,7 +37,7 @@ class OverlayService extends BaseFuickService {
     final navState = navKey?.currentState;
 
     if (navState == null) {
-      debugPrint('[OverlayService] No navigator found for pageId: $pageId');
+      logger.w('[OverlayService] No navigator found for pageId: $pageId');
       return false;
     }
 

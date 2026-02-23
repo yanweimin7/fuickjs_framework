@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../container/fuick_action.dart';
+import '../../logger.dart';
 import '../../utils/extensions.dart';
 import '../fuick_command_listener_mixin.dart';
 import '../fuick_dsl_cache_mixin.dart';
@@ -209,10 +210,10 @@ class _FuickTextFieldState extends State<FuickTextField>
     } else if (method == 'unfocus') {
       _focusNode.unfocus();
     } else if (method == 'setSelection') {
-      debugPrint('setSelection args: $args');
+      logger.d('setSelection args: $args');
       final start = asIntOrNull(args['start']);
       final end = asIntOrNull(args['end']);
-      debugPrint('setSelection parsed: start=$start, end=$end');
+      logger.d('setSelection parsed: start=$start, end=$end');
       if (start != null && end != null) {
         _controller.selection =
             TextSelection(baseOffset: start, extentOffset: end);

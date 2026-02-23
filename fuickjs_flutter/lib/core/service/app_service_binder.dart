@@ -2,6 +2,7 @@ import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../container/fuick_app_controller.dart';
+import '../logger.dart';
 import 'base_fuick_service.dart';
 import 'native_services.dart';
 
@@ -48,7 +49,7 @@ class AppServiceBinder {
       try {
         return handleNativeCall(ctx, method, args);
       } catch (e, s) {
-        debugPrint("failed to callNative $method $e , $s");
+        logger.e("failed to callNative $method $e , $s");
       }
       return null;
     };
@@ -57,7 +58,7 @@ class AppServiceBinder {
       try {
         return await handleNativeCallAsync(ctx, method, args);
       } catch (e, s) {
-        debugPrint("failed to callNativeAsync $method $e , $s");
+        logger.e("failed to callNativeAsync $method $e , $s");
         rethrow;
       }
     };

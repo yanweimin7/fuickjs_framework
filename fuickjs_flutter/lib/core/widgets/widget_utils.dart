@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../logger.dart';
 import '../utils/extensions.dart';
 
 class WidgetUtils {
@@ -27,7 +28,7 @@ class WidgetUtils {
       _colorCache[hexString] = color;
       return color;
     } catch (e) {
-      debugPrint('[WidgetUtils] Error parsing color: $hexString');
+      logger.w('[WidgetUtils] Error parsing color: $hexString');
       return null;
     }
   }

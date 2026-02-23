@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../logger.dart';
 import 'fuick_app_context.dart';
 
 class FuickAppContextManager {
@@ -21,7 +22,7 @@ class FuickAppContextManager {
   /// 注册上下文
   void registerContext(String id, FuickAppContext context) {
     if (_contexts.containsKey(id)) {
-      debugPrint(
+      logger.w(
           'FuickAppContextManager: Context with id $id already exists. Overwriting.');
     }
     _contexts[id] = context;
@@ -33,7 +34,7 @@ class FuickAppContextManager {
   void _retainContext(String id) {
     if (_contexts.containsKey(id)) {
       _refCounts[id] = (_refCounts[id] ?? 0) + 1;
-      debugPrint(
+      logger.d(
           'FuickAppContextManager: Retained context $id. RefCount: ${_refCounts[id]}');
     }
   }
@@ -44,7 +45,7 @@ class FuickAppContextManager {
       final currentCount = _refCounts[id] ?? 0;
       if (currentCount > 0) {
         _refCounts[id] = currentCount - 1;
-        debugPrint(
+        logger.d(
             'FuickAppContextManager: Released context $id. RefCount: ${_refCounts[id]}');
 
         if (_refCounts[id] == 0) {
@@ -63,7 +64,7 @@ class FuickAppContextManager {
 
   /// 销毁并移除上下文
   void destroyContext(String id) {
-    debugPrint('FuickAppContextManager: Destroying context $id');
+    logger.d('FuickAppContextManager: Destroying context $id');
     final context = _contexts.remove(id);
     _refCounts.remove(id);
     context?.dispose();

@@ -3,6 +3,8 @@ import 'package:fjs_engine/core/runtime.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:fuickjs_flutter/core/engine/worker.dart';
 
+import '../logger.dart';
+
 class EngineInit {
   static QuickJsFFI? _qjs;
 
@@ -12,12 +14,12 @@ class EngineInit {
   static initQjs() {
     if (_qjs == null) {
       try {
-        debugPrint("init runtime");
+        logger.d("init runtime");
         final lib = QuickJsFFI.load();
         _qjs = QuickJsFFI(lib);
         runtime = QuickJsRuntime(_qjs!);
       } catch (e) {
-        debugPrint('初始化错误: $e');
+        logger.e('初始化错误: $e');
         runtime = null;
       }
     }

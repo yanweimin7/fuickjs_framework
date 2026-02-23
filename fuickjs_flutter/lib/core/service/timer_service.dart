@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../logger.dart';
 import '../utils/extensions.dart';
 import 'base_fuick_service.dart';
 
@@ -44,7 +45,7 @@ class TimerService extends BaseFuickService {
           try {
             ctx.invoke(null, '__handleTimer', [id]);
           } catch (e) {
-            debugPrint('Error calling __handleTimer: $e');
+            logger.e('Error calling __handleTimer: $e');
           }
         });
       }

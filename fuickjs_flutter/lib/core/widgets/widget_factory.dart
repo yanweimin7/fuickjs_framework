@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../logger.dart';
 import 'fuick_node.dart';
 import 'parsers/alert_dialog_parser.dart';
 import 'parsers/animated_align_parser.dart';
@@ -179,7 +180,7 @@ class WidgetFactory {
     final dsl = dslOrNode;
     final typeValue = dsl['type'];
     if (typeValue is! String) {
-      debugPrint('[WidgetFactory] Error: invalid dsl type: $typeValue');
+      logger.e('[WidgetFactory] Error: invalid dsl type: $typeValue');
       return const SizedBox.shrink();
     }
     final String type = typeValue;
@@ -260,7 +261,7 @@ class WidgetFactory {
       [String? parentType]) {
     if (children is List) {
       if (children.length > 1) {
-        debugPrint(
+        logger.w(
             '[WidgetFactory] Warning: buildFirstChild called with ${children.length} children. '
             'Automatically wrapping in Column (MainAxisSize.min). '
             'Parent Widget: ${parentType ?? "Unknown"}');

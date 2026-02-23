@@ -4,6 +4,7 @@ import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../container/fuick_app_controller.dart';
+import '../logger.dart';
 import 'bundle_preloader.dart';
 import 'engine.dart';
 import 'jscontext_delegate.dart';
@@ -44,12 +45,12 @@ class FuickAppContext {
     try {
       final contextId = '${appName}_${DateTime.now().microsecondsSinceEpoch}';
       await EngineInit.initIsolate();
-      debugPrint(
+      logger.d(
         '[Performance] initIsolate cost: ${stopwatch.elapsedMilliseconds}ms',
       );
       final delegate = JsContextDelegate(contextId);
       await delegate.init();
-      debugPrint(
+      logger.d(
         '[Performance] JsContextDelegate.init cost: ${stopwatch.elapsedMilliseconds}ms',
       );
       ctx = delegate;
@@ -61,7 +62,7 @@ class FuickAppContext {
       isReady.value = true;
       await _loadBundle();
     } catch (e, s) {
-      debugPrint('FuickAppContext init failed: $e\n$s');
+      logger.e('FuickAppContext init failed: $e\n$s');
     }
   }
 
@@ -69,25 +70,25 @@ class FuickAppContext {
     final stopwatch = Stopwatch()..start();
     try {
       await _loadSingleBundle('framework.bundle');
-      debugPrint(
+      logger.d(
         '[Performance] load framework.bundle cost: ${stopwatch.elapsedMilliseconds}ms',
       );
 
       if (debugBusinessCode != null) {
         await ctx.eval(debugBusinessCode!);
-        debugPrint(
+        logger.d(
           '[Debug] Successfully loaded business bundle from debug payload',
         );
       } else {
         await _loadSingleBundle(appName);
       }
-      debugPrint(
+      logger.d(
         '[Performance] load business bundle cost: ${stopwatch.elapsedMilliseconds}ms',
       );
 
       appController.isBundleLoaded.value = true;
     } catch (e, s) {
-      debugPrint('加载 React bundle 失败: $e\n$s');
+      logger.e('加载 React bundle 失败: $e\n$s');
     }
   }
 
@@ -116,12 +117,12 @@ class FuickAppContext {
           await ctx.evalFile('assets/js/$bundleName.js');
         }
       } catch (e) {
-        debugPrint('加载字节码 bundle $bundleName 失败，尝试加载文本 bundle: $e');
+        logger.w('加载字节码 bundle $bundleName 失败，尝试加载文本 bundle: $e');
         await ctx.evalFile('assets/js/$bundleName.js');
-        debugPrint('成功加载文本 bundle $bundleName');
+        logger.i('成功加载文本 bundle $bundleName');
       }
     } catch (e) {
-      debugPrint('加载 bundle $bundleName 失败: $e');
+      logger.e('加载 bundle $bundleName 失败: $e');
       rethrow;
     }
   }

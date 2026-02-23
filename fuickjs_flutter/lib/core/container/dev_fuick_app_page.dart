@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../logger.dart';
 import 'fuick_app_view.dart';
 
 const debugRouteName = '/dev';
@@ -53,14 +54,14 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
   void didPushNext() {
     // 当有新页面覆盖当前页面时触发
     _isShowingPreview = true;
-    debugPrint('[Dev] RouteAware: didPushNext (preview opened)');
+    logger.d('[Dev] RouteAware: didPushNext (preview opened)');
   }
 
   @override
   void didPopNext() {
     // 当覆盖层页面关闭，回到当前页面时触发
     _isShowingPreview = false;
-    debugPrint('[Dev] RouteAware: didPopNext (returned to debug console)');
+    logger.d('[Dev] RouteAware: didPopNext (returned to debug console)');
   }
 
   @override
@@ -76,33 +77,33 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
         (message) {
           final data = jsonDecode(message);
           if (data['type'] == 'reload') {
-            debugPrint('[Dev] Received reload signal and business payload');
+            logger.i('[Dev] Received reload signal and business payload');
             final payload = data['payload'];
             _handleReload(businessCode: payload?['business']);
           }
         },
         onError: (error) {
-          debugPrint('[Dev] WebSocket error: $error');
+          logger.e('[Dev] WebSocket error: $error');
         },
         onDone: () {
-          debugPrint('[Dev] WebSocket closed, retrying in 3s...');
+          logger.w('[Dev] WebSocket closed, retrying in 3s...');
           Future.delayed(const Duration(seconds: 3), _connectDebugServer);
         },
       );
     } catch (e) {
-      debugPrint('[Dev] Failed to connect to debug server: $e');
+      logger.e('[Dev] Failed to connect to debug server: $e');
     }
   }
 
   Future<void> _handleReload({String? businessCode}) async {
     if (businessCode == null || businessCode.isEmpty) {
-      debugPrint('[Dev] No business code received, skip reload');
+      logger.w('[Dev] No business code received, skip reload');
       return;
     }
 
     try {
       _lastDebugCode = businessCode;
-      debugPrint('[Dev] Received bundle code (length: ${businessCode.length})');
+      logger.i('[Dev] Received bundle code (length: ${businessCode.length})');
 
       if (!mounted) return;
 
@@ -126,9 +127,9 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
           ),
         ),
       );
-      debugPrint('[Dev] Opened new debug page with direct eval');
+      logger.d('[Dev] Opened new debug page with direct eval');
     } catch (e) {
-      debugPrint('[Dev] Failed to handle reload: $e');
+      logger.e('[Dev] Failed to handle reload: $e');
     }
   }
 

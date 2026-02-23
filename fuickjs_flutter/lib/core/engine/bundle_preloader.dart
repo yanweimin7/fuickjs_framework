@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart';
 
+import '../logger.dart';
+
 class BundlePreloader {
   static final BundlePreloader _instance = BundlePreloader._internal();
 
@@ -18,7 +20,8 @@ class BundlePreloader {
   /// Preload a bundle by name.
   /// It tries to load .qjc (bytecode) first, then .js (source code).
   Future<void> preloadBundle(String bundleName) async {
-    if (_byteCodeCache.containsKey(bundleName) || _sourceCodeCache.containsKey(bundleName)) {
+    if (_byteCodeCache.containsKey(bundleName) ||
+        _sourceCodeCache.containsKey(bundleName)) {
       return;
     }
 
@@ -44,7 +47,7 @@ class BundlePreloader {
     try {
       final byteData = await rootBundle.load('assets/js/$bundleName.qjc');
       _byteCodeCache[bundleName] = byteData.buffer.asUint8List();
-      debugPrint('[BundlePreloader] Loaded bytecode for $bundleName');
+      logger.d('[BundlePreloader] Loaded bytecode for $bundleName');
       return;
     } catch (e) {
       // Ignore error and fall back to source code
@@ -54,9 +57,9 @@ class BundlePreloader {
     try {
       final source = await rootBundle.loadString('assets/js/$bundleName.js');
       _sourceCodeCache[bundleName] = source;
-      debugPrint('[BundlePreloader] Loaded source code for $bundleName');
+      logger.d('[BundlePreloader] Loaded source code for $bundleName');
     } catch (e) {
-      debugPrint('[BundlePreloader] Failed to load bundle $bundleName: $e');
+      logger.e('[BundlePreloader] Failed to load bundle $bundleName: $e');
       throw e;
     }
   }
@@ -70,10 +73,11 @@ class BundlePreloader {
   String? getSourceCode(String bundleName) {
     return _sourceCodeCache[bundleName];
   }
-  
+
   /// Check if a bundle is cached
   bool isCached(String bundleName) {
-    return _byteCodeCache.containsKey(bundleName) || _sourceCodeCache.containsKey(bundleName);
+    return _byteCodeCache.containsKey(bundleName) ||
+        _sourceCodeCache.containsKey(bundleName);
   }
 
   /// Clear all caches

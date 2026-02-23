@@ -2,6 +2,7 @@ import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/foundation.dart';
 
 import '../container/fuick_app_controller.dart';
+import '../logger.dart';
 
 typedef SyncMethodHandler = dynamic Function(dynamic args);
 typedef AsyncMethodHandler = Future<dynamic> Function(dynamic args);
@@ -25,7 +26,7 @@ abstract class BaseFuickService {
   void registerMethod(String method, SyncMethodHandler handler) {
     syncMethods[method] = (args) {
       if (_isDisposed) {
-        debugPrint(
+        logger.w(
           '[Service] Warning: Calling method $method on disposed service',
         );
         return null;
@@ -37,7 +38,7 @@ abstract class BaseFuickService {
   void registerAsyncMethod(String method, AsyncMethodHandler handler) {
     asyncMethods[method] = (args) async {
       if (_isDisposed) {
-        debugPrint(
+        logger.w(
           '[Service] Warning: Calling async method $method on disposed service',
         );
         return null;

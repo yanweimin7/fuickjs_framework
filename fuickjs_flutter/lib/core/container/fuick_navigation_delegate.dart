@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../logger.dart';
 import 'fuick_app_controller.dart';
 import 'fuick_page.dart';
 import 'fuick_page_view.dart';
@@ -119,7 +120,7 @@ class FuickNavigationDelegate {
           Navigator.of(context).pop(result);
           return true;
         } catch (e) {
-          debugPrint('Failed to pop context: $e');
+          logger.w('Failed to pop context: $e');
         }
       }
     }

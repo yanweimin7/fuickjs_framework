@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' hide widgetFactory;
 
+import '../logger.dart';
 import '../widgets/fuick_node.dart';
 import '../widgets/widget_factory.dart';
 import 'fuick_app_controller.dart';
@@ -114,13 +115,13 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
         widget.controller.notifyLifecycle(widget.pageId, 'visible');
       }
 
-      // debugPrint(
+      // logger.d(
       //   '[Flutter] FuickPageView.onPageRender pageId: ${widget.pageId}, rootNode exists: ${rootNode != null}',
       // );
       final newNode = nodeManager.createNode(dsl, nodeManager);
       if (rootNode != newNode) {
         rootNode = newNode;
-        // debugPrint('[Flutter] FuickPageView set rootNode to: ${rootNode?.id}');
+        // logger.d('[Flutter] FuickPageView set rootNode to: ${rootNode?.id}');
         if (mounted) setState(() {});
       }
     };
@@ -182,13 +183,12 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
               buildTime.difference(_receiveDataTime!).inMilliseconds;
           final paintCost = renderTime.difference(buildTime).inMilliseconds;
 
-          debugPrint(
+          logger.d(
               '[Performance] Page First Render (ID: ${widget.pageId}, Path: ${widget.routeInfo.path}):');
-          debugPrint('  - Total Cost: ${totalCost}ms');
-          debugPrint(
-              '  - Build Cost: ${buildCost}ms (UI Data -> Widget Build)');
-          debugPrint(
-              '  - Layout/Paint Cost: ${paintCost}ms (Post Frame Callback)');
+          logger.d('  - Total Cost: ${totalCost}ms');
+          logger.d('  - Build Cost: ${buildCost}ms (UI Data -> Widget Build)');
+          logger
+              .d('  - Layout/Paint Cost: ${paintCost}ms (Post Frame Callback)');
         });
       }
 
