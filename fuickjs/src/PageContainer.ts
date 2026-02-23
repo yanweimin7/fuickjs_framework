@@ -11,7 +11,9 @@ export class PageContainer {
   public incrementalStrategy: IncrementalStrategy;
   public diffStrategy: DiffStrategy;
 
-  private eventCallbacks: Map<string, (...args: unknown[]) => unknown> = new Map();
+  // 优化：使用二维 Map 避免字符串拼接
+  // 外层 Map 的 key 是 nodeId，内层 Map 的 key 是 eventKey
+  private eventCallbacks: Map<number | string, Map<string, (...args: unknown[]) => unknown>> = new Map();
   private onVisibleCallbacks: Set<(...args: unknown[]) => unknown> = new Set();
   private onInvisibleCallbacks: Set<(...args: unknown[]) => unknown> = new Set();
   private nodes: Map<number | string, Node> = new Map();
@@ -44,15 +46,34 @@ export class PageContainer {
   }
 
   public registerCallback(nodeId: number | string, eventKey: string, fn: (...args: unknown[]) => unknown) {
-    this.eventCallbacks.set(`${nodeId}:${eventKey}`, fn);
+    let nodeCallbacks = this.eventCallbacks.get(nodeId);
+    if (!nodeCallbacks) {
+      nodeCallbacks = new Map();
+      this.eventCallbacks.set(nodeId, nodeCallbacks);
+    }
+    nodeCallbacks.set(eventKey, fn);
   }
 
   public unregisterCallback(nodeId: number | string, eventKey: string) {
-    this.eventCallbacks.delete(`${nodeId}:${eventKey}`);
+    const nodeCallbacks = this.eventCallbacks.get(nodeId);
+    if (nodeCallbacks) {
+      nodeCallbacks.delete(eventKey);
+      // 如果该节点没有回调了，移除整个节点条目
+      if (nodeCallbacks.size === 0) {
+        this.eventCallbacks.delete(nodeId);
+      }
+    }
   }
 
   public getCallback(nodeId: number | string, eventKey: string): ((...args: unknown[]) => unknown) | undefined {
-    return this.eventCallbacks.get(`${nodeId}:${eventKey}`);
+    return this.eventCallbacks.get(nodeId)?.get(eventKey);
+  }
+  
+  /**
+   * 清除指定节点的所有回调（用于节点销毁时）
+   */
+  public clearNodeCallbacks(nodeId: number | string) {
+    this.eventCallbacks.delete(nodeId);
   }
 
   public registerVisibleCallback(fn: (...args: unknown[]) => unknown) {

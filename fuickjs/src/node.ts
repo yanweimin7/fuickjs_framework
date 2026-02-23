@@ -13,6 +13,11 @@ export class Node {
   container?: PageContainer;
   private eventKeys: Set<string> = new Set();
 
+  // DSL 缓存优化
+  private _dslCache: unknown = null;
+  private _dslCacheDirty: boolean = true;
+  private _childrenDslCacheDirty: boolean = true;
+
   constructor(type: string, props: Record<string, unknown> | null, container?: PageContainer) {
     this.id = props && typeof props.id === 'number' ? props.id : nextNodeId++;
     this.type = type;
@@ -46,9 +51,35 @@ export class Node {
 
     // Re-register with new refId
     this.container?.registerNode(this);
-    // Note: We no longer call markChanged here.
-    // It is the responsibility of hostConfig.commitUpdate to call markChanged if necessary.
-    // This allows optimizations where we skip UI updates if only function references changed.
+    
+    // 标记 DSL 缓存需要重新计算
+    this._dslCacheDirty = true;
+    // 通知父节点子树有变化
+    this._invalidateParentDslCache();
+  }
+
+  /**
+   * 递归向上通知父节点 DSL 缓存失效
+   */
+  private _invalidateParentDslCache() {
+    let current = this.parent;
+    while (current) {
+      if (!current._childrenDslCacheDirty) {
+        current._childrenDslCacheDirty = true;
+        current = current.parent;
+      } else {
+        // 父节点已经被标记，可以停止向上传播
+        break;
+      }
+    }
+  }
+
+  /**
+   * 标记当前节点 DSL 缓存失效（供外部调用）
+   */
+  invalidateDslCache() {
+    this._dslCacheDirty = true;
+    this._invalidateParentDslCache();
   }
 
   registerCallbacksRecursive(obj: unknown, initialPath: string = '') {
@@ -98,10 +129,9 @@ export class Node {
   }
 
   clearCallbacks() {
-    if (this.container) {
-      for (const key of this.eventKeys) {
-        this.container.unregisterCallback(this.id, key);
-      }
+    // 优化：使用批量清除方法，避免逐个删除
+    if (this.container && this.eventKeys.size > 0) {
+      this.container.clearNodeCallbacks(this.id);
     }
     this.eventKeys.clear();
   }
@@ -111,16 +141,13 @@ export class Node {
   }
 
   toDsl(): unknown {
+    // 如果自身缓存有效且子树无变化，直接返回缓存
+    if (!this._dslCacheDirty && !this._childrenDslCacheDirty && this._dslCache !== null) {
+      return this._dslCache;
+    }
+
     const type = this.type;
     if (!type) return null;
-
-    // Strip 'flutter-' prefix and convert kebab-case to PascalCase for Flutter side recognition
-    // if (type.startsWith('flutter-')) {
-    //   type = type.substring(8)
-    //     .split('-')
-    //     .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    //     .join('');
-    // }
 
     const props = (this.container ? this.container.processProps(this.id, this.props, type) : {}) as Record<
       string,
@@ -176,6 +203,11 @@ export class Node {
       result.isBoundary = true;
     }
 
+    // 更新缓存
+    this._dslCache = result;
+    this._dslCacheDirty = false;
+    this._childrenDslCacheDirty = false;
+
     return result;
   }
 
@@ -185,6 +217,11 @@ export class Node {
       const node = stack.pop()!;
       node.clearCallbacks();
       node.container?.unregisterNode(node);
+      
+      // 清理 DSL 缓存
+      node._dslCache = null;
+      node._dslCacheDirty = true;
+      node._childrenDslCacheDirty = true;
 
       // Add children to stack in reverse order to maintain original destruction order if needed
       for (let i = node.children.length - 1; i >= 0; i--) {
