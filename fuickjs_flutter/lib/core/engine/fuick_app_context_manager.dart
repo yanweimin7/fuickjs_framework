@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 import '../logger.dart';
 import 'fuick_app_context.dart';
 
@@ -27,11 +25,11 @@ class FuickAppContextManager {
     }
     _contexts[id] = context;
     _refCounts.putIfAbsent(id, () => 0);
-    _retainContext(id);
+    retainContext(id);
   }
 
   /// 增加引用计数
-  void _retainContext(String id) {
+  void retainContext(String id) {
     if (_contexts.containsKey(id)) {
       _refCounts[id] = (_refCounts[id] ?? 0) + 1;
       logger.d(

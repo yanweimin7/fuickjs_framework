@@ -52,20 +52,19 @@ class _FuickAppViewState extends State<FuickAppView> {
   }
 
   Future<void> _initContext() async {
-    // 1. 如果没有外部传入 context，尝试从 Manager 获取或创建
+    appContext = FuickAppContextManager().getContext(widget.appName);
     if (appContext == null) {
-      appContext = FuickAppContextManager().getContext(widget.appName);
-      if (appContext == null) {
-        appContext = FuickAppContext(
-          appName: widget.appName,
-          debugBusinessCode: widget.debugBusinessCode,
-        );
-        FuickAppContextManager().registerContext(widget.appName, appContext!);
-      }
-      // 如果上下文未初始化，进行初始化
-      if (!appContext!.isReady.value) {
-        await appContext!.init();
-      }
+      appContext = FuickAppContext(
+        appName: widget.appName,
+        debugBusinessCode: widget.debugBusinessCode,
+      );
+      FuickAppContextManager().registerContext(widget.appName, appContext!);
+    } else {
+      FuickAppContextManager().retainContext(widget.appName);
+    }
+    // 如果上下文未初始化，进行初始化
+    if (!appContext!.isReady.value) {
+      await appContext!.init();
     }
 
     // 2. 此时 context 已经不为空 (要么是外部传入，要么是 Manager 获取/创建)
