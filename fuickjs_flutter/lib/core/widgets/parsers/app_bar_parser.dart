@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../container/fuick_app_controller.dart';
+import '../../container/fuick_page_view.dart';
+import '../../logger.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
 import 'widget_parser.dart';
@@ -41,17 +44,20 @@ class AppBarParser extends WidgetParser {
       bottom = _wrapPreferredSize(bottomWidget);
     }
 
+    final ctrl = FuickAppScope.find(context);
+    final pageScope = FuickPageScope.find(context);
+    final innerNav =
+        ctrl?.navigation.getNavigatorKey(pageScope?.pageId)?.currentState;
+    final canInnerPop = innerNav?.canPop() ?? false;
+    final canPopRoot = Navigator.of(context, rootNavigator: true).canPop();
+
     return AppBar(
-      automaticallyImplyLeading: false,
+      automaticallyImplyLeading: true,
       title: titleDsl != null ? factory.build(context, titleDsl) : null,
       leading: leadingDsl != null
           ? factory.build(context, leadingDsl)
-          : (ModalRoute.of(context)?.canPop ?? false
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.of(context).pop(),
-                )
-              : null),
+
+              : null,
       actions: actions,
       bottom: bottom,
       backgroundColor: WidgetUtils.colorFromHex(backgroundColorProp),
