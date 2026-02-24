@@ -1,4 +1,3 @@
-import '../fuick_config.dart';
 import '../utils/extensions.dart';
 import 'base_fuick_service.dart';
 
@@ -13,15 +12,6 @@ class NavigationService extends BaseFuickService {
       final path = (m['path'] ?? '') as String;
       final params = m['params'] ?? {};
       final pageId = asIntOrNull(m['pageId']);
-      final rootNavigator = m['rootNavigator'] == true;
-
-      if (rootNavigator && path.isNotEmpty) {
-        // TODO: Support result for root navigator if needed
-        final result = await FuickConfig.onRootPush
-            ?.call(path, Map<String, dynamic>.from(params));
-        return result;
-      }
-
       if (path.isNotEmpty) {
         final result = await controller?.pushWithPath(
             path, Map<String, dynamic>.from(params),
@@ -37,7 +27,6 @@ class NavigationService extends BaseFuickService {
       final path = (m['path'] ?? '') as String;
       final params = m['params'] ?? {};
       final pageId = asIntOrNull(m['pageId']);
-      // final rootNavigator = m['rootNavigator'] == true;
 
       if (path.isNotEmpty) {
         final result = await controller?.pushReplacementWithPath(
@@ -51,18 +40,7 @@ class NavigationService extends BaseFuickService {
     registerMethod('pop', (args) {
       final m = args is Map ? args : {};
       final pageId = asIntOrNull(m['pageId']);
-      final rootNavigator = m['rootNavigator'] == true;
       final result = m['result'];
-
-      if (rootNavigator) {
-        if (result != null && FuickConfig.onRootPopWithResult != null) {
-          FuickConfig.onRootPopWithResult?.call(result);
-        } else {
-          FuickConfig.onRootPop?.call();
-        }
-        return true;
-      }
-
       controller?.pop(pageId: pageId, result: result);
       return true;
     });
