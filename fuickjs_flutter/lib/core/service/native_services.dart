@@ -11,6 +11,7 @@ import 'timer_service.dart';
 import 'toast_service.dart';
 import 'ui_service.dart';
 import 'overlay_service.dart';
+import 'dialog_service.dart';
 
 typedef ServiceBuilder = BaseFuickService Function();
 
@@ -35,6 +36,7 @@ class NativeServiceManager {
     registerService(() => DeviceInfoService());
     registerService(() => ToastService());
     registerService(() => OverlayService());
+    registerService(() => DialogService());
   }
 
   void registerService(ServiceBuilder serviceBuilder) {

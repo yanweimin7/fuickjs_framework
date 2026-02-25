@@ -3,6 +3,7 @@ import { PageContext } from './PageContext';
 import * as PageRender from './page_render';
 
 import { NavigatorService } from './services/NavigatorService';
+import { Dialog } from './services/DialogService';
 
 export function usePageId() {
   const { pageId } = useContext(PageContext);
@@ -25,6 +26,15 @@ export function useNavigator() {
     pop: (result?: unknown) => {
       return NavigatorService.pop(pageId, false, result);
     },
+  };
+}
+
+export function useDialog() {
+  const pageId = usePageId();
+  return {
+    show: (content: React.ReactNode, options?: { barrierDismissible?: boolean; barrierColor?: string }) =>
+      Dialog.show(content, { ...options, pageId }),
+    dismiss: (result?: any) => Dialog.dismiss(result),
   };
 }
 
