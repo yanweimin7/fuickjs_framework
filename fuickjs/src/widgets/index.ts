@@ -68,4 +68,5 @@ export * from './VisibilityDetector';
 export * from './GenericPage';
 export * from './PointerListener';
 export * from './Material';
+export * from './PopScope';
 

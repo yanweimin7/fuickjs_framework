@@ -12,6 +12,10 @@ class FuickNavigationDelegate {
   final Map<int, BuildContext> _pageContexts = {};
   final Map<int, Function(dynamic)> onCloseContainer = {};
 
+  /// 外部导航推送回调
+  Future<dynamic> Function(String path, Map<String, dynamic> params)?
+      onRootPush;
+
   List<BuildContext> get pageContexts => _pageContexts.values.toList();
 
   FuickNavigationDelegate(this.controller);
@@ -37,18 +41,38 @@ class FuickNavigationDelegate {
   }
 
   Future<dynamic> pushWithPath(String path, Map<String, dynamic> params,
-      {int? pageId}) async {
-    return _push(path, params, pageId: pageId);
+      {int? pageId, bool rootNavigator = false}) async {
+    return _push(path, params, pageId: pageId, rootNavigator: rootNavigator);
   }
 
   Future<dynamic> pushReplacementWithPath(
       String path, Map<String, dynamic> params,
-      {int? pageId}) async {
-    return _push(path, params, pageId: pageId, replacement: true);
+      {int? pageId, bool rootNavigator = false}) async {
+    return _push(path, params,
+        pageId: pageId, replacement: true, rootNavigator: rootNavigator);
   }
 
   Future<dynamic> _push(String path, Map<String, dynamic> params,
-      {int? pageId, bool replacement = false}) async {
+      {int? pageId,
+      bool replacement = false,
+      bool rootNavigator = false}) async {
+    if (rootNavigator) {
+      if (onRootPush != null) {
+        return onRootPush!(path, params);
+      }
+      // 如果没有设置 onRootPush，尝试通过当前 context 的 Navigator 往上找
+      final context = _pageContexts[pageId] ?? _pageContexts.values.lastOrNull;
+      if (context != null) {
+        try {
+          final nav = Navigator.of(context, rootNavigator: true);
+          final route = _createRoute(context, path, params, nextPageId);
+          return replacement ? nav.pushReplacement(route) : nav.push(route);
+        } catch (e) {
+          logger.w('Failed to push to root navigator: $e');
+        }
+      }
+    }
+
     final navKey = getNavigatorKey(pageId);
     final nav = navKey?.currentState;
     if (nav == null) return null;

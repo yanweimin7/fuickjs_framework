@@ -59,13 +59,15 @@ class FuickAppController {
       navigation.unregisterNavigator(pageId);
 
   Future<dynamic> pushWithPath(String path, Map<String, dynamic> params,
-          {int? pageId}) =>
-      navigation.pushWithPath(path, params, pageId: pageId);
+          {int? pageId, bool rootNavigator = false}) =>
+      navigation.pushWithPath(path, params,
+          pageId: pageId, rootNavigator: rootNavigator);
 
   Future<dynamic> pushReplacementWithPath(
           String path, Map<String, dynamic> params,
-          {int? pageId}) =>
-      navigation.pushReplacementWithPath(path, params, pageId: pageId);
+          {int? pageId, bool rootNavigator = false}) =>
+      navigation.pushReplacementWithPath(path, params,
+          pageId: pageId, rootNavigator: rootNavigator);
 
   void pop({int? pageId, dynamic result}) =>
       navigation.pop(pageId: pageId, result: result);

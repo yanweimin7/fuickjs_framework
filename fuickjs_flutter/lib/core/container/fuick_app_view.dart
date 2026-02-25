@@ -13,6 +13,8 @@ class FuickAppView extends StatefulWidget {
   final String? debugBusinessCode;
   final String? initialRoute;
   final Map<String, dynamic>? initialParams;
+  final Future<dynamic> Function(String path, Map<String, dynamic> params)?
+      onRootPush;
 
   const FuickAppView({
     super.key,
@@ -20,6 +22,7 @@ class FuickAppView extends StatefulWidget {
     this.debugBusinessCode,
     this.initialRoute,
     this.initialParams,
+    this.onRootPush,
   });
 
   @override
@@ -88,6 +91,7 @@ class _FuickAppViewState extends State<FuickAppView> {
   void _setupWithContext(FuickAppContext context) {
     if (!mounted) return;
     context.appController.registerNavigator(rootPageId, _navKey);
+    context.appController.navigation.onRootPush = widget.onRootPush;
     context.appController.onCloseContainer[rootPageId] = (result) {
       if (mounted) {
         Navigator.of(this.context).pop(result);

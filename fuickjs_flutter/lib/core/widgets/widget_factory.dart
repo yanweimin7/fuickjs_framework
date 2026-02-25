@@ -44,6 +44,7 @@ import 'parsers/material_parser.dart';
 import 'parsers/opacity_parser.dart';
 import 'parsers/padding_parser.dart';
 import 'parsers/page_view_parser.dart';
+import 'parsers/pop_scope_parser.dart';
 import 'parsers/pointer_listener_parser.dart';
 import 'parsers/positioned_parser.dart';
 import 'parsers/refresh_indicator_parser.dart';
@@ -118,6 +119,7 @@ class WidgetFactory {
     register(CircularProgressIndicatorParser());
     register(SafeAreaParser());
     register(PageViewParser());
+    register(PopScopeParser());
     register(GridViewParser());
     register(CustomPaintParser());
     register(ListTileParser());

@@ -12,10 +12,12 @@ class NavigationService extends BaseFuickService {
       final path = (m['path'] ?? '') as String;
       final params = m['params'] ?? {};
       final pageId = asIntOrNull(m['pageId']);
+      final rootNavigator = m['rootNavigator'] == true;
+
       if (path.isNotEmpty) {
         final result = await controller?.pushWithPath(
             path, Map<String, dynamic>.from(params),
-            pageId: pageId);
+            pageId: pageId, rootNavigator: rootNavigator);
         return result;
       }
       return null;
@@ -27,11 +29,12 @@ class NavigationService extends BaseFuickService {
       final path = (m['path'] ?? '') as String;
       final params = m['params'] ?? {};
       final pageId = asIntOrNull(m['pageId']);
+      final rootNavigator = m['rootNavigator'] == true;
 
       if (path.isNotEmpty) {
         final result = await controller?.pushReplacementWithPath(
             path, Map<String, dynamic>.from(params),
-            pageId: pageId);
+            pageId: pageId, rootNavigator: rootNavigator);
         return result;
       }
       return null;
@@ -40,7 +43,9 @@ class NavigationService extends BaseFuickService {
     registerMethod('pop', (args) {
       final m = args is Map ? args : {};
       final pageId = asIntOrNull(m['pageId']);
+      // final rootNavigator = m['rootNavigator'] == true;
       final result = m['result'];
+
       controller?.pop(pageId: pageId, result: result);
       return true;
     });
