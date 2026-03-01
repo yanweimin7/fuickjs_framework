@@ -210,6 +210,7 @@ export const createHostConfig = (): any => {
     appendInitialChild: (parent: Node, child: Node) => {
       child.parent = parent;
       parent.children.push(child);
+      parent.invalidateDslCache(); // Invalidate parent cache
       if (parent.container) {
         parent.container.markChanged(parent);
       }

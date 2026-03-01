@@ -71,3 +71,19 @@ export function useInvisible(callback: () => void) {
     };
   }, [pageId, callback]);
 }
+
+export function usePageConfig(config: { incrementalMode?: boolean; dslCacheEnabled?: boolean }) {
+  const { pageId } = useContext(PageContext);
+
+  useEffect(() => {
+    const container = PageRender.getContainer(pageId);
+    if (container) {
+      if (config.incrementalMode !== undefined) {
+        container.setIncrementalMode(config.incrementalMode);
+      }
+      if (config.dslCacheEnabled !== undefined) {
+        container.setDslCacheEnabled(config.dslCacheEnabled);
+      }
+    }
+  }, [pageId, config.incrementalMode, config.dslCacheEnabled]);
+}

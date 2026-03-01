@@ -17,7 +17,7 @@
 
 ## 模块文档
 
-- [核心特性](./core_features.md)
+- [核心特性](./core_features.md) - 包含事件通信、路由、Hooks 以及 **DSL 渲染缓存机制**。
 - [UI 组件 (Widgets)](./widgets.md)
 - [原生服务 (Native Services)](./services.md)
 - [浏览器标准 API](./browser_apis.md)

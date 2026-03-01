@@ -7,6 +7,7 @@ export class PageContainer {
   pageId: number;
   root: Node | null = null;
   incrementalMode: boolean = true;
+  dslCacheEnabled: boolean = true;
 
   public incrementalStrategy: IncrementalStrategy;
   public diffStrategy: DiffStrategy;
@@ -125,6 +126,10 @@ export class PageContainer {
     this.incrementalMode = enabled;
   }
 
+  public setDslCacheEnabled(enabled: boolean) {
+    this.dslCacheEnabled = enabled;
+  }
+
   public recordUpdate(node: Node, updatePayload: unknown[]) {
     if (this.incrementalMode) {
       this.incrementalStrategy.recordUpdate(node, updatePayload);
@@ -171,6 +176,7 @@ export class PageContainer {
       const oldIndex = child.parent.children.indexOf(child);
       if (oldIndex >= 0) {
         child.parent.children.splice(oldIndex, 1);
+        child.parent.invalidateDslCache(); // Invalidate old parent cache
         if (this.incrementalMode) {
           this.recordRemoval(child.parent, child);
         } else {
@@ -188,6 +194,8 @@ export class PageContainer {
 
     child.parent = parent;
     parent.children.push(child);
+    parent.invalidateDslCache(); // Invalidate new parent cache
+
     if (this.incrementalMode) {
       this.recordInsert(parent, child, parent.children.length - 1);
     } else {
@@ -201,6 +209,7 @@ export class PageContainer {
       const oldIndex = child.parent.children.indexOf(child);
       if (oldIndex >= 0) {
         child.parent.children.splice(oldIndex, 1);
+        child.parent.invalidateDslCache(); // Invalidate old parent cache
         // If it's the same parent, we will mark it changed later with the new insertion
         if (child.parent !== parent) {
           if (this.incrementalMode) {
@@ -232,6 +241,7 @@ export class PageContainer {
     } else {
       parent.children.push(child);
     }
+    parent.invalidateDslCache(); // Invalidate parent cache
 
     if (this.incrementalMode) {
       // If i is -1, it was pushed, index is length-1
@@ -245,6 +255,7 @@ export class PageContainer {
   removeChild(parent: Node, child: Node) {
     const i = parent.children.indexOf(child);
     if (i >= 0) parent.children.splice(i, 1);
+    parent.invalidateDslCache(); // Invalidate parent cache
     child.destroy();
 
     if (this.incrementalMode) {
@@ -275,6 +286,8 @@ export class PageContainer {
     if (oldText === newText) return;
 
     node.props.text = newText;
+    node.invalidateDslCache(); // Ensure DSL cache is invalidated
+
     if (this.incrementalMode) {
       this.recordUpdate(node, ['text', newText]);
     } else {

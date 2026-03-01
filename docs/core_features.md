@@ -90,14 +90,20 @@ Router.register('/detail', (params) => <DetailPage id={params.id} />);
 - **useDialog()**: 获取对话框控制对象，包含 `show` 和 `dismiss`。
 - **useVisible(callback)**: 监听页面变为可见状态的生命周期。
 - **useInvisible(callback)**: 监听页面变为不可见状态的生命周期。
+- **usePageConfig(config)**: 配置页面级渲染参数。
+  - `incrementalMode`: 是否启用增量更新 (Patching)。
+  - `dslCacheEnabled`: 是否启用 DSL 缓存。
 
 ### 使用示例
 ```typescript
-import { useNavigator, useVisible } from 'fuickjs';
+import { useNavigator, useVisible, usePageConfig } from 'fuickjs';
 
 export function MyPage() {
   const nav = useNavigator();
   
+  // 针对高动态页面，可以关闭 DSL 缓存
+  usePageConfig({ dslCacheEnabled: false });
+
   useVisible(() => {
     console.log('页面进入前台');
   });
@@ -108,7 +114,19 @@ export function MyPage() {
 }
 ```
 
-## 5. 渲染核心概念
+## 5. DSL 渲染与缓存优化
+
+FuickJS 采用 DSL (Domain Specific Language) 机制将 React 组件树同步到 Flutter 侧。为了保证渲染性能，框架引入了精细的缓存与失效机制。
+
+### 5.1 缓存失效 (Cache Invalidation)
+- **属性变更**: 当节点的 `props` 发生变化时，该节点的 DSL 缓存会自动标记为 `dirty`。
+- **结构变更**: 当节点发生添加 (`appendChild`)、插入 (`insertBefore`) 或移除 (`removeChild`) 操作时，该节点及其父节点的 DSL 缓存均会失效。
+- **失效传播**: 失效信号会递归向上通知父节点。如果父节点是 **透明节点** (如 `FlutterProps`)，失效信号会自动穿透并确保最近的实体 Widget 节点（如 `Scaffold` 或 `AppBar`）重新生成 DSL，从而保证嵌套组件的状态更新能正确映射。
+
+### 5.2 页面级配置
+通过 `usePageConfig` Hook，开发者可以针对特定页面关闭 DSL 缓存。这在处理包含大量动画或频繁状态更新的复杂页面时非常有用，可以确保 UI 的绝对实时性，避免潜在的缓存同步问题。
+
+## 6. 渲染核心概念
 
 - **PageContainer**: 每个页面都有一个独立的 `PageContainer` 容器，负责持有 React 根节点、管理该页面的回调函数（Callbacks）以及生成渲染 DSL。
 - **DSL (Domain Specific Language)**: React 组件树被转换为一个 JSON 结构的 DSL 发送给 Flutter，Flutter 根据该结构构建真实的 Widget 树。

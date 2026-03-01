@@ -45,17 +45,22 @@ export class Node {
         const value = newProps[key];
         this.props[key] = value;
       }
+
       // Recursively register callbacks to handle nested props and top-level callbacks
       this.registerCallbacksRecursive(newProps);
     }
 
     // Re-register with new refId
     this.container?.registerNode(this);
-    
+
     // 标记 DSL 缓存需要重新计算
     this._dslCacheDirty = true;
     // 通知父节点子树有变化
     this._invalidateParentDslCache();
+  }
+
+  private _isTransparent(): boolean {
+    return this.type === 'FlutterProps' || this.type === 'flutter-props';
   }
 
   /**
@@ -64,11 +69,15 @@ export class Node {
   private _invalidateParentDslCache() {
     let current = this.parent;
     while (current) {
-      if (!current._childrenDslCacheDirty) {
-        current._childrenDslCacheDirty = true;
+      const wasDirty = current._childrenDslCacheDirty;
+      current._childrenDslCacheDirty = true;
+
+      // 如果父节点是透明节点（如 FlutterProps），由于它的 toDsl 不会被直接调用（从而无法清除 dirty 标记），
+      // 我们必须强制继续向上传递失效信号，直到到达一个真正的 Widget 节点。
+      if (!wasDirty || current._isTransparent()) {
         current = current.parent;
       } else {
-        // 父节点已经被标记，可以停止向上传播
+        // 父节点已经被标记，且不是透明节点，可以停止向上传播
         break;
       }
     }
@@ -141,8 +150,10 @@ export class Node {
   }
 
   toDsl(): unknown {
+    const dslCacheEnabled = this.container ? this.container.dslCacheEnabled : true;
+
     // 如果自身缓存有效且子树无变化，直接返回缓存
-    if (!this._dslCacheDirty && !this._childrenDslCacheDirty && this._dslCache !== null) {
+    if (dslCacheEnabled && !this._dslCacheDirty && !this._childrenDslCacheDirty && this._dslCache !== null) {
       return this._dslCache;
     }
 
@@ -217,7 +228,7 @@ export class Node {
       const node = stack.pop()!;
       node.clearCallbacks();
       node.container?.unregisterNode(node);
-      
+
       // 清理 DSL 缓存
       node._dslCache = null;
       node._dslCacheDirty = true;
