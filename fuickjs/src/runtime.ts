@@ -3,12 +3,21 @@ import * as Console from './ex/console';
 import * as Timer from './ex/timer';
 import { fetch } from './ex/fetch';
 import { ErrorHandler } from './ErrorHandler';
+import { atob, btoa } from './ex/base64';
+import { URL, URLSearchParams } from './ex/url';
+import { Event, CustomEvent, EventTarget } from './ex/events';
+import { AbortController, AbortSignal } from './ex/abort';
+import { XMLHttpRequest } from './ex/xhr';
+import { performance } from './ex/performance';
+import { localStorage, sessionStorage } from './ex/storage';
 
 export function bindGlobals() {
   setupPolyfills();
 
-  // 显式挂载到 globalThis，确保 Flutter 侧可以访问到
+  // Standard globals
   Object.assign(globalThis, {
+    window: globalThis,
+    self: globalThis,
     fuickjs: {
       render: PageRender.render,
       destroy: PageRender.destroy,
@@ -35,6 +44,10 @@ function setupPolyfills() {
     log: Console.log,
     warn: Console.warn,
     error: Console.error,
+    info: Console.info,
+    debug: Console.debug,
+    trace: Console.trace,
+    clear: Console.clear,
   } as unknown as Console;
 
   // Timer
@@ -48,12 +61,43 @@ function setupPolyfills() {
   // @ts-ignore
   globalThis.fetch = fetch;
 
+  // Base64
+  globalThis.atob = atob;
+  globalThis.btoa = btoa;
+
+  // URL
+  globalThis.URL = URL as unknown as typeof globalThis.URL;
+  globalThis.URLSearchParams = URLSearchParams as unknown as typeof globalThis.URLSearchParams;
+
+  // Events
+  globalThis.Event = Event as unknown as typeof globalThis.Event;
+  globalThis.CustomEvent = CustomEvent as unknown as typeof globalThis.CustomEvent;
+  globalThis.EventTarget = EventTarget as unknown as typeof globalThis.EventTarget;
+
+  // Abort
+  globalThis.AbortController = AbortController as unknown as typeof globalThis.AbortController;
+  globalThis.AbortSignal = AbortSignal as unknown as typeof globalThis.AbortSignal;
+
+  // XHR
+  globalThis.XMLHttpRequest = XMLHttpRequest as unknown as typeof globalThis.XMLHttpRequest;
+
   // Performance
   if (!globalThis.performance) {
-    (globalThis as unknown as { performance: unknown }).performance = {
-      now: () => Date.now(),
-    };
+    (globalThis as unknown as { performance: unknown }).performance = performance;
   }
+
+  // Storage
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: localStorage,
+    writable: false,
+    configurable: false,
+  });
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    value: sessionStorage,
+    writable: false,
+    configurable: false,
+  });
+
   const globalAny = globalThis as unknown as Record<string, unknown>;
   const handleError = (error: unknown, source: 'promise' | 'runtime', detail?: unknown) => {
     ErrorHandler.notify(error, source, detail);

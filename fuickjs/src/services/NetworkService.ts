@@ -12,6 +12,7 @@ export class NetworkService {
     method: string,
     headers: Record<string, string>,
     body?: string,
+    requestId?: string,
   ): Promise<NetworkResponse> {
     if (typeof dartCallNativeAsync !== 'function') {
       throw new Error('dartCallNativeAsync is not available.');
@@ -21,6 +22,11 @@ export class NetworkService {
       method,
       headers,
       body,
+      requestId,
     })) as NetworkResponse;
+  }
+
+  static cancel(requestId: string): void {
+    dartCallNative('Network.cancel', { requestId });
   }
 }

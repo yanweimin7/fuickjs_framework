@@ -52,3 +52,21 @@ export function error(...args: unknown[]) {
     }
   }
 }
+
+export function info(...args: unknown[]) {
+  log(...args);
+}
+
+export function debug(...args: unknown[]) {
+  log(...args);
+}
+
+export function trace() {
+  const err = new Error();
+  log('Console Trace:', err.stack);
+}
+
+export function clear() {
+  // Not implemented in native yet, but provide the method
+  log('[Console] clear called');
+}
