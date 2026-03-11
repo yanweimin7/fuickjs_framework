@@ -377,3 +377,10 @@ class FuickNodeManagerProvider extends InheritedWidget {
   bool updateShouldNotify(FuickNodeManagerProvider oldWidget) =>
       manager != oldWidget.manager;
 }
+
+/// Global widget factory instance
+final WidgetFactory widgetFactory = WidgetFactory();
+
+/// Global page ID generator
+int _globalPageId = 0;
+int get nextPageId => ++_globalPageId;

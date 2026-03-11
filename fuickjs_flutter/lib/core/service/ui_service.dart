@@ -1,5 +1,5 @@
-import '../container/fuick_app_controller.dart';
 import '../utils/extensions.dart';
+import '../widgets/widget_factory.dart';
 import 'base_fuick_service.dart';
 
 class UIService extends BaseFuickService {
@@ -69,7 +69,7 @@ class UIService extends BaseFuickService {
       final List listArgs = args is List ? args : [args];
       if (listArgs.isNotEmpty && listArgs[0] is String) {
         final type = listArgs[0] as String;
-        return widgetFactory.hasWidget(type) ?? false;
+        return widgetFactory.hasWidget(type);
       }
       return false;
     });
