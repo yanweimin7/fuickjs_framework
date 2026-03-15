@@ -1,5 +1,4 @@
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import '../logger.dart';
 import 'base_fuick_service.dart';
 
@@ -7,7 +6,8 @@ class NetworkService extends BaseFuickService {
   @override
   String get name => 'Network';
 
-  final Map<String, http.Client> _activeRequests = {};
+  final Dio _dio = Dio();
+  final Map<String, CancelToken> _activeRequests = {};
 
   NetworkService() {
     registerAsyncMethod('fetch', (args) async {
@@ -23,7 +23,7 @@ class NetworkService extends BaseFuickService {
 
         final String method =
             (options['method']?.toString() ?? 'GET').toUpperCase();
-        final Map<String, String> headers = {};
+        final Map<String, dynamic> headers = {};
         if (options['headers'] is Map) {
           (options['headers'] as Map).forEach((key, value) {
             headers[key.toString()] = value.toString();
@@ -31,46 +31,53 @@ class NetworkService extends BaseFuickService {
         }
         final dynamic body = options['body'];
 
-        final client = http.Client();
+        final cancelToken = CancelToken();
         if (requestId != null) {
-          _activeRequests[requestId] = client;
+          _activeRequests[requestId] = cancelToken;
         }
 
-        http.Response response;
-        final uri = Uri.parse(url);
-
+        Response response;
         try {
-          switch (method) {
-            case 'GET':
-              response = await client.get(uri, headers: headers);
-              break;
-            case 'POST':
-              response = await client.post(uri, headers: headers, body: body);
-              break;
-            case 'PUT':
-              response = await client.put(uri, headers: headers, body: body);
-              break;
-            case 'DELETE':
-              response = await client.delete(uri, headers: headers, body: body);
-              break;
-            case 'PATCH':
-              response = await client.patch(uri, headers: headers, body: body);
-              break;
-            default:
-              throw Exception('Unsupported HTTP method: $method');
-          }
+          final dioOptions = Options(
+            method: method,
+            headers: headers,
+          );
+
+          response = await _dio.request(
+            url,
+            data: body,
+            options: dioOptions,
+            cancelToken: cancelToken,
+          );
         } finally {
           if (requestId != null) {
             _activeRequests.remove(requestId);
           }
-          client.close();
         }
 
+        final responseHeaders = <String, String>{};
+        response.headers.forEach((key, values) {
+          responseHeaders[key] = values.join(', ');
+        });
+
         return {
-          'status': response.statusCode,
-          'body': response.body,
-          'headers': response.headers,
+          'status': response.statusCode ?? 0,
+          'body': response.data is String
+              ? response.data
+              : response.data?.toString() ?? '',
+          'headers': responseHeaders,
         };
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.cancel) {
+          logger.i('[NetworkService] Request cancelled');
+          return {
+            'status': -1,
+            'body': 'Request cancelled',
+            'headers': {},
+          };
+        }
+        logger.e('[NetworkService] Dio error: ${e.message}');
+        rethrow;
       } catch (e, s) {
         logger.e('[NetworkService] Error in fetch: $e\n$s');
         rethrow;
@@ -81,10 +88,10 @@ class NetworkService extends BaseFuickService {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? requestId = options['requestId']?.toString();
       if (requestId != null) {
-        final client = _activeRequests.remove(requestId);
-        if (client != null) {
+        final cancelToken = _activeRequests.remove(requestId);
+        if (cancelToken != null) {
           logger.i('[NetworkService] Cancelling request: $requestId');
-          client.close();
+          cancelToken.cancel('User cancelled');
           return true;
         }
       }
