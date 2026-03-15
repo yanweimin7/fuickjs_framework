@@ -1,6 +1,6 @@
+import '../../util/logger.dart';
 import '../entities/package.dart';
 import '../value_objects/sync_result.dart';
-import '../../util/logger.dart';
 
 class SyncService {
   SyncService();
@@ -20,6 +20,7 @@ class SyncService {
       effectivePackages[pkg.name] = pkg;
     }
 
+    /// 如果远程包跟内置包一致（版本号和shasum都相同），则使用内置包
     for (final pkg in internal) {
       final existing = effectivePackages[pkg.name];
       if (existing != null && existing.isSameVersion(pkg)) {
@@ -37,9 +38,9 @@ class SyncService {
       }
     }
 
+    /// 如果远程包已经删了，本地还在，则要删除本地生效的包
     for (final activePkg in active) {
-      final exists = effectivePackages.values.any((p) =>
-          p.name == activePkg.name && p.versionShasumName == activePkg.versionShasumName);
+      final exists = effectivePackages.containsKey(activePkg.name);
       if (!exists) {
         removed.add(activePkg);
       }
@@ -52,7 +53,8 @@ class SyncService {
     );
 
     if (result.hasChanges) {
-      logger(() => 'Sync: added=${result.added.length}, updated=${result.updated.length}, removed=${result.removed.length}');
+      logger(() =>
+          'Sync: added=${result.added.length}, updated=${result.updated.length}, removed=${result.removed.length}');
     }
 
     return result;
