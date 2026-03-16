@@ -10,6 +10,7 @@ import { AbortController, AbortSignal } from './ex/abort';
 import { XMLHttpRequest } from './ex/xhr';
 import { performance } from './ex/performance';
 import { localStorage, sessionStorage } from './ex/storage';
+import { WebSocket, CloseEvent, MessageEvent, base64ToArrayBuffer } from './ex/websocket';
 
 export function bindGlobals() {
   setupPolyfills();
@@ -80,6 +81,12 @@ function setupPolyfills() {
 
   // XHR
   globalThis.XMLHttpRequest = XMLHttpRequest as unknown as typeof globalThis.XMLHttpRequest;
+
+  // WebSocket
+  globalThis.WebSocket = WebSocket as unknown as typeof globalThis.WebSocket;
+
+  // Make base64ToArrayBuffer available globally for Flutter to use
+  (globalThis as unknown as Record<string, unknown>).base64ToArrayBuffer = base64ToArrayBuffer;
 
   // Performance
   if (!globalThis.performance) {

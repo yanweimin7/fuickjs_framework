@@ -12,6 +12,7 @@ import 'toast_service.dart';
 import 'ui_service.dart';
 import 'overlay_service.dart';
 import 'dialog_service.dart';
+import 'websocket_service.dart';
 
 typedef ServiceBuilder = BaseFuickService Function();
 
@@ -37,6 +38,7 @@ class NativeServiceManager {
     registerService(() => ToastService());
     registerService(() => OverlayService());
     registerService(() => DialogService());
+    registerService(() => WebSocketService());
   }
 
   void registerService(ServiceBuilder serviceBuilder) {

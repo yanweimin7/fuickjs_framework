@@ -21,3 +21,4 @@ export { DeviceInfo, type DeviceInfoData } from './services/DeviceInfo';
 export { Toast } from './services/Toast';
 export { Overlay } from './services/OverlayService';
 export { Dialog } from './services/DialogService';
+export { WebSocket, CloseEvent, MessageEvent } from './ex/websocket';
