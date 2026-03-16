@@ -6,8 +6,17 @@ import '../engine/fuick_js_proxy.dart';
 import '../service/app_service_binder.dart';
 import '../service/base_fuick_service.dart';
 import '../service/fuick_command_bus.dart';
+import '../widgets/widget_factory.dart';
 import 'fuick_navigation_delegate.dart';
 import 'fuick_page_delegate.dart';
+
+int pageId = 0;
+
+int get nextPageId {
+  return ++pageId;
+}
+
+WidgetFactory widgetFactory = WidgetFactory();
 
 class FuickAppController {
   final IQuickJsContext ctx;

@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../logger.dart';
-import '../widgets/widget_factory.dart';
 import 'fuick_app_controller.dart';
 import 'fuick_page.dart';
 import 'fuick_page_view.dart';
