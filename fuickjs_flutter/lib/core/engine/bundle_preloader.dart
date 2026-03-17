@@ -55,7 +55,7 @@ class BundlePreloader {
 
     // Fallback to source code
     try {
-      final source = await rootBundle.loadString('assets/js/$bundleName.js');
+      final source = await rootBundle.loadString('assets/js/$bundleName.js',cache: false);
       _sourceCodeCache[bundleName] = source;
       logger.d('[BundlePreloader] Loaded source code for $bundleName');
     } catch (e) {
