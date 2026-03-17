@@ -104,20 +104,32 @@ export function createRenderer(): Renderer {
     return root;
   }
 
+  // Track rendered pages to avoid flushSync after first render
+  const renderedPages = new Set<number>();
+
   return {
     update(element: React.ReactNode, pageId: number) {
       const root = ensureRoot(pageId);
+      const isFirstRender = !renderedPages.has(pageId);
       let retryCount = 0;
       const maxRetries = 100; // Prevent infinite loop
 
       const performUpdate = () => {
         try {
-          reconciler.updateContainer(element, root, null, () => {
-            // Success
-          });
+          if (isFirstRender) {
+            // Use flushSync for first render to ensure page is displayed immediately
+            reconciler.flushSync(() => {
+              reconciler.updateContainer(element, root, null, null);
+            });
+            renderedPages.add(pageId);
+          } else {
+            // Use async rendering for subsequent updates
+            reconciler.updateContainer(element, root, null, null);
+          }
           retryCount = 0; // Reset on success
         } catch (e: unknown) {
           const msg = (e as Error).message || String(e);
+          console.error(`[Renderer] Error in updateContainer for page ${pageId}:`, msg);
           if ((msg.includes('327') || msg.includes('working')) && retryCount < maxRetries) {
             retryCount++;
             globalThis.setTimeout(performUpdate, 16);
@@ -142,9 +154,7 @@ export function createRenderer(): Renderer {
 
         const performDestroy = () => {
           try {
-            reconciler.updateContainer(null, root, null, () => {
-              console.log(`[Renderer] Page ${pageId} unmounted successfully`);
-            });
+            reconciler.updateContainer(null, root, null, null);
             delete roots[pageId];
             delete containers[pageId];
 

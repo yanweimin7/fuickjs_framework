@@ -105,11 +105,15 @@ class IsolateHandler {
 
           dynamic result;
           if (type == 'eval') {
-            result = await ctx!.eval(payload as String);
+            final code = payload['code'] as String;
+            final returnValue = payload['returnValue'] as bool? ?? true;
+            result = await ctx!.eval(code, returnValue: returnValue);
           } else if (type == 'evalModule') {
             result = await ctx!.evalModule(payload as String);
           } else if (type == 'evalBinary') {
-            result = await ctx!.evalBinary(payload as Uint8List);
+            final bytecode = payload['bytecode'] as Uint8List;
+            final returnValue = payload['returnValue'] as bool? ?? false;
+            result = await ctx!.evalBinary(bytecode, returnValue: returnValue);
           } else if (type == 'runJobs') {
             result = await ctx!.runJobs();
           } else if (type == 'invoke') {

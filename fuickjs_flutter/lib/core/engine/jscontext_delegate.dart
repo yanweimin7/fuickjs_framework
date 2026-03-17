@@ -42,16 +42,16 @@ class JsContextDelegate implements IQuickJsContext {
   }
 
   @override
-  Future<dynamic> eval(String code) =>
-      IsolateWorker.instance.sendRequest(contextId, 'eval', code);
+  Future<dynamic> eval(String code, {bool returnValue = true}) =>
+      IsolateWorker.instance.sendRequest(contextId, 'eval', {'code': code, 'returnValue': returnValue});
 
   @override
   Future<dynamic> evalModule(String code) =>
       IsolateWorker.instance.sendRequest(contextId, 'evalModule', code);
 
   @override
-  Future<dynamic> evalBinary(Uint8List bytecode) =>
-      IsolateWorker.instance.sendRequest(contextId, 'evalBinary', bytecode);
+  Future<dynamic> evalBinary(Uint8List bytecode, {bool returnValue = false}) =>
+      IsolateWorker.instance.sendRequest(contextId, 'evalBinary', {'bytecode': bytecode, 'returnValue': returnValue});
 
   @override
   dynamic invoke(String? objectName, String methodName, List<dynamic> args) =>
@@ -86,18 +86,18 @@ class JsContextDelegate implements IQuickJsContext {
   }
 
   @override
-  Future evalBinaryFile(String path) async {
+  Future evalBinaryFile(String path, {bool returnValue = false}) async {
     final ByteData data = await rootBundle.load(path);
     final Uint8List bytes = data.buffer.asUint8List(
       data.offsetInBytes,
       data.lengthInBytes,
     );
-    return evalBinary(bytes);
+    return evalBinary(bytes, returnValue: returnValue);
   }
 
   @override
-  Future evalFile(String path) async {
+  Future evalFile(String path, {bool returnValue = true}) async {
     final String code = await rootBundle.loadString(path);
-    return eval(code);
+    return eval(code, returnValue: returnValue);
   }
 }

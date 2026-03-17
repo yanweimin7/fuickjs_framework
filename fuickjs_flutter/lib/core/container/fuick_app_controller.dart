@@ -32,9 +32,9 @@ class FuickAppController {
   final serviceBinder = AppServiceBinder();
   final ValueNotifier<bool> isBundleLoaded = ValueNotifier<bool>(false);
 
-  static Future<void> preloadBundle(String bundleName) {
-    return BundlePreloader().preloadBundle(bundleName);
-  }
+  // static Future<void> preloadBundle(String bundleName) {
+  //   return BundlePreloader().preloadBundle(bundleName, );
+  // }
 
   FuickAppController(this.ctx) {
     jsProxy = FuickJsProxy(ctx);

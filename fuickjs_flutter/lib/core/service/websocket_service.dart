@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../logger.dart';
+import '../utils/extensions.dart';
 import 'base_fuick_service.dart';
 
 class WebSocketService extends BaseFuickService {
@@ -187,7 +188,7 @@ class WebSocketService extends BaseFuickService {
     try {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? socketId = options['socketId']?.toString();
-      final int? code = options['code'] as int?;
+      final int? code =  asIntOrNull(options['code']);
       final String? reason = options['reason']?.toString();
 
       if (socketId == null || socketId.isEmpty) {

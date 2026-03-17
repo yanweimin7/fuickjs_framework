@@ -21,7 +21,7 @@ class FuickAppContext {
 
   FuickAppContext({
     required this.appName,
-    this.useAotCode = true,
+    this.useAotCode = false,
     this.debugBusinessCode,
   });
 
@@ -37,9 +37,9 @@ class FuickAppContext {
 
     // Start bundle preloading in parallel with engine initialization
     final frameworkPreload =
-        BundlePreloader().preloadBundle('framework.bundle');
+        BundlePreloader().preloadBundle('framework.bundle', useAot: useAotCode);
     final appPreload = (debugBusinessCode == null)
-        ? BundlePreloader().preloadBundle(appName)
+        ? BundlePreloader().preloadBundle(appName,useAot: useAotCode)
         : Future.value();
 
     try {
@@ -75,7 +75,7 @@ class FuickAppContext {
       );
 
       if (debugBusinessCode != null) {
-        await ctx.eval(debugBusinessCode!);
+        await ctx.eval(debugBusinessCode!,returnValue: false);
         logger.d(
           '[Debug] Successfully loaded business bundle from debug payload',
         );
@@ -98,27 +98,27 @@ class FuickAppContext {
       // Try using preloaded bytecode
       final bytecode = preloader.getByteCode(bundleName);
       if (bytecode != null && useAotCode) {
-        await ctx.evalBinary(bytecode);
+        await ctx.evalBinary(bytecode, returnValue: false);
         return;
       }
 
       // Try using preloaded source code
       final sourceCode = preloader.getSourceCode(bundleName);
       if (sourceCode != null) {
-        await ctx.eval(sourceCode);
+        await ctx.eval(sourceCode, returnValue: false);
         return;
       }
 
       // Fallback to file loading if not preloaded (though it should be)
       try {
         if (useAotCode) {
-          await ctx.evalBinaryFile('assets/js/$bundleName.qjc');
+          await ctx.evalBinaryFile('assets/js/$bundleName.qjc', returnValue: false);
         } else {
-          await ctx.evalFile('assets/js/$bundleName.js');
+          await ctx.evalFile('assets/js/$bundleName.js', returnValue: false);
         }
       } catch (e) {
         logger.w('加载字节码 bundle $bundleName 失败，尝试加载文本 bundle: $e');
-        await ctx.evalFile('assets/js/$bundleName.js');
+        await ctx.evalFile('assets/js/$bundleName.js', returnValue: false);
         logger.i('成功加载文本 bundle $bundleName');
       }
     } catch (e) {

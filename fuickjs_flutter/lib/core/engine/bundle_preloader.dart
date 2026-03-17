@@ -19,7 +19,7 @@ class BundlePreloader {
 
   /// Preload a bundle by name.
   /// It tries to load .qjc (bytecode) first, then .js (source code).
-  Future<void> preloadBundle(String bundleName) async {
+  Future<void> preloadBundle(String bundleName, {required bool useAot}) async {
     if (_byteCodeCache.containsKey(bundleName) ||
         _sourceCodeCache.containsKey(bundleName)) {
       return;
@@ -33,7 +33,7 @@ class BundlePreloader {
     _pendingLoads[bundleName] = completer.future;
 
     try {
-      await _loadBundleContent(bundleName);
+      await _loadBundleContent(bundleName,useAot: useAot);
       completer.complete();
     } catch (e) {
       completer.completeError(e);
@@ -42,15 +42,17 @@ class BundlePreloader {
     }
   }
 
-  Future<void> _loadBundleContent(String bundleName) async {
-    // Try loading bytecode first
-    try {
-      final byteData = await rootBundle.load('assets/js/$bundleName.qjc');
-      _byteCodeCache[bundleName] = byteData.buffer.asUint8List();
-      logger.d('[BundlePreloader] Loaded bytecode for $bundleName');
-      return;
-    } catch (e) {
-      // Ignore error and fall back to source code
+  Future<void> _loadBundleContent(String bundleName,  {required bool useAot}) async {
+    if(useAot) {
+      // Try loading bytecode first
+      try {
+        final byteData = await rootBundle.load('assets/js/$bundleName.qjc');
+        _byteCodeCache[bundleName] = byteData.buffer.asUint8List();
+        logger.d('[BundlePreloader] Loaded bytecode for $bundleName');
+        return;
+      } catch (e) {
+        // Ignore error and fall back to source code
+      }
     }
 
     // Fallback to source code
