@@ -36,10 +36,8 @@ class FuickAppContext {
     final stopwatch = Stopwatch()..start();
 
     // Start bundle preloading in parallel with engine initialization
-    final frameworkPreload =
-        BundlePreloader().preloadBundle('framework.bundle', useAot: useAotCode);
     final appPreload = (debugBusinessCode == null)
-        ? BundlePreloader().preloadBundle(appName,useAot: useAotCode)
+        ? BundlePreloader().preloadBundle('bundle', useAot: useAotCode)
         : Future.value();
 
     try {
@@ -57,7 +55,7 @@ class FuickAppContext {
       appController = FuickAppController(ctx);
 
       // Wait for preloading to finish
-      await Future.wait([frameworkPreload, appPreload]);
+      await appPreload;
 
       isReady.value = true;
       await _loadBundle();
@@ -69,26 +67,21 @@ class FuickAppContext {
   Future<void> _loadBundle() async {
     final stopwatch = Stopwatch()..start();
     try {
-      await _loadSingleBundle('framework.bundle');
-      logger.d(
-        '[Performance] load framework.bundle cost: ${stopwatch.elapsedMilliseconds}ms',
-      );
-
       if (debugBusinessCode != null) {
         await ctx.eval(debugBusinessCode!,returnValue: false);
         logger.d(
           '[Debug] Successfully loaded business bundle from debug payload',
         );
       } else {
-        await _loadSingleBundle(appName);
+        await _loadSingleBundle('bundle');
       }
       logger.d(
-        '[Performance] load business bundle cost: ${stopwatch.elapsedMilliseconds}ms',
+        '[Performance] load bundle cost: ${stopwatch.elapsedMilliseconds}ms',
       );
 
       appController.isBundleLoaded.value = true;
     } catch (e, s) {
-      logger.e('加载 React bundle 失败: $e\n$s');
+      logger.e('加载 bundle 失败: $e\n$s');
     }
   }
 
