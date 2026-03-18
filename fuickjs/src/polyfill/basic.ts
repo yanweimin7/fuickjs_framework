@@ -93,3 +93,9 @@ if (typeof TextDecoder === 'undefined') {
     }
   };
 }
+
+if (typeof globalAny.queueMicrotask === 'undefined') {
+  globalAny.queueMicrotask = function queueMicrotask(callback: () => void) {
+    Promise.resolve().then(callback);
+  };
+}
