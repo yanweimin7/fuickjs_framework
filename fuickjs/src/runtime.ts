@@ -10,7 +10,8 @@ import { AbortController, AbortSignal } from './ex/abort';
 import { XMLHttpRequest } from './ex/xhr';
 import { performance } from './ex/performance';
 import { localStorage, sessionStorage } from './ex/storage';
-import { WebSocket, CloseEvent, MessageEvent, base64ToArrayBuffer } from './ex/websocket';
+import { WebSocket, base64ToArrayBuffer } from './ex/websocket';
+import { Headers } from './ex/headers';
 
 export function bindGlobals() {
   setupPolyfills();
@@ -78,6 +79,9 @@ function setupPolyfills() {
   // Abort
   globalThis.AbortController = AbortController as unknown as typeof globalThis.AbortController;
   globalThis.AbortSignal = AbortSignal as unknown as typeof globalThis.AbortSignal;
+
+  // Headers
+  globalThis.Headers = Headers as unknown as typeof globalThis.Headers;
 
   // XHR
   globalThis.XMLHttpRequest = XMLHttpRequest as unknown as typeof globalThis.XMLHttpRequest;

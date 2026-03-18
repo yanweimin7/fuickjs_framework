@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import '../logger.dart';
 import 'base_fuick_service.dart';
@@ -6,7 +8,11 @@ class NetworkService extends BaseFuickService {
   @override
   String get name => 'Network';
 
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
+    validateStatus: (status) => true,
+  ));
   final Map<String, CancelToken> _activeRequests = {};
 
   NetworkService() {
@@ -64,7 +70,7 @@ class NetworkService extends BaseFuickService {
           'status': response.statusCode ?? 0,
           'body': response.data is String
               ? response.data
-              : response.data?.toString() ?? '',
+              : jsonEncode(response.data),
           'headers': responseHeaders,
         };
       } on DioException catch (e) {
@@ -76,8 +82,16 @@ class NetworkService extends BaseFuickService {
             'headers': {},
           };
         }
-        logger.e('[NetworkService] Dio error: ${e.message}');
-        rethrow;
+        final statusCode = e.response?.statusCode ?? 0;
+        final responseBody = e.response?.data is String
+            ? e.response!.data
+            : jsonEncode(e.response?.data) ?? e.message ?? 'Unknown error';
+        logger.e('[NetworkService] Dio error: ${e.message}, status: $statusCode');
+        return {
+          'status': statusCode,
+          'body': responseBody,
+          'headers': {},
+        };
       } catch (e, s) {
         logger.e('[NetworkService] Error in fetch: $e\n$s');
         rethrow;
