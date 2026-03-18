@@ -90,16 +90,7 @@ export function createRenderer(): Renderer {
 
     // container.setIncrementalMode(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const root = (reconciler as any).createContainer(
-      container,
-      1,
-      null,
-      false,
-      null,
-      '',
-      handleRecoverableError,
-      null,
-    );
+    const root = (reconciler as any).createContainer(container, 1, null, false, null, '', handleRecoverableError, null);
     roots[pageId] = root;
     return root;
   }

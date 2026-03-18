@@ -42,13 +42,15 @@ export function warn(...args: unknown[]) {
 }
 
 export function error(...args: unknown[]) {
+  const stack = new Error().stack;
   const message = args.map(formatArg).join(' ');
+  const fullMessage = message + (stack ? '\n' + stack : '');
   try {
-    ConsoleService.error(message);
+    ConsoleService.error(fullMessage);
   } catch {
     const globalObj = globalThis as unknown as { print?: (msg: string) => void };
     if (typeof globalObj.print === 'function') {
-      globalObj.print('[ERROR] ' + message);
+      globalObj.print('[ERROR] ' + fullMessage);
     }
   }
 }

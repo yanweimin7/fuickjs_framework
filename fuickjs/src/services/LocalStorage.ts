@@ -1,4 +1,3 @@
-
 export class LocalStorage {
   static getItem(key: string): Promise<string | null> {
     return dartCallNativeAsync('LocalStorage.getItem', [key]);

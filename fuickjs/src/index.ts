@@ -1,4 +1,4 @@
-import './polyfills';
+import './polyfill';
 export * from './components';
 export * from './renderer';
 export * from './router';

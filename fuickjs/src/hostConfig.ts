@@ -193,9 +193,9 @@ export const createHostConfig = (): any => {
     isPrimaryRenderer: true,
     getCurrentEventPriority: () => 16, // DefaultEventPriority
     getInstanceFromNode: () => null,
-    beforeActiveInstanceBlur: () => { },
-    afterActiveInstanceBlur: () => { },
-    prepareScopeUpdate: () => { },
+    beforeActiveInstanceBlur: () => {},
+    afterActiveInstanceBlur: () => {},
+    prepareScopeUpdate: () => {},
     getInstanceFromScope: () => null,
     getPublicInstance: (inst: Node) => inst,
     getRootHostContext: (_root: PageContainer) => null,
@@ -261,7 +261,7 @@ export const createHostConfig = (): any => {
     insertInContainerBefore: (container: PageContainer, child: Node, _beforeChild: Node) => {
       container.appendChildToContainer(child);
     },
-    resetTextContent: (_instance: Node) => { },
+    resetTextContent: (_instance: Node) => {},
     detachDeletedInstance: (instance: Node) => {
       instance.destroy();
     },
@@ -322,7 +322,7 @@ export const createHostConfig = (): any => {
     resetAfterCommit: (container: PageContainer) => {
       container.commit();
     },
-    prepareForCommit: (_container: PageContainer) => { },
+    prepareForCommit: (_container: PageContainer) => {},
     supportsHydration: false,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;

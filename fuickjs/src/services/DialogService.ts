@@ -13,7 +13,7 @@ export class Dialog {
       pageId?: number;
       barrierDismissible?: boolean;
       barrierColor?: string;
-    } = {}
+    } = {},
   ): Promise<any> {
     const targetPageId = options.pageId ?? -1;
     const dsl = elementToDsl(targetPageId, content);
