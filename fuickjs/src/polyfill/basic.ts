@@ -49,6 +49,12 @@ if (!globalAny.crypto?.getRandomValues) {
   };
 }
 
+if (typeof globalAny.queueMicrotask === 'undefined') {
+  globalAny.queueMicrotask = function queueMicrotask(callback: () => void) {
+    Promise.resolve().then(callback);
+  };
+}
+
 if (typeof TextEncoder === 'undefined') {
   globalAny.TextEncoder = class TextEncoder {
     encode(str: string): Uint8Array {

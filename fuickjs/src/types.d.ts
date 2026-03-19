@@ -1,6 +1,7 @@
 import * as Widgets from './widgets';
 
 declare module 'react-reconciler';
+declare module 'crypto-js';
 
 declare global {
   // Bridge function to call Flutter
