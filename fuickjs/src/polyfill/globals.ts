@@ -34,9 +34,17 @@ export function setupGlobals() {
   globalThis.XMLHttpRequest = XMLHttpRequest as any;
   globalThis.WebSocket = WebSocket as any;
   globalAny.base64ToArrayBuffer = base64ToArrayBuffer;
+
+  if (typeof (globalAny as any).queueMicrotask === 'undefined') {
+    (globalAny as any).queueMicrotask = function queueMicrotask(callback: () => void) {
+      Promise.resolve().then(callback);
+    };
+  }
+
   if (!globalThis.performance) {
     globalThis.performance = performance as any;
   }
+
   Object.defineProperty(globalThis, 'localStorage', {
     value: localStorage,
     writable: false,
