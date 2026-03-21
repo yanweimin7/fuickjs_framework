@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:convert';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
@@ -26,23 +27,41 @@ class ImageParser extends WidgetParser {
 
     Widget image;
     if (url.startsWith('http')) {
-      image = CachedNetworkImage(
-        imageUrl: url,
+      if (url.contains('.svg') || url.startsWith('data:image/svg')) {
+        image = SvgPicture.network(
+          url,
+          width: width,
+          height: height,
+          fit: fit ?? BoxFit.contain,
+        );
+      } else {
+        image = CachedNetworkImage(
+          imageUrl: url,
+          width: width,
+          height: height,
+          fit: fit,
+          useOldImageOnUrlChange: gaplessPlayback ?? false,
+          placeholder: (context, url) => Container(
+            width: width,
+            height: height,
+            color: Colors.grey[100],
+          ),
+          errorWidget: (context, url, error) => Container(
+            width: width,
+            height: height,
+            color: Colors.grey[300],
+            child: const Icon(Icons.error_outline),
+          ),
+        );
+      }
+    } else if (url.startsWith('data:image/svg')) {
+      final base64Str = url.split(',').last;
+      final svgString = utf8.decode(base64Decode(base64Str));
+      image = SvgPicture.string(
+        svgString,
         width: width,
         height: height,
-        fit: fit,
-        useOldImageOnUrlChange: gaplessPlayback ?? false,
-        placeholder: (context, url) => Container(
-          width: width,
-          height: height,
-          color: Colors.grey[100],
-        ),
-        errorWidget: (context, url, error) => Container(
-          width: width,
-          height: height,
-          color: Colors.grey[300],
-          child: const Icon(Icons.error_outline),
-        ),
+        fit: fit ?? BoxFit.contain,
       );
     } else if (url.startsWith('data:image')) {
       final base64Str = url.split(',').last;
@@ -52,6 +71,13 @@ class ImageParser extends WidgetParser {
         height: height,
         gaplessPlayback: gaplessPlayback ?? true,
         fit: fit,
+      );
+    } else if (url.endsWith('.svg')) {
+      image = SvgPicture.asset(
+        url,
+        width: width,
+        height: height,
+        fit: fit ?? BoxFit.contain,
       );
     } else {
       image = Image.asset(

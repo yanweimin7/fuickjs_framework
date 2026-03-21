@@ -12,7 +12,7 @@ import { WebSocket, base64ToArrayBuffer } from '../ex/websocket';
 import { Headers } from '../ex/headers';
 import { ErrorHandler } from '../ErrorHandler';
 
-const globalAny = globalThis as any;
+const globalAny = globalThis as unknown;
 
 export function setupGlobals() {
   globalThis.console = Console as any;
@@ -42,7 +42,7 @@ export function setupGlobals() {
   }
 
   if (!globalThis.performance) {
-    globalThis.performance = performance as any;
+    globalThis.performance = performance as Performance;
   }
 
   Object.defineProperty(globalThis, 'localStorage', {

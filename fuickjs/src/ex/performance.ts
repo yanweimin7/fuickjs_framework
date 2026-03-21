@@ -3,7 +3,7 @@ export interface Performance {
   timeOrigin: number;
 }
 
-let startTime = Date.now();
+const startTime = Date.now();
 
 export const performance: Performance = {
   now: () => Date.now() - startTime,
