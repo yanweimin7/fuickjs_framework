@@ -84,6 +84,12 @@ class FuickNavigationDelegate {
     return replacement ? nav.pushReplacement(route) : nav.push(route);
   }
 
+  /// 是否启用转场动画，默认 true
+  static bool enableTransitionAnimation = true;
+
+  /// 转场动画持续时间，默认 300ms
+  static Duration transitionDuration = const Duration(milliseconds: 250);
+
   Route _createRoute(BuildContext context, String path,
       Map<String, dynamic> params, int pageId) {
     final page = FuickPage(
@@ -105,7 +111,24 @@ class FuickNavigationDelegate {
         builder: (ctx) => _buildBottomSheet(ctx, page, params),
       );
     }
-    return CupertinoPageRoute(settings: settings, builder: (_) => page);
+
+    // 根据配置选择转场动画
+    if (!enableTransitionAnimation) {
+      // 无动画路由
+      return PageRouteBuilder(
+        settings: settings,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (_, __, ___) => page,
+      );
+    }
+
+    // 使用更快的转场动画
+    return _FastPageRoute(
+      settings: settings,
+      builder: (_) => page,
+      transitionDuration: transitionDuration,
+    );
   }
 
   Widget _buildBottomSheet(
@@ -165,5 +188,73 @@ class FuickNavigationDelegate {
     getNavigatorKey(pageId)
         ?.currentState
         ?.popUntil((route) => route.settings.name == name);
+  }
+}
+
+/// 快速转场路由 - 使用更轻量的动画
+class _FastPageRoute<T> extends PageRoute<T> {
+  _FastPageRoute({
+    required this.builder,
+    RouteSettings? settings,
+    this.transitionDuration = const Duration(milliseconds: 250),
+  }) : super(settings: settings);
+
+  final WidgetBuilder builder;
+
+  @override
+  final Duration transitionDuration;
+
+  @override
+  final Duration reverseTransitionDuration = const Duration(milliseconds: 200);
+
+  @override
+  bool get opaque => true;
+
+  @override
+  bool get barrierDismissible => false;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Widget buildPage(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation) {
+    return builder(context);
+  }
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    // 使用简单的淡入淡出 + 轻微滑动，比 CupertinoPageRoute 更轻量
+    final slideAnimation = Tween<Offset>(
+      begin: const Offset(0.05, 0), // 轻微滑动
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
+
+    final fadeAnimation = Tween<double>(
+      begin: 0.8, // 从 0.8 开始淡入，减少闪烁感
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOut,
+    ));
+
+    return FadeTransition(
+      opacity: fadeAnimation,
+      child: SlideTransition(
+        position: slideAnimation,
+        child: child,
+      ),
+    );
   }
 }
