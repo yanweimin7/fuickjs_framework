@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide widgetFactory;
+import 'package:flutter/scheduler.dart';
 
 import '../logger.dart';
 import '../widgets/fuick_node.dart';
@@ -35,6 +36,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   bool _isVisible = false;
   DateTime? _receiveDataTime;
   bool _isFirstRender = true;
+  int _dslParseCost = 0;
 
   Widget? _cachedChild;
   FuickNode? _lastBuiltNode;
@@ -102,6 +104,15 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     }
   }
 
+  /// 递归计算节点数量
+  int _countNodes(FuickNode node) {
+    int count = 1;
+    for (final child in node.children) {
+      count += _countNodes(child);
+    }
+    return count;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -115,10 +126,13 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
         widget.controller.notifyLifecycle(widget.pageId, 'visible');
       }
 
-      // logger.d(
-      //   '[Flutter] FuickPageView.onPageRender pageId: ${widget.pageId}, rootNode exists: ${rootNode != null}',
-      // );
+      // 测量 DSL 解析时间
+      final dslParseStart = DateTime.now();
       final newNode = nodeManager.createNode(dsl, nodeManager);
+      _dslParseCost = DateTime.now().difference(dslParseStart).inMilliseconds;
+
+      logger.d('[Performance] DSL Parse Cost: ${_dslParseCost}ms (nodes: ${_countNodes(newNode)})');
+
       if (rootNode != newNode) {
         rootNode = newNode;
         // logger.d('[Flutter] FuickPageView set rootNode to: ${rootNode?.id}');
@@ -174,25 +188,8 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     }
 
     if (_cachedChild == null || _lastBuiltNode != rootNode) {
-      if (_isFirstRender && _receiveDataTime != null) {
-        _isFirstRender = false;
-        final buildTime = DateTime.now();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final renderTime = DateTime.now();
-          final totalCost =
-              renderTime.difference(_receiveDataTime!).inMilliseconds;
-          final buildCost =
-              buildTime.difference(_receiveDataTime!).inMilliseconds;
-          final paintCost = renderTime.difference(buildTime).inMilliseconds;
-
-          logger.d(
-              '[Performance] Page First Render (ID: ${widget.pageId}, Path: ${widget.routeInfo.path}):');
-          logger.d('  - Total Cost: ${totalCost}ms');
-          logger.d('  - Build Cost: ${buildCost}ms (UI Data -> Widget Build)');
-          logger
-              .d('  - Layout/Paint Cost: ${paintCost}ms (Post Frame Callback)');
-        });
-      }
+      // 测量 Widget 构建时间
+      final widgetBuildStart = DateTime.now();
 
       _lastBuiltNode = rootNode;
       _cachedChild = FuickNodeManagerProvider(
@@ -209,6 +206,30 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
           ),
         ),
       );
+
+      final widgetBuildCost = DateTime.now().difference(widgetBuildStart).inMilliseconds;
+
+      if (_isFirstRender && _receiveDataTime != null) {
+        _isFirstRender = false;
+        final buildTime = DateTime.now();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final renderTime = DateTime.now();
+          final totalCost =
+              renderTime.difference(_receiveDataTime!).inMilliseconds;
+          final buildCost =
+              buildTime.difference(_receiveDataTime!).inMilliseconds;
+          final paintCost = renderTime.difference(buildTime).inMilliseconds;
+
+          logger.d(
+              '[Performance] Page First Render (ID: ${widget.pageId}, Path: ${widget.routeInfo.path}):');
+          logger.d('  - Total Cost: ${totalCost}ms');
+          logger.d('  - DSL Parse Cost: ${_dslParseCost}ms');
+          logger.d('  - Widget Build Cost: ${widgetBuildCost}ms');
+          logger.d('  - Build Cost: ${buildCost}ms (UI Data -> Widget Build)');
+          logger
+              .d('  - Layout/Paint Cost: ${paintCost}ms (Post Frame Callback)');
+        });
+      }
     }
     return _cachedChild!;
   }

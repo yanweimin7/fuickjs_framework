@@ -12,7 +12,7 @@ import { WebSocket, base64ToArrayBuffer } from '../ex/websocket';
 import { Headers } from '../ex/headers';
 import { ErrorHandler } from '../ErrorHandler';
 
-const globalAny = globalThis as unknown;
+const globalAny = globalThis as any;
 
 export function setupGlobals() {
   globalThis.console = Console as any;

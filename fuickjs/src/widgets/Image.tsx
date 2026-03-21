@@ -7,6 +7,7 @@ export interface ImageProps extends WidgetProps {
   height?: number;
   gaplessPlayback?: boolean;
   fit?: 'cover' | 'contain' | 'fill' | 'fitWidth' | 'fitHeight' | 'none' | 'scaleDown';
+  color?: string;
   borderRadius?:
     | number
     | {
