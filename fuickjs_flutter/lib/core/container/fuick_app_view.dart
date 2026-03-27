@@ -35,6 +35,10 @@ class _FuickAppViewState extends State<FuickAppView> {
   bool _isReady = false;
   FuickAppContext? appContext;
 
+  // 保存 isReady listener 引用，以便在 dispose 时移除
+  VoidCallback? _isReadyListener;
+  FuickAppContext? _pendingListenContext;
+
   final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
   late final NavigatorObserver _observer = _FuickNavigatorObserver(() {
@@ -80,11 +84,17 @@ class _FuickAppViewState extends State<FuickAppView> {
     if (currentContext.isReady.value) {
       _setupWithContext(currentContext);
     } else {
-      currentContext.isReady.addListener(() {
-        if (mounted && currentContext.isReady.value) {
-          _setupWithContext(currentContext);
+      _pendingListenContext = currentContext;
+      void listener() {
+        if (currentContext.isReady.value) {
+          currentContext.isReady.removeListener(_isReadyListener!);
+          _isReadyListener = null;
+          _pendingListenContext = null;
+          if (mounted) _setupWithContext(currentContext);
         }
-      });
+      }
+      _isReadyListener = listener;
+      currentContext.isReady.addListener(listener);
     }
   }
 
@@ -137,6 +147,12 @@ class _FuickAppViewState extends State<FuickAppView> {
 
   @override
   void dispose() {
+    // 移除 isReady listener，防止在 context 未就绪时 widget 已被销毁后仍触发
+    if (_isReadyListener != null) {
+      _pendingListenContext?.isReady.removeListener(_isReadyListener!);
+      _isReadyListener = null;
+      _pendingListenContext = null;
+    }
     appContext?.appController.unregisterNavigator(rootPageId);
     appContext?.appController.onCloseContainer.remove(rootPageId);
     FuickAppContextManager().releaseContext(widget.appName);

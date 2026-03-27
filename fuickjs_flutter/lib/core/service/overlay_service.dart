@@ -71,7 +71,12 @@ class OverlayService extends BaseFuickService {
       },
     );
 
-    navState.overlay?.insert(entry);
+    final overlay = navState.overlay;
+    if (overlay == null) {
+      logger.w('[OverlayService] No overlay found for pageId: $pageId');
+      return false;
+    }
+    overlay.insert(entry);
     _entries[key] = entry;
     return true;
   }

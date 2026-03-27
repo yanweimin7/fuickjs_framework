@@ -66,6 +66,9 @@ class JsContextDelegate implements IQuickJsContext {
     IsolateWorker.instance.sendRequest(contextId, 'registerModule', {
       'name': name,
       'code': code,
+    }).catchError((e) {
+      // Log but don't throw - registerModule is void in the interface
+      assert(() { print('[JsContextDelegate] registerModule error: $e'); return true; }());
     });
   }
 

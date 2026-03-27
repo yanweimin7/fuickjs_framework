@@ -63,6 +63,8 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     widget.controller.isBundleLoaded.removeListener(_checkAndRender);
     widget.controller.destroyPage(widget.pageId);
     widget.controller.onPageRender.remove(widget.pageId);
+    widget.controller.onPagePatch.remove(widget.pageId);
+    widget.controller.onPagePatchOps.remove(widget.pageId);
     super.dispose();
   }
 

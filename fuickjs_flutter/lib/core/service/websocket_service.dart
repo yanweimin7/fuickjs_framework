@@ -12,6 +12,7 @@ class WebSocketService extends BaseFuickService {
   @override
   String get name => 'WebSocket';
 
+  bool _isDisposed = false;
   final Map<String, WebSocketChannel> _sockets = {};
   final Map<String, StreamSubscription> _subscriptions = {};
 
@@ -84,6 +85,7 @@ class WebSocketService extends BaseFuickService {
   }
 
   void _handleMessage(String socketId, dynamic message) {
+    if (_isDisposed) return;
     try {
       String data;
       bool isBinary = false;
@@ -114,6 +116,7 @@ class WebSocketService extends BaseFuickService {
   }
 
   void _handleCloseEvent(String socketId) {
+    if (_isDisposed) return;
     try {
       final socket = _sockets[socketId];
       if (socket == null) return;
@@ -136,6 +139,7 @@ class WebSocketService extends BaseFuickService {
   }
 
   void _handleError(String socketId, String error) {
+    if (_isDisposed) return;
     try {
       // Call JS handler
       final jsHandler = '_ws_$socketId';
@@ -226,10 +230,17 @@ class WebSocketService extends BaseFuickService {
 
   @override
   void dispose() {
-    // Close all sockets
+    _isDisposed = true;
+    // 同步取消所有 stream 订阅，避免 dispose 后仍收到消息回调
+    // sink.close() 是异步的，无法在 dispose 中 await，让底层自行关闭
     for (final socketId in _sockets.keys.toList()) {
-      _closeSocket(socketId);
+      _subscriptions[socketId]?.cancel();
+      try {
+        _sockets[socketId]?.sink.close(1000, '');
+      } catch (_) {}
     }
+    _subscriptions.clear();
+    _sockets.clear();
     super.dispose();
   }
 }

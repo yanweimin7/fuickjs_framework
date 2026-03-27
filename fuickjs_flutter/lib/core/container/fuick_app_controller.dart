@@ -105,15 +105,12 @@ class FuickAppController {
       page.getItemDSL(pageId, refId, index);
 
   void dispose() {
-    // Store context locally to avoid race conditions
-    final currentCtx = ctx;
-    final currentServiceBinder = serviceBinder;
-
-    // Use a shorter delay and add cleanup tracking
-    Future.delayed(const Duration(seconds: 2), () {
-      currentCtx.dispose();
-      currentServiceBinder.dispose(currentCtx);
-    });
+    // 先销毁 service（如 Timer、WebSocket），再销毁 context
+    // JsContextDelegate.dispose() 通过 isolate 消息队列发送 disposeContext，
+    // 天然保证在所有 pending 操作之后执行，无需人为延迟
+    serviceBinder.dispose(ctx);
+    ctx.dispose();
+    isBundleLoaded.dispose();
   }
 }
 

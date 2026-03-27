@@ -20,10 +20,22 @@ class Package {
   });
 
   factory Package.fromJson(Map<String, dynamic> json) {
+    final name = json['name'] as String?;
+    final version = json['version'] as String?;
+    final shasum = json['shasum'] as String?;
+    if (name == null || name.isEmpty) {
+      throw ArgumentError('Package name is required');
+    }
+    if (version == null || version.isEmpty) {
+      throw ArgumentError('Package version is required');
+    }
+    if (shasum == null || shasum.isEmpty) {
+      throw ArgumentError('Package shasum is required');
+    }
     return Package(
-      name: json['name'] as String? ?? '',
-      version: json['version'] as String? ?? '',
-      shasum: json['shasum'] as String? ?? '',
+      name: name,
+      version: version,
+      shasum: shasum,
       url: json['url'] as String?,
       mustBeUpdated: json['mustBeUpdated'] as bool? ?? false,
       timestamp: json['timeStamp'] as int?,
@@ -65,8 +77,9 @@ class Package {
       other is Package &&
           name == other.name &&
           version == other.version &&
-          shasum == other.shasum;
+          shasum == other.shasum &&
+          url == other.url;
 
   @override
-  int get hashCode => Object.hash(name, version, shasum);
+  int get hashCode => Object.hash(name, version, shasum, url);
 }

@@ -161,12 +161,16 @@ class DownloadService {
     final rootDir = firstFile.name.substring(0, separateIndex);
 
     for (final file in archive.files.skip(1)) {
+      // Skip symbolic links to prevent path traversal attacks
+      if (file.isSymbolicLink) continue;
+
       final fileName = file.name.substring(rootDir.length + 1);
+      if (fileName.isEmpty) continue;
       final filePath = path.join(outputPath, path.normalize(fileName));
 
       if (!path.isWithin(outputPath, filePath)) continue;
 
-      if (!file.isFile && !file.isSymbolicLink) {
+      if (!file.isFile) {
         await Directory(filePath).parent.create(recursive: true);
         continue;
       }

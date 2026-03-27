@@ -86,12 +86,13 @@ class DialogService extends BaseFuickService {
   }
 
   bool _dismiss(dynamic args) {
+    // Remove stale unmounted contexts first
+    _dialogContexts.removeWhere((ctx) => !ctx.mounted);
+
     if (_dialogContexts.isNotEmpty) {
       final context = _dialogContexts.removeLast();
-      if (context.mounted) {
-        Navigator.of(context).pop(args);
-        return true;
-      }
+      Navigator.of(context).pop(args);
+      return true;
     }
 
     // Fallback: if no tracked dialogs, try to pop from navigation stack

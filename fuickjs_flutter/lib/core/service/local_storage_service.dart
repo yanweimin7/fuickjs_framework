@@ -19,14 +19,16 @@ class LocalStorageService extends BaseFuickService {
     registerAsyncMethod('getItem', (args) async {
       await _ensureInitialized();
       final key =
-          args is List && args.isNotEmpty ? args[0] as String : args as String;
+          args is List && args.isNotEmpty ? args[0]?.toString() : args?.toString();
+      if (key == null) return null;
       return _cache[key];
     });
 
     registerAsyncMethod('setItem', (args) async {
       await _ensureInitialized();
       if (args is List && args.length >= 2) {
-        final key = args[0] as String;
+        final key = args[0]?.toString();
+        if (key == null) return false;
         final value = args[1];
         _cache[key] = value;
         await _flush();
@@ -38,7 +40,8 @@ class LocalStorageService extends BaseFuickService {
     registerAsyncMethod('removeItem', (args) async {
       await _ensureInitialized();
       final key =
-          args is List && args.isNotEmpty ? args[0] as String : args as String;
+          args is List && args.isNotEmpty ? args[0]?.toString() : args?.toString();
+      if (key == null) return false;
       if (_cache.containsKey(key)) {
         _cache.remove(key);
         await _flush();

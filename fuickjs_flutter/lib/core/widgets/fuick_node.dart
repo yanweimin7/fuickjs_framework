@@ -75,7 +75,8 @@ class FuickNode {
   }
 
   /// 按需处理属性中的节点升级
-  dynamic _resolveValue(dynamic value, FuickNodeManager manager) {
+  dynamic _resolveValue(dynamic value, FuickNodeManager manager, [int depth = 0]) {
+    if (depth > 64) return value; // Prevent infinite recursion
     if (value is Map) {
       final type = value['type'];
       if (type is String && value.containsKey('id')) {
@@ -85,7 +86,7 @@ class FuickNode {
           final childrenDsl = value['children'] as List?;
           if (childrenDsl == null || childrenDsl.isEmpty) return null;
           final upgradedChildren = childrenDsl
-              .map((c) => _resolveValue(c, manager))
+              .map((c) => _resolveValue(c, manager, depth + 1))
               .where((e) => e != null)
               .toList();
           if (upgradedChildren.isEmpty) return null;
