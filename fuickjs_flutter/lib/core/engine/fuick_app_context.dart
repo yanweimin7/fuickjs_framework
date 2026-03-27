@@ -68,7 +68,7 @@ class FuickAppContext {
     final stopwatch = Stopwatch()..start();
     try {
       if (debugBusinessCode != null) {
-        await ctx.eval(debugBusinessCode!,returnValue: false);
+        await ctx.eval(debugBusinessCode!, returnValue: false);
         logger.d(
           '[Debug] Successfully loaded business bundle from debug payload',
         );
@@ -105,7 +105,8 @@ class FuickAppContext {
       // Fallback to file loading if not preloaded (though it should be)
       try {
         if (useAotCode) {
-          await ctx.evalBinaryFile('assets/js/$bundleName.qjc', returnValue: false);
+          await ctx.evalBinaryFile('assets/js/$bundleName.qjc',
+              returnValue: false);
         } else {
           await ctx.evalFile('assets/js/$bundleName.js', returnValue: false);
         }
