@@ -37,7 +37,7 @@ class FuickAppContext {
 
     // Start bundle preloading in parallel with engine initialization
     final appPreload = (debugBusinessCode == null)
-        ? BundlePreloader().preloadBundle('bundle', useAot: useAotCode)
+        ? BundlePreloader().preloadBundle(appName, useAot: useAotCode)
         : Future.value();
 
     try {
@@ -73,7 +73,7 @@ class FuickAppContext {
           '[Debug] Successfully loaded business bundle from debug payload',
         );
       } else {
-        await _loadSingleBundle('bundle');
+        await _loadSingleBundle(appName);
       }
       logger.d(
         '[Performance] load bundle cost: ${stopwatch.elapsedMilliseconds}ms',

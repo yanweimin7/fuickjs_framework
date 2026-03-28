@@ -75,6 +75,10 @@ class FuickAppController {
   void popTo(String name, {int? pageId}) =>
       navigation.popTo(name, pageId: pageId);
 
+  void popAll({int? pageId}) => navigation.popAll(pageId: pageId);
+
+  void switchTab(String path) => navigation.switchTab(path);
+
   Map<int, Function(dynamic)> get onCloseContainer =>
       navigation.onCloseContainer;
 

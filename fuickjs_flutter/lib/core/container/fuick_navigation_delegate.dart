@@ -189,6 +189,20 @@ class FuickNavigationDelegate {
         ?.currentState
         ?.popUntil((route) => route.settings.name == name);
   }
+
+  /// 弹出所有路由，回到根页面（用于 reLaunch）
+  void popAll({int? pageId}) {
+    getNavigatorKey(pageId)
+        ?.currentState
+        ?.popUntil((route) => route.isFirst);
+  }
+
+  /// 切换 TabBar（通知 tabbar 状态变化，Phase 1 仅做 popAll + push）
+  void switchTab(String path) {
+    // 回到根路由
+    popAll();
+    // Phase 2: 支持真正的 TabBar 状态切换
+  }
 }
 
 /// 快速转场路由 - 使用更轻量的动画

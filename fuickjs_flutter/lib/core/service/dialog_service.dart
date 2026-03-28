@@ -19,6 +19,8 @@ class DialogService extends BaseFuickService {
   DialogService() {
     registerAsyncMethod('show', _show);
     registerMethod('dismiss', _dismiss);
+    registerAsyncMethod('showModal', _showModal);
+    registerAsyncMethod('showActionSheet', _showActionSheet);
   }
 
   Future<dynamic> _show(dynamic args) async {
@@ -83,6 +85,76 @@ class DialogService extends BaseFuickService {
       _dialogContexts.removeWhere((ctx) => !ctx.mounted);
       return result;
     });
+  }
+
+  /// showModal: 显示系统风格的 AlertDialog（不需要 DSL）
+  Future<bool> _showModal(dynamic args) async {
+    final Map params = args is Map ? args : {};
+    final String title = params['title']?.toString() ?? '';
+    final String content = params['content']?.toString() ?? '';
+    final bool showCancel = params['showCancel'] ?? true;
+    final String cancelText = params['cancelText']?.toString() ?? '取消';
+    final String confirmText = params['confirmText']?.toString() ?? '确定';
+
+    if (controller == null) return false;
+    final contexts = controller!.navigation.pageContexts;
+    if (contexts.isEmpty) return false;
+    final context = contexts.last;
+    if (!context.mounted) return false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: title.isNotEmpty ? Text(title) : null,
+        content: content.isNotEmpty ? Text(content) : null,
+        actions: [
+          if (showCancel)
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(cancelText),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(confirmText),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  /// showActionSheet: 显示底部动作菜单
+  Future<int> _showActionSheet(dynamic args) async {
+    final Map params = args is Map ? args : {};
+    final List items = params['items'] is List ? params['items'] as List : [];
+
+    if (controller == null) return -1;
+    final contexts = controller!.navigation.pageContexts;
+    if (contexts.isEmpty) return -1;
+    final context = contexts.last;
+    if (!context.mounted) return -1;
+
+    final result = await showModalBottomSheet<int>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...items.asMap().entries.map((entry) => ListTile(
+              title: Text(entry.value.toString()),
+              onTap: () => Navigator.of(ctx).pop(entry.key),
+            )),
+            const Divider(height: 1),
+            ListTile(
+              title: const Text('取消', textAlign: TextAlign.center),
+              onTap: () => Navigator.of(ctx).pop(-1),
+            ),
+          ],
+        ),
+      ),
+    );
+    return result ?? -1;
   }
 
   bool _dismiss(dynamic args) {

@@ -18,29 +18,47 @@ class LocalStorageService extends BaseFuickService {
   LocalStorageService() {
     registerAsyncMethod('getItem', (args) async {
       await _ensureInitialized();
-      final key =
-          args is List && args.isNotEmpty ? args[0]?.toString() : args?.toString();
+      final String? key;
+      if (args is Map) {
+        key = args['key']?.toString();
+      } else if (args is List && args.isNotEmpty) {
+        key = args[0]?.toString();
+      } else {
+        key = args?.toString();
+      }
       if (key == null) return null;
       return _cache[key];
     });
 
     registerAsyncMethod('setItem', (args) async {
       await _ensureInitialized();
-      if (args is List && args.length >= 2) {
-        final key = args[0]?.toString();
-        if (key == null) return false;
-        final value = args[1];
-        _cache[key] = value;
-        await _flush();
-        return true;
+      final String? key;
+      final dynamic value;
+      if (args is Map) {
+        key = args['key']?.toString();
+        value = args['value'];
+      } else if (args is List && args.length >= 2) {
+        key = args[0]?.toString();
+        value = args[1];
+      } else {
+        return false;
       }
-      return false;
+      if (key == null) return false;
+      _cache[key] = value;
+      await _flush();
+      return true;
     });
 
     registerAsyncMethod('removeItem', (args) async {
       await _ensureInitialized();
-      final key =
-          args is List && args.isNotEmpty ? args[0]?.toString() : args?.toString();
+      final String? key;
+      if (args is Map) {
+        key = args['key']?.toString();
+      } else if (args is List && args.isNotEmpty) {
+        key = args[0]?.toString();
+      } else {
+        key = args?.toString();
+      }
       if (key == null) return false;
       if (_cache.containsKey(key)) {
         _cache.remove(key);
