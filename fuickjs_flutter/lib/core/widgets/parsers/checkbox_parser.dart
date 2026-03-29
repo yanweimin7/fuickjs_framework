@@ -11,8 +11,9 @@ class CheckboxParser extends WidgetParser {
   @override
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
-    final bool? value = props['value'] as bool?;
     final bool tristate = props['tristate'] == true;
+    final bool? rawValue = props['value'] as bool?;
+    final bool? value = tristate ? rawValue : (rawValue ?? false);
 
     return Checkbox(
       value: value,

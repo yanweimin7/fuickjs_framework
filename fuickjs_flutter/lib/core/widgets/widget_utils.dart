@@ -22,8 +22,12 @@ class WidgetUtils {
 
     try {
       final buffer = StringBuffer();
-      if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
-      buffer.write(hexString.replaceFirst('#', ''));
+      String hex = hexString.replaceFirst('#', '');
+      if (hex.length == 3) {
+        hex = '${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}';
+      }
+      if (hex.length == 6) buffer.write('ff');
+      buffer.write(hex);
       final color = Color(int.parse(buffer.toString(), radix: 16));
       _colorCache[hexString] = color;
       return color;

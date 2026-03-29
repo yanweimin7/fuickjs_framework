@@ -17,7 +17,7 @@ class TextParser extends WidgetParser {
 
     final fontSize = WidgetUtils.asDoubleOrNull(fontSizeProp);
     final color = WidgetUtils.colorFromHex(colorProp);
-    final fontWeight = fontWeightProp == 'bold' ? FontWeight.bold : null;
+    final fontWeight = fontWeightProp == 'bold' ? FontWeight.bold : FontWeight.normal;
 
     return WidgetUtils.wrapPadding(
       props,

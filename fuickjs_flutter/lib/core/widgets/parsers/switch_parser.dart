@@ -16,9 +16,11 @@ class SwitchParser extends WidgetParser {
       props,
       Switch(
         value: v,
-        onChanged: (nv) {
-          FuickAction.event(context, onChangedEvent, value: nv);
-        },
+        onChanged: onChangedEvent != null
+            ? (nv) {
+                FuickAction.event(context, onChangedEvent, value: nv);
+              }
+            : null,
       ),
     );
   }
