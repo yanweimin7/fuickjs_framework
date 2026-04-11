@@ -1,0 +1,105 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../logger.dart';
+import 'base_fuick_service.dart';
+
+class LocalStorageService extends BaseFuickService {
+  @override
+  String get name => 'LocalStorage';
+
+  File? _file;
+  Map<String, dynamic> _cache = {};
+  bool _initialized = false;
+
+  LocalStorageService() {
+    registerAsyncMethod('getItem', (args) async {
+      await _ensureInitialized();
+      final String? key;
+      if (args is Map) {
+        key = args['key']?.toString();
+      } else if (args is List && args.isNotEmpty) {
+        key = args[0]?.toString();
+      } else {
+        key = args?.toString();
+      }
+      if (key == null) return null;
+      return _cache[key];
+    });
+
+    registerAsyncMethod('setItem', (args) async {
+      await _ensureInitialized();
+      final String? key;
+      final dynamic value;
+      if (args is Map) {
+        key = args['key']?.toString();
+        value = args['value'];
+      } else if (args is List && args.length >= 2) {
+        key = args[0]?.toString();
+        value = args[1];
+      } else {
+        return false;
+      }
+      if (key == null) return false;
+      _cache[key] = value;
+      await _flush();
+      return true;
+    });
+
+    registerAsyncMethod('removeItem', (args) async {
+      await _ensureInitialized();
+      final String? key;
+      if (args is Map) {
+        key = args['key']?.toString();
+      } else if (args is List && args.isNotEmpty) {
+        key = args[0]?.toString();
+      } else {
+        key = args?.toString();
+      }
+      if (key == null) return false;
+      if (_cache.containsKey(key)) {
+        _cache.remove(key);
+        await _flush();
+        return true;
+      }
+      return false;
+    });
+
+    registerAsyncMethod('clear', (args) async {
+      await _ensureInitialized();
+      _cache.clear();
+      await _flush();
+      return true;
+    });
+  }
+
+  Future<void> _ensureInitialized() async {
+    if (_initialized) return;
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      _file = File('${dir.path}/fuick_storage.json');
+      if (await _file!.exists()) {
+        final content = await _file!.readAsString();
+        if (content.isNotEmpty) {
+          _cache = jsonDecode(content) as Map<String, dynamic>;
+        }
+      }
+    } catch (e) {
+      logger.e('Error initializing storage: $e');
+    } finally {
+      _initialized = true;
+    }
+  }
+
+  Future<void> _flush() async {
+    if (_file == null) return;
+    try {
+      await _file!.writeAsString(jsonEncode(_cache));
+    } catch (e) {
+      logger.e('Error writing storage: $e');
+    }
+  }
+}
