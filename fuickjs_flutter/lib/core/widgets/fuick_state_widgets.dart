@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../logger.dart';
@@ -18,6 +20,12 @@ class FuickPageView extends StatefulWidget implements FuickDslWidget {
   final List<Widget> children;
   final ControllerCallback<PageController>? onControllerCreated;
   final ControllerCallback<PageController>? onDispose;
+  final bool autoplay;
+  final int autoplayInterval;
+  final bool circular;
+  final bool indicatorDots;
+  final Color? indicatorColor;
+  final Color? indicatorActiveColor;
 
   const FuickPageView({
     super.key,
@@ -29,6 +37,12 @@ class FuickPageView extends StatefulWidget implements FuickDslWidget {
     required this.children,
     this.onControllerCreated,
     this.onDispose,
+    this.autoplay = false,
+    this.autoplayInterval = 5000,
+    this.circular = false,
+    this.indicatorDots = false,
+    this.indicatorColor,
+    this.indicatorActiveColor,
   });
 
   @override
@@ -47,6 +61,8 @@ class _FuickPageViewState extends State<FuickPageView>
         FuickCommandListenerMixin<FuickPageView>,
         FuickDslCacheMixin<FuickPageView> {
   late PageController _controller;
+  Timer? _autoplayTimer;
+  int _currentPage = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -63,8 +79,10 @@ class _FuickPageViewState extends State<FuickPageView>
     super.initState();
     logger.d(
         '[FuickPageView] initState refId=${widget.refId} initialPage=${widget.initialPage}');
+    _currentPage = widget.initialPage;
     _controller = PageController(initialPage: widget.initialPage);
     widget.onControllerCreated?.call(_controller);
+    _startAutoplay();
   }
 
   @override
@@ -87,6 +105,32 @@ class _FuickPageViewState extends State<FuickPageView>
     }
   }
 
+  void _startAutoplay() {
+    if (!widget.autoplay || widget.children.length <= 1) return;
+    _autoplayTimer = Timer.periodic(
+      Duration(milliseconds: widget.autoplayInterval),
+      (_) => _nextPage(),
+    );
+  }
+
+  void _stopAutoplay() {
+    _autoplayTimer?.cancel();
+    _autoplayTimer = null;
+  }
+
+  void _nextPage() {
+    if (!mounted) return;
+    final pageCount = widget.children.length;
+    final nextPage = _currentPage + 1;
+    if (widget.circular || nextPage < pageCount) {
+      _controller.animateToPage(
+        nextPage % pageCount,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   @override
   void didUpdateWidget(FuickPageView oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -99,11 +143,18 @@ class _FuickPageViewState extends State<FuickPageView>
         widget.onControllerCreated?.call(_controller);
       }
     }
+
+    if (widget.autoplay != oldWidget.autoplay ||
+        widget.autoplayInterval != oldWidget.autoplayInterval) {
+      _stopAutoplay();
+      _startAutoplay();
+    }
   }
 
   @override
   void dispose() {
     logger.d('[FuickPageView] dispose refId=${widget.refId}');
+    _stopAutoplay();
     widget.onDispose?.call(_controller);
     _controller.dispose();
     super.dispose();
@@ -112,13 +163,63 @@ class _FuickPageViewState extends State<FuickPageView>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return PageView(
+
+    void onPageChanged(int index) {
+      setState(() => _currentPage = index);
+      widget.onPageChanged?.call(index);
+    }
+
+    Widget pageView = PageView(
       controller: _controller,
       scrollDirection: widget.scrollDirection,
       physics: widget.physics,
-      onPageChanged: widget.onPageChanged,
+      onPageChanged: onPageChanged,
       children: widget.children,
     );
+
+    if (widget.indicatorDots && widget.children.length > 1) {
+      final isVertical = widget.scrollDirection == Axis.vertical;
+      final indicatorColor =
+          widget.indicatorColor ?? Colors.black.withValues(alpha: 0.3);
+      final indicatorActiveColor = widget.indicatorActiveColor ?? Colors.black;
+
+      pageView = Stack(
+        alignment: isVertical ? Alignment.centerRight : Alignment.bottomCenter,
+        children: [
+          pageView,
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: isVertical
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _buildDots(widget.children.length, indicatorColor,
+                        indicatorActiveColor),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _buildDots(widget.children.length, indicatorColor,
+                        indicatorActiveColor),
+                  ),
+          ),
+        ],
+      );
+    }
+
+    return pageView;
+  }
+
+  List<Widget> _buildDots(int count, Color color, Color activeColor) {
+    return List.generate(count, (i) {
+      return Container(
+        width: 8,
+        height: 8,
+        margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: i == _currentPage ? activeColor : color,
+        ),
+      );
+    });
   }
 }
 
