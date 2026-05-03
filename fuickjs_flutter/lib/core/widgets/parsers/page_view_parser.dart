@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../container/fuick_action.dart';
+import '../../container/fuick_app_controller.dart';
+import '../../service/fuick_command_bus.dart';
 import '../../utils/extensions.dart';
-import '../fuick_state_widgets.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
 import 'widget_parser.dart';
@@ -14,7 +15,13 @@ class PageViewParser extends WidgetParser {
   String get type => 'PageView';
 
   @override
-  void onCommand(String refId, String method, dynamic args) {}
+  void onCommand(String refId, String method, dynamic args) {
+    _commandBus?.dispatch(refId, method, args);
+  }
+
+  FuickCommandBus? _commandBus;
+
+  FuickCommandBus? get commandBus => _commandBus;
 
   @override
   Widget parse(
@@ -23,6 +30,8 @@ class PageViewParser extends WidgetParser {
     dynamic children,
     WidgetFactory factory,
   ) {
+    _commandBus = FuickAppScope.of(context)?.commandBus;
+
     final int? initialPage = asIntOrNull(props['initialPage']);
     final String? refId = props['refId']?.toString();
     final ScrollPhysics? physics = WidgetUtils.physics(props['physics']);
@@ -41,6 +50,7 @@ class PageViewParser extends WidgetParser {
       _FuickPageViewWithAutoplay(
         key: refId != null ? ValueKey(refId) : null,
         refId: refId,
+        commandBus: _commandBus,
         initialPage: initialPage ?? 0,
         scrollDirection: props['scrollDirection'] == 'vertical'
             ? Axis.vertical
@@ -70,6 +80,7 @@ class PageViewParser extends WidgetParser {
 
 class _FuickPageViewWithAutoplay extends StatefulWidget {
   final String? refId;
+  final FuickCommandBus? commandBus;
   final int initialPage;
   final Axis scrollDirection;
   final ScrollPhysics? physics;
@@ -85,6 +96,7 @@ class _FuickPageViewWithAutoplay extends StatefulWidget {
   const _FuickPageViewWithAutoplay({
     super.key,
     this.refId,
+    this.commandBus,
     required this.initialPage,
     required this.scrollDirection,
     this.physics,
@@ -114,7 +126,31 @@ class _FuickPageViewWithAutoplayState
     super.initState();
     _currentPage = widget.initialPage;
     _controller = PageController(initialPage: widget.initialPage);
+    _registerCommandListener();
     _startAutoplay();
+  }
+
+  void _registerCommandListener() {
+    if (widget.refId != null && widget.commandBus != null) {
+      widget.commandBus!.addListener(widget.refId!, _onCommand);
+    }
+  }
+
+  void _onCommand(String method, dynamic args) {
+    if (!_controller.hasClients) return;
+
+    if (method == 'animateToPage') {
+      final page = asInt(args['page']);
+      final duration = asIntOrNull(args['duration']) ?? 300;
+      _controller.animateToPage(
+        page,
+        duration: Duration(milliseconds: duration),
+        curve: Curves.easeInOut,
+      );
+    } else if (method == 'jumpToPage' || method == 'setPageIndex') {
+      final page = asInt(args['page'] ?? args['index']);
+      _controller.jumpToPage(page);
+    }
   }
 
   @override
@@ -156,6 +192,9 @@ class _FuickPageViewWithAutoplayState
   @override
   void dispose() {
     _stopAutoplay();
+    if (widget.refId != null && widget.commandBus != null) {
+      widget.commandBus!.removeListener(widget.refId!, _onCommand);
+    }
     _controller.dispose();
     super.dispose();
   }
@@ -206,8 +245,9 @@ class _FuickPageViewWithAutoplayState
         margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              i == _currentPage ? widget.indicatorActiveColor : widget.indicatorColor,
+          color: i == _currentPage
+              ? widget.indicatorActiveColor
+              : widget.indicatorColor,
         ),
       );
     });
