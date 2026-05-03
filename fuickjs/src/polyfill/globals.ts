@@ -10,6 +10,7 @@ import { performance } from '../ex/performance';
 import { localStorage, sessionStorage } from '../ex/storage';
 import { WebSocket, base64ToArrayBuffer } from '../ex/websocket';
 import { Headers } from '../ex/headers';
+import { Blob } from '../ex/blob';
 import { ErrorHandler } from '../core/ErrorHandler';
 
 const globalAny = globalThis as any;
@@ -33,6 +34,7 @@ export function setupGlobals() {
   globalThis.Headers = Headers as any;
   globalThis.XMLHttpRequest = XMLHttpRequest as any;
   globalThis.WebSocket = WebSocket as any;
+  globalThis.Blob = Blob as any;
   globalAny.base64ToArrayBuffer = base64ToArrayBuffer;
 
   if (typeof (globalAny as any).queueMicrotask === 'undefined') {

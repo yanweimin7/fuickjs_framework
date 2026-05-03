@@ -154,7 +154,7 @@ class FuickNodeManager {
     // 1. Recursively create/update children
     List<FuickNode> children;
     if (childrenDsl.isEmpty) {
-      children = const [];
+      children = [];
     } else {
       children = childrenDsl.map((c) => createNode(asMap(c), manager)).toList();
     }

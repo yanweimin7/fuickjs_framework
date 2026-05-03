@@ -49,6 +49,58 @@ FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件
 - **PageView**: 页面滑动切换组件。
 - **NestedScrollView**: 嵌套滚动视图，用于协调外部 Sliver 头部与内部可滚动 body。通过 `FlutterProps propsKey="headerSliverBuilder"` 传入 Sliver 列表，`FlutterProps propsKey="body"` 传入主体组件。支持 `scrollDirection`, `reverse`, `physics`。
 
+### itemBuilder 约束：无 React 生命周期
+
+`itemBuilder` / `renderItem` 构造的 item **不经过 React Reconciler**，每次 Flutter 滚动到新位置时直接调用函数求值并生成 DSL，等价于"模板函数"而非真实组件。
+
+**以下在 item 内无效：**
+- `useState` / `useEffect` / `useRef` 等任意 Hook（会抛 "Invalid hook call"）
+- `this.setState()`（能调但不触发重渲染）
+- `componentDidMount` / `componentWillUnmount`
+
+**根本原因**：Flutter `ListView.builder` 在 Dart 侧按需请求 item Widget，每次请求是一次跨线程同步 `ctx.invoke`，不维护 JS 侧 Fiber 状态。
+
+#### 正确用法：状态上移
+
+将所有 item 状态提升到父组件，通过 props 下传；父组件 setState 后，`itemBuilder` 闭包自动读到最新值。
+
+```tsx
+function MyList() {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  return (
+    <ListView
+      itemCount={100}
+      itemBuilder={(index) => (
+        // item 本身是纯函数，无内部状态
+        <ItemRow
+          index={index}
+          selected={selected.has(index)}
+          onTap={() => setSelected((prev) => new Set(prev).add(index))}
+        />
+      )}
+    />
+  );
+}
+
+// ItemRow：纯函数组件，无 Hook
+function ItemRow({ index, selected, onTap }: {
+  index: number;
+  selected: boolean;
+  onTap: () => void;
+}) {
+  return (
+    <Container
+      onTap={onTap}
+      decoration={{ color: selected ? '#e0f0ff' : '#ffffff' }}
+      padding={12}
+    >
+      <Text text={`Item ${index}${selected ? ' ✓' : ''}`} />
+    </Container>
+  );
+}
+```
+
 ## 5. 动画组件
 - **AnimatedContainer**: 属性变更时自动执行补间动画的容器。支持 `onTap`/`onLongPress` 手势，以及 `constraints` 约束（与 Container 行为对齐）。
 - **AnimatedOpacity**: 自动淡入淡出。

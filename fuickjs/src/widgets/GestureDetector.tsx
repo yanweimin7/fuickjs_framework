@@ -2,6 +2,8 @@ import React, { ReactNode } from 'react';
 import { WidgetProps } from './types';
 
 export interface GestureDetectorProps extends WidgetProps {
+  onTapDown?: () => void;
+  onTapCancel?: () => void;
   onTap?: () => void;
   onDoubleTap?: () => void;
   onLongPress?: () => void;

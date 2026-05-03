@@ -73,8 +73,6 @@ import 'parsers/tabs_parser.dart';
 import 'parsers/text_field_parser.dart';
 import 'parsers/text_parser.dart';
 import 'parsers/transform_parser.dart';
-import 'parsers/video_player_parser.dart';
-import 'parsers/visibility_detector_parser.dart';
 import 'parsers/visibility_parser.dart';
 import 'parsers/widget_parser.dart';
 import 'parsers/wrap_parser.dart';
@@ -91,6 +89,8 @@ import 'parsers/nested_scroll_view_parser.dart';
 import 'parsers/decorated_box_outline_parser.dart';
 import 'parsers/clip_path_parser.dart';
 import 'parsers/color_filtered_parser.dart';
+import 'parsers/overlay_parser.dart';
+import 'parsers/dialog_parser.dart';
 
 class WidgetFactory {
   WidgetFactory() {
@@ -165,8 +165,6 @@ class WidgetFactory {
     register(FittedBoxParser());
     register(IntrinsicHeightParser());
     register(IntrinsicWidthParser());
-    register(VisibilityDetectorParser());
-    register(VideoPlayerParser());
     register(WrapParser());
     register(CardParser());
     register(CheckboxParser());
@@ -190,6 +188,8 @@ class WidgetFactory {
     register(DecoratedBoxOutlineParser());
     register(ClipPathParser());
     register(ColorFilteredParser());
+    register(OverlayParser());
+    register(DialogParser());
   }
 
   void register(WidgetParser parser) {
@@ -239,6 +239,12 @@ class WidgetFactory {
     );
   }
 
+  int _parseCostMicros = 0;
+
+  void resetParseCost() => _parseCostMicros = 0;
+
+  int get parseCostMicros => _parseCostMicros;
+
   Widget buildInternal(
     BuildContext context,
     String type,
@@ -247,7 +253,10 @@ class WidgetFactory {
   ) {
     final parser = _parsers[type];
     if (parser != null) {
-      return parser.parse(context, props, children, this);
+      final sw = Stopwatch()..start();
+      final result = parser.parse(context, props, children, this);
+      _parseCostMicros += sw.elapsedMicroseconds;
+      return result;
     }
     throw Exception('Unknown widget type: $type');
   }

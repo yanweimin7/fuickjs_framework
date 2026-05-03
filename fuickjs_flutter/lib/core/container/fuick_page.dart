@@ -7,12 +7,14 @@ class FuickPage extends StatefulWidget {
   final int pageId;
   final FuickAppController controller;
   final RouteInfo routeInfo;
+  final Color loadingBackgroundColor;
 
   const FuickPage({
     super.key,
     required this.pageId,
     required this.controller,
     required this.routeInfo,
+    this.loadingBackgroundColor = const Color(0xFFFFFFFF),
   });
 
   @override
@@ -33,6 +35,7 @@ class _FuickAppPageState extends State<FuickPage> {
       pageId: widget.pageId,
       controller: widget.controller,
       routeInfo: widget.routeInfo,
+      loadingBackgroundColor: widget.loadingBackgroundColor,
     );
   }
 }

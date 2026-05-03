@@ -332,8 +332,16 @@ export class PageContainer {
     }
   }
 
+  public static readonly MAX_ELEMENT_DEPTH = 512;
+
   public elementToDsl(element: React.ReactNode, depth: number = 0): unknown {
     if (!element) return null;
+    if (depth > PageContainer.MAX_ELEMENT_DEPTH) {
+      console.warn(
+        `[PageContainer] elementToDsl depth exceeded ${PageContainer.MAX_ELEMENT_DEPTH} on page ${this.pageId}; truncating`,
+      );
+      return null;
+    }
 
     let currentElement: React.ReactNode = element;
 

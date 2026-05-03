@@ -85,9 +85,6 @@ class FuickAppController {
 
   void switchTab(String path) => navigation.switchTab(path);
 
-  Map<int, Function(dynamic)> get onCloseContainer =>
-      navigation.onCloseContainer;
-
   // --- Page/Rendering Delegates ---
 
   Map<int, Function(Map<String, dynamic>)> get onPageRender =>

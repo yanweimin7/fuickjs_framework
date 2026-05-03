@@ -1,86 +1,151 @@
-# 原生服务 (Native Services / Bridge) 详尽指南
+# 原生服务 & 浏览器 API
 
-原生服务是 JS 与 Flutter 通信的核心桥梁。开发者可以通过 JS 类调用 Flutter 侧实现的功能。
+本文档覆盖两类桥接能力：
+1. **原生服务**（`fuickjs/src/services/` ↔ `fuickjs_flutter/lib/core/service/`）：JS 主动通过服务类调用 Flutter。
+2. **浏览器 API 补丁**（`fuickjs/src/ex/` & `fuickjs/src/polyfill/`）：将 Web 标准 API 模拟到 QuickJS 环境，底层仍依赖原生服务桥接。
 
-## 1. 核心导航服务 (NavigatorService)
-用于管理页面的跳转与返回。
-- `push(path: string, params?: any)`: 推入一个新页面。
-- `pushReplace(path: string, params?: any)`: 替换当前页面。
-- `pop(result?: any)`: 关闭当前页面并向上一页返回结果。
-- `popTo(routeName: string)`: 回退到指定名称的路由页面。
-- `showModal(path: string, params?: any, options?: { minHeight?: number, maxHeight?: number })`: 弹出半屏模态窗 (BottomSheet)。
-- `showDialog(pathOrComponent: string | ReactNode, params?: any)`: 弹出对话框。支持传入路由路径或直接传入 React 组件。
+---
 
-## 2. 界面与交互服务
-### Dialog (对话框)
-- `show(content: ReactNode, options?: { pageId?: number, barrierDismissible?: boolean, barrierColor?: string })`: 弹出自定义 DSL 对话框。支持多层嵌套管理。
-- `dismiss(result?: any)`: 关闭当前最上层的对话框。
+## 一、原生服务（Native Services）
 
-### Toast (简短提示)
-- `show(message: string, duration?: number)`: 显示全局 Toast 提示。
+### 1. 导航 (NavigatorService)
+- `push(path, params?)`: 推入新页面
+- `pushReplace(path, params?)`: 替换当前页面
+- `pop(result?)`: 关闭当前页面并向上一页返回结果
+- `popTo(routeName)`: 回退到指定路由
+- `showModal(path, params?, options?: { minHeight?, maxHeight? })`: 弹半屏 BottomSheet
+- `showDialog(pathOrComponent, params?)`: 弹对话框（支持路径或 React 组件）
 
-### Overlay (全局悬浮层)
-- `show(key: string, element: ReactNode, pageId?: number)`: 在全局视图层之上显示悬浮组件。
-- `hide(key: string)`: 移除指定 key 的悬浮层。
+### 2. 界面与交互
 
-### UIService (底层 UI 控制)
-- `isWidgetRegistered(type: string): boolean`: 检查某个 Widget 类型是否已在 Flutter 侧注册解析器。
-- `componentCommand(pageId, refId, method, args, nodeType)`: 向特定原生组件发送指令（如滚动列表跳转到指定位置）。
+**Dialog（对话框）**
+- `show(content, options?: { pageId?, barrierDismissible?, barrierColor? })`: 弹自定义 DSL 对话框，支持多层嵌套
+- `dismiss(result?)`: 关闭最上层对话框
 
-## 3. 系统能力服务
-### ClipboardService (剪贴板)
-- `setData(text: string): Promise<void>`: 写入剪贴板。
-- `getData(): Promise<string>`: 读取剪贴板内容。
+**Toast（简短提示）**
+- `show(message, duration?)`: 显示全局 Toast
 
-### DeviceInfo (设备信息)
-- `getDeviceInfo(): Promise<DeviceInfoData>`: 获取详尽的设备信息，包括 OS、版本、屏幕宽高度、像素比等。
+**Overlay（全局悬浮层）**
+- `show(key, element, pageId?)`: 在视图层之上显示悬浮组件
+- `hide(key)`: 移除指定 key 的悬浮层
 
-### LocalStorage (本地存储)
-- `getItem(key: string): Promise<string | null>`: 异步获取持久化数据。
-- `setItem(key: string, value: string): Promise<boolean>`: 异步存储数据。
-- `removeItem(key: string)`: 移除数据。
-- `clear()`: 清空所有存储。
+**UIService（底层 UI 控制）**
+- `isWidgetRegistered(type): boolean`: 检查 Widget 类型是否已在 Flutter 侧注册 parser
+- `componentCommand(pageId, refId, method, args, nodeType)`: 向原生组件发指令（如滚动列表跳转）
 
-### TimerService (定时器)
-- 驱动 JS 侧的标准 `setTimeout` 和 `setInterval`。通常开发者直接使用全局函数即可。
+**PickerService（选择器）**
+- `showPicker({ range, value?, title?, cancelText?, confirmText? })`: 单列选择
+- `showMultiPicker({ range: string[][], value?: number[], ... })`: 多列联动选择
+- `showDatePicker({ value?: 'YYYY-MM-DD', start?, end? })`: 日期选择
 
-## 4. 网络与文件服务
-### NetworkService (网络)
-- `fetch(url, method, headers, body?, requestId?)`: 底层 fetch 实现。
-- `cancel(requestId: string)`: 中断指定 ID 的网络请求。
+**MediaService（多媒体）**
+- `chooseImage(count?, sourceType?: ('album' | 'camera')[])`: 选图，返回 `{ tempFilePaths, tempFiles }`
+- `chooseVideo(sourceType?)`: 选视频，返回 `{ tempFilePath, size, type }`
 
-### fs (FileSystem / 文件系统)
-提供了丰富的文件操作 API。
-- `readFile(path, options?)`: 读取文件内容。
-- `writeFile(path, data, options?)`: 写入文件。
-- `unlink(path)`: 删除文件。
-- `mkdir(path, options?)`: 创建目录。
-- `rmdir(path, options?)`: 删除目录。
-- `readdir(path)`: 列出目录内容。
-- `stat(path)`: 获取文件/目录状态信息（大小、修改时间等）。
-- `exists(path)`: 检查路径是否存在。
-- `rename(oldPath, newPath)`: 重命名。
-- `copyFile(src, dest)`: 复制文件。
-- `getDirectories()`: 获取系统常用目录路径（如 Documents, Temp 等）。
+**SoundService（声音/触觉，仅 Flutter 侧）**
+- `Sound.play({ type: 'move' | 'capture' | 'check' | 'win' })`: 播放系统音效并触发 HapticFeedback，通过 `dartCallNative('Sound.play', ...)` 调用
 
-## 5. 调试与事件
-### ConsoleService (日志)
-- 拦截 JS `console` 日志并转发到原生侧，支持 `log`, `warn`, `error` 级别。
+### 3. 系统能力
 
-### NativeEventService (原生事件)
-- `emit(event: string, data: any)`: JS 侧向原生侧发送自定义事件。
-- **原生侧 API**: 原生侧也可通过 `NativeEventService.emit` 向 JS 发送事件，或使用 `on` 监听 JS 事件（详见 [核心特性](./core_features.md)）。
+**ClipboardService（剪贴板）**
+- `setData(text): Promise<void>` / `getData(): Promise<string>`
+
+**DeviceInfo（设备信息）**
+- `getDeviceInfo(): Promise<DeviceInfoData>`: OS、版本、屏幕宽高、像素比等
+
+**LocalStorage（本地存储）**
+- `getItem(key) / setItem(key, value) / removeItem(key) / clear()` — 均为异步
+
+**TimerService（定时器）**
+- 驱动 JS 侧全局 `setTimeout` / `setInterval`，开发者直接用全局函数即可
+
+### 4. 网络与文件
+
+**NetworkService（网络）**
+- `fetch(url, method, headers, body?, requestId?)`: 底层 fetch 实现
+- `cancel(requestId)`: 中断请求
+
+**fs（FileSystem）**
+- `readFile(path, options?)` / `writeFile(path, data, options?)`
+- `unlink(path)` / `mkdir(path, options?)` / `rmdir(path, options?)`
+- `readdir(path)` / `stat(path)` / `exists(path)`
+- `rename(oldPath, newPath)` / `copyFile(src, dest)`
+- `getDirectories()`: 系统常用目录（Documents、Temp 等）
+
+**WebSocketService（仅 Flutter 侧，JS 侧通过 `WebSocket` polyfill 使用）**
+- Client 模式：`connect` / `send` / `close`
+- Server 模式：`listen` / `sendToClient` / `stopListen`
+
+### 5. 调试与事件
+
+**ConsoleService**
+- 拦截 JS `console.log/warn/error`，转发到原生
+
+**NativeEventService**
+- 双向事件总线，详见 [README.md §2 NativeEvent](./README.md#2-nativeevent双向事件总线)
+
+---
+
+## 二、浏览器 API 补丁
+
+FuickJS 在 QuickJS 环境中补齐了 Web 标准 API，通过 Flutter 原生能力高性能模拟。
+
+### 网络通信
+- **fetch**: 支持 GET/POST/PUT/DELETE/PATCH；通过 `AbortController` + `AbortSignal` 真正取消请求；响应支持 `.json()` / `.text()`
+- **XMLHttpRequest**: 完整 `readyState` 状态机；事件 `onload/onerror/onreadystatechange`；`responseType = 'json'`；仅异步（同步调用会回退为异步）
+- **WebSocket**: W3C 标准接口（`new WebSocket(url, protocols?)`、`onopen/onmessage/onerror/onclose`、`send/close`），底层由 `WebSocketService` 驱动
+
+### 数据存储
+- **localStorage**: Web 一致接口（`setItem/getItem/removeItem/clear`），持久化到 Flutter `SharedPreferences`
+- **sessionStorage**: 会话级存储，JS 上下文销毁前有效
+
+### 工具与编码
+- **atob / btoa**: Base64 编解码；**Unicode 增强**：原生 `btoa` 不支持非 Latin1 字符，内部自动 UTF-8 转换
+- **URL / URLSearchParams**: 完整 URL 解析与查询字符串构造
+- **TextEncoder / TextDecoder**: 字符串 ↔ `Uint8Array` 编解码
+- **Buffer**: Node.js 兼容 API 子集
+- **structuredClone(value)**: 标准深拷贝，支持 `Date / RegExp / Map / Set / ArrayBuffer / TypedArray`、循环引用；不支持 Function / DOM 节点（QuickJS 环境无 DOM）
+- **Blob**: `new Blob(parts, { type })`、`size`、`type`、`slice(start, end, contentType?)`、`arrayBuffer()`、`text()`；`stream()` 未支持
+
+### 定时器与异步
+- **setTimeout / setInterval / clearTimeout / clearInterval**: 毫秒级精度，底层由 Flutter `Timer` 驱动
+
+### 事件与性能
+- **EventTarget / Event / CustomEvent**: 完整 DOM 事件模型（`addEventListener/removeEventListener/dispatchEvent`）
+- **performance**: `performance.now()` 返回自引擎启动以来的高精度毫秒数
+
+### 其他 Polyfill
+- **crypto**:
+  - `getRandomValues(array)`: 填充随机字节
+  - `randomUUID()`: 生成 RFC 4122 v4 UUID
+  - `subtle`: 部分 SubtleCrypto（digest / importKey / deriveBits(PBKDF2) / AES 加解密等，源码 `polyfill/crypto.ts`）
+- **process**: Node.js 兼容对象（`process.env` / `process.nextTick` 等）
+
+### Console 扩展
+除 `log / warn / error / info / debug / trace / clear` 外，额外支持：
+- `console.time(label?)` / `console.timeLog(label?, ...args)` / `console.timeEnd(label?)`
+- `console.group(...args)` / `console.groupCollapsed(...args)` / `console.groupEnd()`（无 UI 折叠，语义等同 group）
+- `console.table(data, columns?)`：输出 ASCII 表格，`data` 支持对象数组 / 普通对象 / 标量数组
+
+### 全局别名
+- `window` 指向 `globalThis`
+- `self` 指向 `globalThis`
+
+### 实现说明
+- **代码位置**: `fuickjs/src/ex/`（浏览器标准 API）与 `fuickjs/src/polyfill/`（Node 兼容 & 其他 polyfill）
+- **挂载时机**: `fuickjs/src/runtime.ts` 的 `setupPolyfills()` 中定义到全局
+- **桥接依赖**: fetch、storage、WebSocket 等依赖 `services/` 下的桥接服务调用 Flutter 能力
 
 ---
 
 ## 如何添加新服务
 
-1.  **Flutter 侧**:
-    - 在 `fuickjs_flutter/lib/core/service/` 创建实现类，继承 `BaseFuickService`。
-    - 使用 `registerMethod` (同步) 或 `registerAsyncMethod` (异步) 注册方法。
-    - 在 `NativeServiceManager` 中添加注册。
-2.  **JS 侧**:
-    - 在 `fuickjs/src/services/` 创建对应的 TS 类。
-    - 使用全局的 `dartCallNative` 或 `dartCallNativeAsync` 进行调用。
-    - 在 `fuickjs/src/index.ts` 导出供外部使用。
-3.  **同步文档**: 更新本列表。
+1. **Flutter 侧**
+   - 在 `fuickjs_flutter/lib/core/service/` 创建实现类，继承 `BaseFuickService`
+   - 用 `registerMethod`（同步）/ `registerAsyncMethod`（异步）注册方法
+   - 在 `NativeServiceManager` 中注册服务
+2. **JS 侧**
+   - 在 `fuickjs/src/services/` 创建对应 TS 类
+   - 用全局 `dartCallNative` / `dartCallNativeAsync` 调用
+   - 在 `fuickjs/src/index.ts` 导出
+3. **同步文档**：更新本列表

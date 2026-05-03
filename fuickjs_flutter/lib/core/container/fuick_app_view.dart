@@ -6,6 +6,8 @@ import '../engine/fuick_app_context.dart';
 import '../engine/fuick_app_context_manager.dart';
 import '../logger.dart';
 import 'fuick_app_controller.dart';
+import 'fuick_navigation_delegate.dart';
+import 'fuick_page.dart';
 import 'fuick_page_view.dart';
 
 class FuickAppView extends StatefulWidget {
@@ -13,8 +15,15 @@ class FuickAppView extends StatefulWidget {
   final String? debugBusinessCode;
   final String? initialRoute;
   final Map<String, dynamic>? initialParams;
+  /// 宿主集成第三方路由（go_router / auto_route 等）时的 root push 钩子，可选。
   final Future<dynamic> Function(String path, Map<String, dynamic> params)?
       onRootPush;
+
+  /// 页面转场动画类型，默认 cupertino
+  final FuickPageTransition pageTransition;
+
+  /// 页面 DSL 尚未就绪时的占位背景色，默认白色
+  final Color loadingBackgroundColor;
 
   const FuickAppView({
     super.key,
@@ -23,6 +32,8 @@ class FuickAppView extends StatefulWidget {
     this.initialRoute,
     this.initialParams,
     this.onRootPush,
+    this.pageTransition = FuickPageTransition.cupertino,
+    this.loadingBackgroundColor = const Color(0xFFFFFFFF),
   });
 
   @override
@@ -43,7 +54,7 @@ class _FuickAppViewState extends State<FuickAppView> {
 
   late final NavigatorObserver _observer = _FuickNavigatorObserver(() {
     if (mounted) {
-      final canPop = _navKey.currentState?.canPop() ?? false;
+      final canPop = _canInnerNavigatorPop();
       if (canPop != _canInnerPop) {
         setState(() {
           _canInnerPop = canPop;
@@ -51,6 +62,25 @@ class _FuickAppViewState extends State<FuickAppView> {
       }
     }
   });
+
+  bool _canInnerNavigatorPop() {
+    final nav = _navKey.currentState;
+    if (nav == null) return false;
+    if (!nav.canPop()) return false;
+    // 检查内层当前 route 是否允许 pop。
+    // PopScope(canPop:false) 会让 route.popDisposition == doNotPop，
+    // 此时外层 PopScope 也不应该允许 pop（否则系统返回键绕过了内层 PopScope）。
+    Route<dynamic>? currentRoute;
+    nav.popUntil((route) {
+      currentRoute = route;
+      return true; // 立即停止，只是为了拿到当前 route
+    });
+    if (currentRoute != null &&
+        currentRoute!.popDisposition == RoutePopDisposition.doNotPop) {
+      return false;
+    }
+    return true;
+  }
 
   @override
   void initState() {
@@ -102,11 +132,9 @@ class _FuickAppViewState extends State<FuickAppView> {
     if (!mounted) return;
     context.appController.registerNavigator(rootPageId, _navKey);
     context.appController.navigation.onRootPush = widget.onRootPush;
-    context.appController.onCloseContainer[rootPageId] = (result) {
-      if (mounted) {
-        Navigator.of(this.context).pop(result);
-      }
-    };
+    context.appController.navigation.pageTransition = widget.pageTransition;
+    context.appController.navigation.loadingBackgroundColor =
+        widget.loadingBackgroundColor;
     setState(() {
       _isReady = true;
     });
@@ -115,15 +143,18 @@ class _FuickAppViewState extends State<FuickAppView> {
   @override
   Widget build(BuildContext context) {
     if (!_isReady) {
-      return const Center(child: CupertinoActivityIndicator());
+      return ColoredBox(color: widget.loadingBackgroundColor);
     }
     return PopScope(
+      // 仅当内层 Navigator 没有可 pop 的页面时，才允许外层 pop（退出整个容器）
       canPop: !_canInnerPop,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
         final NavigatorState? nav = _navKey.currentState;
-        if (nav != null && nav.canPop()) {
-          nav.pop();
+        if (nav == null) return;
+        if (nav.canPop()) {
+          // 用 maybePop 代替 pop，让内层 PopScope(canPop:false) 能拦截
+          nav.maybePop();
         }
       },
       child: Navigator(
@@ -131,12 +162,15 @@ class _FuickAppViewState extends State<FuickAppView> {
         observers: [_observer],
         onGenerateInitialRoutes: (NavigatorState nav, String initialRoute) {
           return [
-            CupertinoPageRoute(
-              builder: (_) => FuickPageView(
+            PageRouteBuilder(
+              transitionDuration: Duration.zero,
+              reverseTransitionDuration: Duration.zero,
+              pageBuilder: (_, __, ___) => FuickPage(
                 pageId: rootPageId,
                 controller: appContext!.appController,
                 routeInfo: RouteInfo(
                     widget.initialRoute ?? '/', widget.initialParams ?? {}),
+                loadingBackgroundColor: widget.loadingBackgroundColor,
               ),
             ),
           ];
@@ -154,7 +188,6 @@ class _FuickAppViewState extends State<FuickAppView> {
       _pendingListenContext = null;
     }
     appContext?.appController.unregisterNavigator(rootPageId);
-    appContext?.appController.onCloseContainer.remove(rootPageId);
     FuickAppContextManager().releaseContext(widget.appName);
     super.dispose();
   }

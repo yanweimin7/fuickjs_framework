@@ -12,6 +12,8 @@ class GestureDetectorParser extends WidgetParser {
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
     final dynamic onTapProp = props['onTap'];
+    final dynamic onTapDownProp = props['onTapDown'];
+    final dynamic onTapCancelProp = props['onTapCancel'];
     final dynamic onDoubleTapProp = props['onDoubleTap'];
     final dynamic onLongPressProp = props['onLongPress'];
     final dynamic onPanStartProp = props['onPanStart'];
@@ -22,6 +24,12 @@ class GestureDetectorParser extends WidgetParser {
       props,
       GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onTapDown: onTapDownProp != null
+            ? (_) => FuickAction.event(context, onTapDownProp)
+            : null,
+        onTapCancel: onTapCancelProp != null
+            ? () => FuickAction.event(context, onTapCancelProp)
+            : null,
         onTap: onTapProp != null
             ? () {
                 FuickAction.event(context, onTapProp);

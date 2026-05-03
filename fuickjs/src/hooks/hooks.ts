@@ -3,7 +3,6 @@ import { PageContext } from '../core/PageContext';
 import * as PageRender from '../core/page_render';
 
 import { NavigatorService } from '../services/NavigatorService';
-import { DialogService } from '../services/DialogService';
 
 export function usePageId() {
   const { pageId } = useContext(PageContext);
@@ -13,28 +12,17 @@ export function usePageId() {
 export function useNavigator() {
   const pageId = usePageId();
   return {
-    push: (path: string, params?: unknown, rootNavigator?: boolean) =>
-      NavigatorService.push(path, params, pageId, rootNavigator),
+    push: (path: string, params?: unknown, rootNavigator?: boolean, prewarmMs?: number) =>
+      NavigatorService.push(path, params, pageId, rootNavigator, prewarmMs),
     pushReplace: (path: string, params?: unknown, rootNavigator?: boolean) =>
       NavigatorService.pushReplace(path, params, pageId, rootNavigator),
-    showModal: (path: string, params?: unknown, options?: { minHeight?: number, maxHeight?: number }, rootNavigator?: boolean) =>
-      NavigatorService.showModal(path, params, options, pageId, rootNavigator),
-    showDialog: (pathOrComponent: string | React.ReactNode, params?: unknown, rootNavigator?: boolean) =>
-      NavigatorService.showDialog(pathOrComponent, params, pageId, rootNavigator),
-    showComponentDialog: (path: string, component: React.ReactNode, params?: unknown, rootNavigator?: boolean) =>
-      NavigatorService.showComponentDialog(path, component, params, pageId, rootNavigator),
+    showBottomSheet: (component: React.ReactNode, options?: { minHeight?: number; maxHeight?: number; backgroundColor?: string }, rootNavigator?: boolean) =>
+      NavigatorService.showBottomSheet(component, options, pageId, rootNavigator),
+    showDialog: (component: React.ReactNode, params?: unknown, rootNavigator?: boolean) =>
+      NavigatorService.showDialog(component, params, pageId, rootNavigator),
     pop: (result?: unknown) => {
       return NavigatorService.pop(pageId, false, result);
     },
-  };
-}
-
-export function useDialog() {
-  const pageId = usePageId();
-  return {
-    show: (content: React.ReactNode, options?: { barrierDismissible?: boolean; barrierColor?: string }) =>
-      DialogService.show(content, { ...options, pageId }),
-    dismiss: (result?: any) => DialogService.dismiss(result),
   };
 }
 

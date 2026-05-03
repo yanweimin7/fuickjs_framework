@@ -29,22 +29,7 @@ export function dispatchEvent(eventObj: unknown, payload: unknown) {
     const nodeId: number = Number(evt?.nodeId || evt?.id);
     const eventKey = evt?.eventKey;
 
-    // 优先从正常页面容器查找
-    let container = containers[pageId];
-
-    // 兼容性：如果容器不存在（可能是 Dialog/Overlay 使用了临时 pageId 且已销毁或未注册），
-    // 尝试从其他活跃容器中查找（针对全局/跨页面事件）
-    if (!container) {
-      // 如果是 Dialog/Overlay 常用的 -1，或者找不到容器，尝试遍历所有容器
-      // 注意：这仅作为兜底逻辑
-      for (const id in containers) {
-        const c = containers[id];
-        if (c.getCallback(nodeId, eventKey)) {
-          container = c;
-          break;
-        }
-      }
-    }
+    const container = containers[pageId];
 
     if (container) {
       const fn = container.getCallback(nodeId, eventKey);

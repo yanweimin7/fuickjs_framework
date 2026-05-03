@@ -1,6 +1,5 @@
 export { ToastService } from './ToastService';
 export { DialogService } from './DialogService';
-export { OverlayService } from './OverlayService';
 export { PickerService } from './PickerService';
 export { LocalStorageService } from './LocalStorageService';
 export { DeviceInfoService, type DeviceInfoData } from './DeviceInfoService';
@@ -9,4 +8,3 @@ export * from './FileSystemService';
 export { NetworkService } from './NetworkService';
 export { NavigatorService } from './NavigatorService';
 export { UIService } from './UIService';
-export { MediaService, type ChooseImageResult, type ChooseVideoResult } from './MediaService';

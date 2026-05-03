@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart' hide widgetFactory;
-import 'package:flutter/scheduler.dart';
 
 import '../logger.dart';
 import '../widgets/fuick_node.dart';
@@ -17,12 +16,14 @@ class FuickPageView extends StatefulWidget {
   final int pageId;
   final FuickAppController controller;
   final RouteInfo routeInfo;
+  final Color loadingBackgroundColor;
 
   const FuickPageView({
     super.key,
     required this.pageId,
     required this.controller,
     required this.routeInfo,
+    this.loadingBackgroundColor = const Color(0xFFFFFFFF),
   });
 
   @override
@@ -30,7 +31,7 @@ class FuickPageView extends StatefulWidget {
 }
 
 class _JsUiHostState extends State<FuickPageView> with RouteAware {
-  final FuickNodeManager nodeManager = FuickNodeManager();
+  FuickNodeManager nodeManager = FuickNodeManager();
   FuickNode? rootNode;
   bool _hasRendered = false;
   bool _isVisible = false;
@@ -41,6 +42,10 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   Widget? _cachedChild;
   FuickNode? _lastBuiltNode;
 
+  /// 首次构建：先 inflate+layout（Opacity 0 不可见），下一帧再 paint（Opacity 1）
+  /// 将 inflate+layout 和 paint 分到不同帧，减少单帧峰值
+  bool _offstage = true;
+
   @override
   void didUpdateWidget(FuickPageView oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -48,6 +53,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
         oldWidget.pageId != widget.pageId) {
       _cachedChild = null;
       _lastBuiltNode = null;
+      _offstage = true;
     }
   }
 
@@ -115,26 +121,34 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     return count;
   }
 
+  /// 非预渲染路径下，是否需要延迟 1 帧再 setState，
+  /// 将 createNode 和 build 分到不同帧，避免单帧峰值卡顿
+  bool _deferSetState = false;
+
   void _handleRenderDsl(Map<String, dynamic> dsl) {
     _receiveDataTime = DateTime.now();
 
-    // Initial render completed. If the page is currently visible, we need to notify JS again.
-    // The initial 'visible' event from didPush might have been missed because the JS container
-    // wasn't created yet.
     if (mounted && _isVisible) {
       widget.controller.notifyLifecycle(widget.pageId, 'visible');
     }
 
-    // 测量 DSL 解析时间
     final dslParseStart = DateTime.now();
     final newNode = nodeManager.createNode(dsl, nodeManager);
     _dslParseCost = DateTime.now().difference(dslParseStart).inMilliseconds;
+    logger.d(
+        '[Performance] DSL Parse Cost: ${_dslParseCost}ms (nodes: ${_countNodes(newNode)})');
 
-    logger.d('[Performance] DSL Parse Cost: ${_dslParseCost}ms (nodes: ${_countNodes(newNode)})');
-
-    if (rootNode != newNode) {
+    if (rootNode != newNode && mounted) {
       rootNode = newNode;
-      if (mounted) setState(() {});
+      if (_deferSetState) {
+        // 非预渲染路径：延迟 1 帧再 setState，将 createNode 和 build 分帧
+        _deferSetState = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+      } else {
+        setState(() {});
+      }
     }
   }
 
@@ -157,13 +171,21 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     final prewarm = widget.controller.page.consumeByPageId(widget.pageId);
     if (prewarm != null) {
       _hasRendered = true;
-      if (prewarm.hasDsl) {
-        // DSL 已就绪：首帧直接用
+      if (prewarm.hasPrebuiltNodes) {
+        // 预构建 Node 树就绪：直接复用，跳过动画期间的 createNode
+        nodeManager = prewarm.prebuiltNodeManager!;
+        rootNode = prewarm.prebuiltRootNode!;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+      } else if (prewarm.hasDsl) {
+        // DSL 已就绪但 Node 未构建（兜底）
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _handleRenderDsl(prewarm.dsl!);
         });
       } else {
-        // JS 渲染还在飞行中：等 future
+        // JS 渲染还在飞行中：等 future，DSL 到达时延迟 1 帧 setState
+        _deferSetState = true;
         prewarm.future.then((dsl) {
           if (mounted) _handleRenderDsl(dsl);
         });
@@ -172,7 +194,8 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
       return;
     }
 
-    // 普通路径（无预渲染）
+    // 普通路径（无预渲染）：DSL 到达时延迟 1 帧 setState，分摊 createNode 和 build 的帧压力
+    _deferSetState = true;
     widget.controller.isBundleLoaded.addListener(_checkAndRender);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRender();
@@ -184,8 +207,6 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     if (!widget.controller.isBundleLoaded.value) return;
     if (!mounted) return;
     _hasRendered = true;
-    // isBundleLoaded 在 _loadBundle 完成后才置 true，JS 环境此时已完全就绪，
-    // 无需再延迟一帧，直接发起渲染
     widget.controller.renderPage(
       widget.pageId,
       widget.routeInfo.path,
@@ -193,18 +214,11 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
     if (rootNode == null) {
-      return Scaffold(
-        body: const Center(
-          child: SizedBox(
-            width: 100,
-            height: 100,
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      );
+      return ColoredBox(color: widget.loadingBackgroundColor);
     }
 
     if (_cachedChild == null || _lastBuiltNode != rootNode) {
@@ -212,16 +226,20 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
       final widgetBuildStart = DateTime.now();
 
       _lastBuiltNode = rootNode;
-      _cachedChild = FuickNodeManagerProvider(
-        manager: nodeManager,
-        child: FuickAppScope(
-          controller: widget.controller,
-          child: FuickPageScope(
-            pageId: widget.pageId,
-            child: widgetFactory.buildFromNode(
-              context,
-              rootNode!,
-              forceWrap: true,
+      // 最外层 RepaintBoundary：push 动画时旧页被隔离为独立合成层，
+      // 避免旧页跟随动画每帧重绘，节省 UI 线程时间。
+      _cachedChild = RepaintBoundary(
+        child: FuickNodeManagerProvider(
+          manager: nodeManager,
+          child: FuickAppScope(
+            controller: widget.controller,
+            child: FuickPageScope(
+              pageId: widget.pageId,
+              child: widgetFactory.buildFromNode(
+                context,
+                rootNode!,
+                forceWrap: true,
+              ),
             ),
           ),
         ),
@@ -231,27 +249,39 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
 
       if (_isFirstRender && _receiveDataTime != null) {
         _isFirstRender = false;
-        final buildTime = DateTime.now();
+        widgetFactory.resetParseCost();
+        final buildEndTime = DateTime.now();
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          final renderTime = DateTime.now();
+          final frameEndTime = DateTime.now();
           final totalCost =
-              renderTime.difference(_receiveDataTime!).inMilliseconds;
-          final buildCost =
-              buildTime.difference(_receiveDataTime!).inMilliseconds;
-          final paintCost = renderTime.difference(buildTime).inMilliseconds;
+              frameEndTime.difference(_receiveDataTime!).inMilliseconds;
+          final inflateCost =
+              frameEndTime.difference(buildEndTime).inMilliseconds;
+          final parseCostMs =
+              (widgetFactory.parseCostMicros / 1000).round();
 
           logger.d(
               '[Performance] Page First Render (ID: ${widget.pageId}, Path: ${widget.routeInfo.path}):');
           logger.d('  - Total Cost: ${totalCost}ms');
-          logger.d('  - DSL Parse Cost: ${_dslParseCost}ms');
-          logger.d('  - Widget Build Cost: ${widgetBuildCost}ms');
-          logger.d('  - Build Cost: ${buildCost}ms (UI Data -> Widget Build)');
-          logger
-              .d('  - Layout/Paint Cost: ${paintCost}ms (Post Frame Callback)');
+          logger.d('  - DSL Parse Cost: ${_dslParseCost}ms (createNode)');
+          logger.d('  - Node→Widget Cost: ${parseCostMs}ms (parser.parse × N)');
+          logger.d('  - Widget Build Cost: ${widgetBuildCost}ms (config assembly)');
+          logger.d(
+              '  - Layout Cost: ${inflateCost - parseCostMs}ms');
+        });
+      }
+
+      // 首次构建：inflate+layout 在本帧（不可见），下一帧切换为可见（仅 paint）
+      if (_offstage) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() { _offstage = false; });
         });
       }
     }
-    return _cachedChild!;
+
+    // _offstage=true: Opacity(0) 保持占位+layout 但不 paint
+    // _offstage=false: 正常显示
+    return Opacity(opacity: _offstage ? 0.0 : 1.0, child: _cachedChild!);
   }
 }
 

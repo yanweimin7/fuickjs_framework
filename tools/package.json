@@ -1,0 +1,12 @@
+{
+  "name": "fuickjs-tools",
+  "version": "1.0.0",
+  "description": "FuickJS 开发工具集",
+  "type": "module",
+  "scripts": {
+    "resolve": "node resolve-sourcemap.mjs"
+  },
+  "dependencies": {
+    "source-map": "^0.7.6"
+  }
+}

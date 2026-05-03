@@ -66,11 +66,15 @@ class NetworkService extends BaseFuickService {
           responseHeaders[key] = values.join(', ');
         });
 
+        final String responseBody = response.data == null
+            ? ''
+            : response.data is String
+                ? response.data as String
+                : jsonEncode(response.data);
+
         return {
           'status': response.statusCode ?? 0,
-          'body': response.data is String
-              ? response.data
-              : jsonEncode(response.data),
+          'body': responseBody,
           'headers': responseHeaders,
         };
       } on DioException catch (e) {
@@ -83,9 +87,12 @@ class NetworkService extends BaseFuickService {
           };
         }
         final statusCode = e.response?.statusCode ?? 0;
-        final responseBody = e.response?.data is String
-            ? e.response!.data
-            : jsonEncode(e.response?.data) ?? e.message ?? 'Unknown error';
+        final rawData = e.response?.data;
+        final responseBody = rawData == null
+            ? (e.message ?? 'Unknown error')
+            : rawData is String
+                ? rawData
+                : jsonEncode(rawData);
         logger.e('[NetworkService] Dio error: ${e.message}, status: $statusCode');
         return {
           'status': statusCode,

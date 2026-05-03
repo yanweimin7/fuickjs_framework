@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import '../widgets/fuick_node.dart';
 import 'fuick_app_controller.dart';
 
 class PrewarmEntry {
@@ -9,14 +11,24 @@ class PrewarmEntry {
   Map<String, dynamic>? dsl;
   final Completer<Map<String, dynamic>> _completer = Completer();
 
+  /// 预构建产物：DSL 就绪时立即 createNode，动画期间跳过此步
+  FuickNodeManager? prebuiltNodeManager;
+  FuickNode? prebuiltRootNode;
+
   PrewarmEntry(this.pageId, this.path, this.params);
 
   bool get hasDsl => dsl != null;
+
+  /// 是否有预构建的 Node 树可直接复用
+  bool get hasPrebuiltNodes => prebuiltRootNode != null;
 
   Future<Map<String, dynamic>> get future => _completer.future;
 
   void resolveDsl(Map<String, dynamic> d) {
     dsl = d;
+    // 立即解析 DSL 为 FuickNode 树，不等 FuickPageView
+    prebuiltNodeManager = FuickNodeManager();
+    prebuiltRootNode = prebuiltNodeManager!.createNode(d, prebuiltNodeManager!);
     if (!_completer.isCompleted) _completer.complete(d);
   }
 }
@@ -75,6 +87,9 @@ class FuickPageDelegate {
     controller.jsProxy.render(id, path, params);
   }
 
+  /// 获取预热条目（不消费，仅用于等待 DSL 就绪）
+  PrewarmEntry? getPrewarmEntry(String path) => _prewarmCache[path];
+
   /// 认领预渲染条目（navigation delegate 调用）：
   /// 从 path 缓存移到 pageId 缓存，返回 entry 以便取 pageId。
   PrewarmEntry? claimPrewarm(String path, Map<String, dynamic> params) {
@@ -104,11 +119,8 @@ class FuickPageDelegate {
   }
 
   bool _paramsEqual(Map<String, dynamic> a, Map<String, dynamic> b) {
-    if (a.length != b.length) return false;
-    for (final key in a.keys) {
-      if (a[key] != b[key]) return false;
-    }
-    return true;
+    // 用 JSON 序列化做深度比较，正确处理嵌套 Map/List
+    return jsonEncode(a) == jsonEncode(b);
   }
 
   void destroyPage(int pageId) {

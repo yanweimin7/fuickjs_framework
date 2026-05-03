@@ -2,19 +2,44 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../logger.dart';
+import '../widgets/widget_utils.dart';
 import 'fuick_app_controller.dart';
 import 'fuick_page.dart';
 import 'fuick_page_view.dart';
+
+/// 宿主选择 FuickJS 页面路由的转场动画。
+enum FuickPageTransition {
+  /// iOS 原生右滑（默认，支持左滑返回手势）
+  cupertino,
+
+  /// Material 3 缩放+淡入（无左滑手势）
+  materialZoom,
+
+  /// Android 经典 Material 底部淡入上浮（无左滑手势）
+  fadeUpwards,
+
+  /// 跟随平台自适应（iOS → cupertino，Android → zoom）
+  platformAdaptive,
+
+  /// 无动画
+  none,
+}
 
 class FuickNavigationDelegate {
   final FuickAppController controller;
   final Map<int, GlobalKey<NavigatorState>> _navigators = {};
   final Map<int, BuildContext> _pageContexts = {};
-  final Map<int, Function(dynamic)> onCloseContainer = {};
 
-  /// 外部导航推送回调
+  /// 宿主集成第三方路由（go_router / auto_route 等）时的 root push 钩子。
+  /// 未设置时回退到 Navigator.of(context, rootNavigator: true)。
   Future<dynamic> Function(String path, Map<String, dynamic> params)?
       onRootPush;
+
+  /// 页面 DSL 尚未就绪时的占位背景色
+  Color loadingBackgroundColor = const Color(0xFFFFFFFF);
+
+  /// 页面转场动画类型，默认 cupertino（iOS 右滑，支持左滑返回手势）
+  FuickPageTransition pageTransition = FuickPageTransition.cupertino;
 
   List<BuildContext> get pageContexts => _pageContexts.values.toList();
 
@@ -60,7 +85,6 @@ class FuickNavigationDelegate {
       if (onRootPush != null) {
         return onRootPush!(path, params);
       }
-      // 如果没有设置 onRootPush，尝试通过当前 context 的 Navigator 往上找
       final context = _pageContexts[pageId] ?? _pageContexts.values.lastOrNull;
       if (context != null) {
         try {
@@ -87,18 +111,13 @@ class FuickNavigationDelegate {
     return replacement ? nav.pushReplacement(route) : nav.push(route);
   }
 
-  /// 是否启用转场动画，默认 true
-  static bool enableTransitionAnimation = true;
-
-  /// 转场动画持续时间，默认 300ms
-  static Duration transitionDuration = const Duration(milliseconds: 250);
-
   Route _createRoute(BuildContext context, String path,
       Map<String, dynamic> params, int pageId) {
     final page = FuickPage(
       pageId: pageId,
       controller: controller,
       routeInfo: RouteInfo(path, params),
+      loadingBackgroundColor: loadingBackgroundColor,
     );
     final settings = RouteSettings(name: path);
     final presentation = params['presentation'];
@@ -107,46 +126,59 @@ class FuickNavigationDelegate {
       return DialogRoute(
           context: context, settings: settings, builder: (_) => page);
     } else if (presentation == 'bottomSheet') {
+      final screenHeight = MediaQuery.of(context).size.height;
+      final rawMin = (params['minHeight'] as num?)?.toDouble();
+      final rawMax = (params['maxHeight'] as num?)?.toDouble();
+      final minHeight = rawMin != null
+          ? (rawMin <= 1.0 ? screenHeight * rawMin : rawMin)
+          : 0.0;
+      final maxHeight = rawMax != null
+          ? (rawMax <= 1.0 ? screenHeight * rawMax : rawMax)
+          : screenHeight * 0.9;
+
+      final bgColor = params['backgroundColor'] as String?;
       return ModalBottomSheetRoute(
         settings: settings,
         isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => _buildBottomSheet(ctx, page, params),
+        backgroundColor: bgColor != null
+            ? WidgetUtils.colorFromHex(bgColor) ?? Theme.of(context).dialogTheme.backgroundColor ?? Theme.of(context).colorScheme.surface
+            : Theme.of(context).dialogTheme.backgroundColor ?? Theme.of(context).colorScheme.surface,
+        constraints: BoxConstraints(
+          minHeight: minHeight,
+          maxHeight: maxHeight,
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        ),
+        builder: (_) => page,
       );
     }
 
-    // 根据配置选择转场动画
-    if (!enableTransitionAnimation) {
-      // 无动画路由
-      return PageRouteBuilder(
-        settings: settings,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-        pageBuilder: (_, __, ___) => page,
-      );
+    switch (pageTransition) {
+      case FuickPageTransition.none:
+        return PageRouteBuilder(
+          settings: settings,
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+          pageBuilder: (_, __, ___) => page,
+        );
+      case FuickPageTransition.cupertino:
+        return CupertinoPageRoute(settings: settings, builder: (_) => page);
+      case FuickPageTransition.platformAdaptive:
+        return MaterialPageRoute(settings: settings, builder: (_) => page);
+      case FuickPageTransition.fadeUpwards:
+        return _FuickPageRoute(
+          settings: settings,
+          child: page,
+          builder: const FadeUpwardsPageTransitionsBuilder(),
+        );
+      case FuickPageTransition.materialZoom:
+        return _FuickPageRoute(
+          settings: settings,
+          child: page,
+          builder: const ZoomPageTransitionsBuilder(),
+        );
     }
-
-    // 使用更快的转场动画
-    return _FastPageRoute(
-      settings: settings,
-      builder: (_) => page,
-      transitionDuration: transitionDuration,
-    );
-  }
-
-  Widget _buildBottomSheet(
-      BuildContext context, Widget child, Map<String, dynamic> params) {
-    final height = MediaQuery.of(context).size.height;
-    final minHeight = (params['minHeight'] as num?)?.toDouble();
-    final maxHeight = (params['maxHeight'] as num?)?.toDouble() ?? 0.9;
-
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        minHeight: minHeight != null ? height * minHeight : 0,
-        maxHeight: height * maxHeight,
-      ),
-      child: child,
-    );
   }
 
   void pop({int? pageId, dynamic result}) {
@@ -158,7 +190,10 @@ class FuickNavigationDelegate {
     if (nav.canPop()) {
       nav.pop(result);
     } else {
-      _handleFallbackPop(nav, pageId, result);
+      // 内层 Navigator 栈底，穿透到外层 Flutter Navigator 退出整个容器
+      try {
+        Navigator.of(nav.context).pop(result);
+      } catch (_) {}
     }
   }
 
@@ -175,16 +210,6 @@ class FuickNavigationDelegate {
       }
     }
     return false;
-  }
-
-  void _handleFallbackPop(NavigatorState nav, int? pageId, dynamic result) {
-    if (pageId != null && onCloseContainer.containsKey(pageId)) {
-      onCloseContainer[pageId]?.call(result);
-    } else {
-      try {
-        Navigator.of(nav.context).pop(result);
-      } catch (_) {}
-    }
   }
 
   void popTo(String name, {int? pageId}) {
@@ -208,27 +233,16 @@ class FuickNavigationDelegate {
   }
 }
 
-/// 快速转场路由 - 使用更轻量的动画
-class _FastPageRoute<T> extends PageRoute<T> {
-  _FastPageRoute({
+/// Material 系转场动画的通用 PageRoute（不受平台自适应影响，无左滑手势）
+class _FuickPageRoute<T> extends PageRoute<T> {
+  _FuickPageRoute({
+    required this.child,
     required this.builder,
-    RouteSettings? settings,
-    this.transitionDuration = const Duration(milliseconds: 250),
-  }) : super(settings: settings);
+    super.settings,
+  });
 
-  final WidgetBuilder builder;
-
-  @override
-  final Duration transitionDuration;
-
-  @override
-  final Duration reverseTransitionDuration = const Duration(milliseconds: 200);
-
-  @override
-  bool get opaque => true;
-
-  @override
-  bool get barrierDismissible => false;
+  final Widget child;
+  final PageTransitionsBuilder builder;
 
   @override
   Color? get barrierColor => null;
@@ -240,38 +254,16 @@ class _FastPageRoute<T> extends PageRoute<T> {
   bool get maintainState => true;
 
   @override
+  Duration get transitionDuration => const Duration(milliseconds: 300);
+
+  @override
   Widget buildPage(BuildContext context, Animation<double> animation,
-      Animation<double> secondaryAnimation) {
-    return builder(context);
-  }
+          Animation<double> secondaryAnimation) =>
+      child;
 
   @override
   Widget buildTransitions(BuildContext context, Animation<double> animation,
-      Animation<double> secondaryAnimation, Widget child) {
-    // 使用简单的淡入淡出 + 轻微滑动，比 CupertinoPageRoute 更轻量
-    final slideAnimation = Tween<Offset>(
-      begin: const Offset(0.05, 0), // 轻微滑动
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    ));
-
-    final fadeAnimation = Tween<double>(
-      begin: 0.8, // 从 0.8 开始淡入，减少闪烁感
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOut,
-    ));
-
-    return FadeTransition(
-      opacity: fadeAnimation,
-      child: SlideTransition(
-        position: slideAnimation,
-        child: child,
-      ),
-    );
-  }
+          Animation<double> secondaryAnimation, Widget child) =>
+      builder.buildTransitions(
+          this, context, animation, secondaryAnimation, child);
 }

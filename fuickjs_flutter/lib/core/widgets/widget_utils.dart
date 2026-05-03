@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:vector_math/vector_math_64.dart' hide Colors;
 import '../logger.dart';
 import '../utils/extensions.dart';
 
@@ -23,16 +22,12 @@ class WidgetUtils {
     if (hexString == 'orange') return Colors.orange;
 
     // rgba(r, g, b, a) 格式
-    final rgbaMatch = RegExp(
-            r'rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)')
-        .firstMatch(hexString);
+    final rgbaMatch = RegExp(r'rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)').firstMatch(hexString);
     if (rgbaMatch != null) {
       final r = int.parse(rgbaMatch.group(1)!);
       final g = int.parse(rgbaMatch.group(2)!);
       final b = int.parse(rgbaMatch.group(3)!);
-      final a = rgbaMatch.group(4) != null
-          ? (double.parse(rgbaMatch.group(4)!) * 255).round()
-          : 255;
+      final a = rgbaMatch.group(4) != null ? (double.parse(rgbaMatch.group(4)!) * 255).round() : 255;
       final color = Color.fromARGB(a, r, g, b);
       _colorCache[hexString] = color;
       return color;
@@ -112,12 +107,8 @@ class WidgetUtils {
 
       // 当 horizontal/vertical 与 top/bottom/left/right 混合时（3-value shorthand），
       // 展开 horizontal/vertical 为具体方向后用 fromLTRB
-      if (left != null ||
-          top != null ||
-          right != null ||
-          bottom != null ||
-          horizontal != null ||
-          vertical != null) {
+      if (left != null || top != null || right != null || bottom != null ||
+          horizontal != null || vertical != null) {
         return EdgeInsets.fromLTRB(
           left ?? horizontal ?? 0.0,
           top ?? vertical ?? 0.0,
@@ -454,42 +445,23 @@ class WidgetUtils {
     final fitStr = m['fit'] as String?;
     final BoxFit fit;
     switch (fitStr) {
-      case 'cover':
-        fit = BoxFit.cover;
-        break;
-      case 'contain':
-        fit = BoxFit.contain;
-        break;
-      case 'fill':
-        fit = BoxFit.fill;
-        break;
-      case 'none':
-        fit = BoxFit.none;
-        break;
-      case 'scaleDown':
-        fit = BoxFit.scaleDown;
-        break;
-      default:
-        fit = BoxFit.cover;
+      case 'cover': fit = BoxFit.cover; break;
+      case 'contain': fit = BoxFit.contain; break;
+      case 'fill': fit = BoxFit.fill; break;
+      case 'none': fit = BoxFit.none; break;
+      case 'scaleDown': fit = BoxFit.scaleDown; break;
+      default: fit = BoxFit.cover;
     }
 
-    final alignment =
-        WidgetUtils.alignment(m['alignment'] as String?) ?? Alignment.center;
+    final alignment = WidgetUtils.alignment(m['alignment'] as String?) ?? Alignment.center;
 
     final repeatStr = m['repeat'] as String?;
     final ImageRepeat repeat;
     switch (repeatStr) {
-      case 'repeat':
-        repeat = ImageRepeat.repeat;
-        break;
-      case 'repeatX':
-        repeat = ImageRepeat.repeatX;
-        break;
-      case 'repeatY':
-        repeat = ImageRepeat.repeatY;
-        break;
-      default:
-        repeat = ImageRepeat.noRepeat;
+      case 'repeat': repeat = ImageRepeat.repeat; break;
+      case 'repeatX': repeat = ImageRepeat.repeatX; break;
+      case 'repeatY': repeat = ImageRepeat.repeatY; break;
+      default: repeat = ImageRepeat.noRepeat;
     }
 
     final ImageProvider provider = url.startsWith('http')
@@ -509,8 +481,7 @@ class WidgetUtils {
       case 'dashed':
       case 'dotted':
       case 'solid':
-        return BorderStyle
-            .solid; // Flutter only supports solid; dashed/dotted need CustomPainter
+        return BorderStyle.solid; // Flutter only supports solid; dashed/dotted need CustomPainter
       case 'none':
         return BorderStyle.none;
       default:
@@ -518,8 +489,7 @@ class WidgetUtils {
     }
   }
 
-  static BorderSide _borderSide(Map<String, dynamic> m,
-      {BorderSide fallback = BorderSide.none}) {
+  static BorderSide _borderSide(Map<String, dynamic> m, {BorderSide fallback = BorderSide.none}) {
     final color = colorFromHex(m['color'] as String?);
     final width = sizeNum(m['width']);
     final style = _borderStyle(m['style'] as String?);
@@ -535,10 +505,8 @@ class WidgetUtils {
     if (v is Map) {
       final m = asMap(v);
       // 如果有单边 key，走单边模式
-      final hasDirectional = m.containsKey('top') ||
-          m.containsKey('right') ||
-          m.containsKey('bottom') ||
-          m.containsKey('left');
+      final hasDirectional = m.containsKey('top') || m.containsKey('right') ||
+          m.containsKey('bottom') || m.containsKey('left');
       if (hasDirectional) {
         final globalColor = colorFromHex(m['color'] as String?);
         final globalWidth = sizeNum(m['width']);
@@ -551,18 +519,10 @@ class WidgetUtils {
               )
             : BorderSide.none;
         return Border(
-          top: m.containsKey('top')
-              ? _borderSide(asMap(m['top']), fallback: fallback)
-              : fallback,
-          right: m.containsKey('right')
-              ? _borderSide(asMap(m['right']), fallback: fallback)
-              : fallback,
-          bottom: m.containsKey('bottom')
-              ? _borderSide(asMap(m['bottom']), fallback: fallback)
-              : fallback,
-          left: m.containsKey('left')
-              ? _borderSide(asMap(m['left']), fallback: fallback)
-              : fallback,
+          top: m.containsKey('top') ? _borderSide(asMap(m['top']), fallback: fallback) : fallback,
+          right: m.containsKey('right') ? _borderSide(asMap(m['right']), fallback: fallback) : fallback,
+          bottom: m.containsKey('bottom') ? _borderSide(asMap(m['bottom']), fallback: fallback) : fallback,
+          left: m.containsKey('left') ? _borderSide(asMap(m['left']), fallback: fallback) : fallback,
         );
       }
       final color = colorFromHex(m['color'] as String?) ?? Colors.black;
@@ -619,17 +579,10 @@ class WidgetUtils {
     final decorations = <TextDecoration>[];
     for (final part in parts) {
       switch (part) {
-        case 'underline':
-          decorations.add(TextDecoration.underline);
-          break;
-        case 'lineThrough':
-          decorations.add(TextDecoration.lineThrough);
-          break;
-        case 'overline':
-          decorations.add(TextDecoration.overline);
-          break;
-        case 'none':
-          return TextDecoration.none;
+        case 'underline': decorations.add(TextDecoration.underline); break;
+        case 'lineThrough': decorations.add(TextDecoration.lineThrough); break;
+        case 'overline': decorations.add(TextDecoration.overline); break;
+        case 'none': return TextDecoration.none;
       }
     }
     if (decorations.isEmpty) return null;
@@ -639,26 +592,16 @@ class WidgetUtils {
 
   static FontWeight fontWeight(String? v) {
     switch (v) {
-      case 'w100':
-        return FontWeight.w100;
-      case 'w200':
-        return FontWeight.w200;
-      case 'w300':
-        return FontWeight.w300;
-      case 'normal':
-        return FontWeight.normal;
-      case 'w500':
-        return FontWeight.w500;
-      case 'w600':
-        return FontWeight.w600;
-      case 'bold':
-        return FontWeight.bold;
-      case 'w800':
-        return FontWeight.w800;
-      case 'w900':
-        return FontWeight.w900;
-      default:
-        return FontWeight.normal;
+      case 'w100': return FontWeight.w100;
+      case 'w200': return FontWeight.w200;
+      case 'w300': return FontWeight.w300;
+      case 'normal': return FontWeight.normal;
+      case 'w500': return FontWeight.w500;
+      case 'w600': return FontWeight.w600;
+      case 'bold': return FontWeight.bold;
+      case 'w800': return FontWeight.w800;
+      case 'w900': return FontWeight.w900;
+      default: return FontWeight.normal;
     }
   }
 
@@ -711,38 +654,34 @@ class WidgetUtils {
           return s.endsWith('rpx') ? n / 2 : n;
         }
         if (s.endsWith('deg')) {
-          return (double.tryParse(s.replaceAll('deg', '')) ?? 0) *
-              3.14159265358979 /
-              180;
+          return (double.tryParse(s.replaceAll('deg', '')) ?? 0) * 3.14159265358979 / 180;
         }
         if (s.endsWith('rad')) {
           return double.tryParse(s.replaceAll('rad', '')) ?? 0;
         }
         if (s.endsWith('turn')) {
-          return (double.tryParse(s.replaceAll('turn', '')) ?? 0) *
-              2 *
-              3.14159265358979;
+          return (double.tryParse(s.replaceAll('turn', '')) ?? 0) * 2 * 3.14159265358979;
         }
         return double.tryParse(s) ?? 0;
       }).toList();
 
       switch (fn) {
         case 'translate':
-          matrix.translate(Vector3(args.isNotEmpty ? args[0] : 0.0,
-              args.length > 1 ? args[1] : 0.0, 0.0));
+          matrix.translateByDouble(args.isNotEmpty ? args[0] : 0.0, args.length > 1 ? args[1] : 0.0, 0.0, 1.0);
           break;
         case 'translateX':
-          matrix.translate(Vector3(args.isNotEmpty ? args[0] : 0.0, 0.0, 0.0));
+          matrix.translateByDouble(args.isNotEmpty ? args[0] : 0.0, 0.0, 0.0, 1.0);
           break;
         case 'translateY':
-          matrix.translate(Vector3(0.0, args.isNotEmpty ? args[0] : 0.0, 0.0));
+          matrix.translateByDouble(0.0, args.isNotEmpty ? args[0] : 0.0, 0.0, 1.0);
           break;
         case 'translate3d':
-          matrix.translate(Vector3(
+          matrix.translateByDouble(
             args.isNotEmpty ? args[0] : 0.0,
             args.length > 1 ? args[1] : 0.0,
             args.length > 2 ? args[2] : 0.0,
-          ));
+            1.0,
+          );
           break;
         case 'rotate':
         case 'rotateZ':
@@ -757,15 +696,13 @@ class WidgetUtils {
         case 'scale':
           final sx = args.isNotEmpty ? args[0] : 1.0;
           final sy = args.length > 1 ? args[1] : sx;
-          matrix.multiply(Matrix4.diagonal3Values(sx, sy, 1.0));
+          matrix.scaleByDouble(sx, sy, 1.0, 1.0);
           break;
         case 'scaleX':
-          final sx1 = args.isNotEmpty ? args[0] : 1.0;
-          matrix.multiply(Matrix4.diagonal3Values(sx1, 1.0, 1.0));
+          matrix.scaleByDouble(args.isNotEmpty ? args[0] : 1.0, 1.0, 1.0, 1.0);
           break;
         case 'scaleY':
-          final sy1 = args.isNotEmpty ? args[0] : 1.0;
-          matrix.multiply(Matrix4.diagonal3Values(1.0, sy1, 1.0));
+          matrix.scaleByDouble(1.0, args.isNotEmpty ? args[0] : 1.0, 1.0, 1.0);
           break;
         case 'skew':
           // skew 通过矩阵实现

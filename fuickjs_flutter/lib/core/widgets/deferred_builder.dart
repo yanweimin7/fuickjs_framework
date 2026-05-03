@@ -21,18 +21,29 @@ class DeferredBuilder extends StatefulWidget {
 
 class _DeferredBuilderState extends State<DeferredBuilder> {
   Widget? _child;
+  int? _callbackId;
 
   @override
   void initState() {
     super.initState();
-    // 延迟到下一帧构建
-    SchedulerBinding.instance.scheduleFrameCallback((_) {
+    // 延迟到下一帧构建，保存 id 以便 dispose 时取消
+    _callbackId = SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _callbackId = null;
       if (mounted) {
         setState(() {
           _child = widget.builder(context);
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    if (_callbackId != null) {
+      SchedulerBinding.instance.cancelFrameCallbackWithId(_callbackId!);
+      _callbackId = null;
+    }
+    super.dispose();
   }
 
   @override

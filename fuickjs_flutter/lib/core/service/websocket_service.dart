@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -13,14 +14,29 @@ class WebSocketService extends BaseFuickService {
   String get name => 'WebSocket';
 
   bool _isDisposed = false;
+
+  // ── Client mode state ─────────────────────────────────────────────────────
   final Map<String, WebSocketChannel> _sockets = {};
   final Map<String, StreamSubscription> _subscriptions = {};
 
+  // ── Server mode state ─────────────────────────────────────────────────────
+  int _clientCounter = 0;
+  final Map<String, HttpServer> _servers = {};
+  // serverId -> { clientId -> WebSocket }
+  final Map<String, Map<String, WebSocket>> _serverClients = {};
+
   WebSocketService() {
+    // Client mode
     registerAsyncMethod('connect', _handleConnect);
     registerMethod('send', _handleSend);
     registerMethod('close', _handleClose);
+    // Server mode
+    registerAsyncMethod('listen', _handleListen);
+    registerMethod('sendToClient', _handleSendToClient);
+    registerMethod('stopListen', _handleStopListen);
   }
+
+  // ── Client mode ───────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> _handleConnect(dynamic args) async {
     try {
@@ -105,10 +121,10 @@ class WebSocketService extends BaseFuickService {
 
       // Call JS handler
       final jsHandler = '_ws_$socketId';
-      final escapedData = data.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n').replaceAll('\r', '\\r');
+      final encodedData = jsonEncode(data);
       final jsCode = isBinary
-          ? '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleMessage) { socket._handleMessage(base64ToArrayBuffer("$escapedData")); } })();'''
-          : '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleMessage) { socket._handleMessage("$escapedData"); } })();''';
+          ? '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleMessage) { socket._handleMessage(base64ToArrayBuffer($encodedData)); } })();'''
+          : '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleMessage) { socket._handleMessage($encodedData); } })();''';
       ctx.eval(jsCode);
     } catch (e, s) {
       logger.e('[WebSocketService] Error handling message: $e\n$s');
@@ -127,8 +143,8 @@ class WebSocketService extends BaseFuickService {
 
       // Call JS handler
       final jsHandler = '_ws_$socketId';
-      final escapedReason = closeReason.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n').replaceAll('\r', '\\r');
-      final jsCode = '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleClose) { socket._handleClose($closeCode, "$escapedReason", $wasClean); } delete globalThis["$jsHandler"]; })();''';
+      final encodedReason = jsonEncode(closeReason);
+      final jsCode = '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleClose) { socket._handleClose($closeCode, $encodedReason, $wasClean); } delete globalThis["$jsHandler"]; })();''';
       ctx.eval(jsCode);
 
       // Clean up
@@ -192,7 +208,7 @@ class WebSocketService extends BaseFuickService {
     try {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? socketId = options['socketId']?.toString();
-      final int? code =  asIntOrNull(options['code']);
+      final int? code = asIntOrNull(options['code']);
       final String? reason = options['reason']?.toString();
 
       if (socketId == null || socketId.isEmpty) {
@@ -228,11 +244,182 @@ class WebSocketService extends BaseFuickService {
     _sockets.remove(socketId);
   }
 
+  // ── Server mode ───────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> _handleListen(dynamic args) async {
+    try {
+      final Map<dynamic, dynamic> options = args is Map ? args : {};
+      final String? serverId = options['serverId']?.toString();
+      final int port = asInt(options['port'] ?? 0);
+
+      if (serverId == null || serverId.isEmpty) {
+        return {'success': false, 'error': 'serverId is required'};
+      }
+
+      // Stop any existing server with the same id
+      await _stopServer(serverId);
+
+      final httpServer = await HttpServer.bind(InternetAddress.anyIPv4, port);
+      _servers[serverId] = httpServer;
+      _serverClients[serverId] = {};
+
+      final actualPort = httpServer.port;
+      final ip = await _findLocalIp();
+
+      logger.i('[WebSocketService] Server $serverId listening on $ip:$actualPort');
+
+      // Accept WebSocket upgrades
+      httpServer.transform(WebSocketTransformer()).listen(
+        (WebSocket ws) {
+          final clientId = (++_clientCounter).toString();
+          _serverClients[serverId]![clientId] = ws;
+
+          logger.i('[WebSocketService] Server $serverId: client $clientId connected');
+          _fireServerEvent(serverId, '_handleClientConnected', clientId, null);
+
+          ws.listen(
+            (message) {
+              _handleServerClientMessage(serverId, clientId, message);
+            },
+            onDone: () {
+              logger.i('[WebSocketService] Server $serverId: client $clientId disconnected');
+              _serverClients[serverId]?.remove(clientId);
+              _fireServerEvent(serverId, '_handleClientDisconnected', clientId, null);
+            },
+            onError: (e) {
+              logger.e('[WebSocketService] Server $serverId client $clientId error: $e');
+              _serverClients[serverId]?.remove(clientId);
+              _fireServerEvent(serverId, '_handleClientDisconnected', clientId, null);
+            },
+          );
+        },
+        onError: (e) {
+          logger.e('[WebSocketService] Server $serverId accept error: $e');
+        },
+      );
+
+      return {'success': true, 'ip': ip, 'port': actualPort};
+    } catch (e, s) {
+      logger.e('[WebSocketService] listen error: $e\n$s');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  void _handleServerClientMessage(String serverId, String clientId, dynamic message) {
+    if (_isDisposed) return;
+    try {
+      String data;
+      if (message is String) {
+        data = message;
+      } else if (message is List<int>) {
+        data = base64Encode(message);
+      } else if (message is Uint8List) {
+        data = base64Encode(message);
+      } else {
+        data = message.toString();
+      }
+      _fireServerEvent(serverId, '_handleClientMessage', clientId, data);
+    } catch (e, s) {
+      logger.e('[WebSocketService] _handleServerClientMessage error: $e\n$s');
+    }
+  }
+
+  void _fireServerEvent(String serverId, String method, String clientId, String? data) {
+    if (_isDisposed) return;
+    try {
+      final jsGlobal = '_ws_server_$serverId';
+      final encodedClientId = jsonEncode(clientId);
+      String jsCode;
+      if (data != null) {
+        final encodedData = jsonEncode(data);
+        jsCode = '(function(){ var s=globalThis["$jsGlobal"]; if(s&&s.$method) s.$method($encodedClientId,$encodedData); })();';
+      } else {
+        jsCode = '(function(){ var s=globalThis["$jsGlobal"]; if(s&&s.$method) s.$method($encodedClientId); })();';
+      }
+      ctx.eval(jsCode);
+    } catch (e, s) {
+      logger.e('[WebSocketService] _fireServerEvent error: $e\n$s');
+    }
+  }
+
+  dynamic _handleSendToClient(dynamic args) {
+    try {
+      final Map<dynamic, dynamic> options = args is Map ? args : {};
+      final String? serverId = options['serverId']?.toString();
+      final String? clientId = options['clientId']?.toString();
+      final String? data = options['data']?.toString();
+
+      if (serverId == null || clientId == null || data == null) {
+        logger.w('[WebSocketService] sendToClient: missing serverId/clientId/data');
+        return false;
+      }
+
+      final ws = _serverClients[serverId]?[clientId];
+      if (ws == null) {
+        logger.w('[WebSocketService] sendToClient: client not found $serverId/$clientId');
+        return false;
+      }
+
+      ws.add(data);
+      return true;
+    } catch (e, s) {
+      logger.e('[WebSocketService] sendToClient error: $e\n$s');
+      return false;
+    }
+  }
+
+  dynamic _handleStopListen(dynamic args) {
+    try {
+      final Map<dynamic, dynamic> options = args is Map ? args : {};
+      final String? serverId = options['serverId']?.toString();
+      if (serverId == null || serverId.isEmpty) return false;
+      _stopServer(serverId);
+      return true;
+    } catch (e, s) {
+      logger.e('[WebSocketService] stopListen error: $e\n$s');
+      return false;
+    }
+  }
+
+  Future<void> _stopServer(String serverId) async {
+    final clients = _serverClients.remove(serverId) ?? {};
+    for (final ws in clients.values) {
+      try {
+        await ws.close();
+      } catch (_) {}
+    }
+    try {
+      await _servers[serverId]?.close(force: true);
+    } catch (_) {}
+    _servers.remove(serverId);
+  }
+
+  Future<String> _findLocalIp() async {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLinkLocal: false,
+    );
+    for (final iface in interfaces) {
+      for (final addr in iface.addresses) {
+        if (!addr.isLoopback && addr.address.startsWith('192.')) {
+          return addr.address;
+        }
+      }
+    }
+    for (final iface in interfaces) {
+      for (final addr in iface.addresses) {
+        if (!addr.isLoopback) return addr.address;
+      }
+    }
+    return '127.0.0.1';
+  }
+
+  // ── dispose ───────────────────────────────────────────────────────────────
+
   @override
   void dispose() {
     _isDisposed = true;
-    // 同步取消所有 stream 订阅，避免 dispose 后仍收到消息回调
-    // sink.close() 是异步的，无法在 dispose 中 await，让底层自行关闭
+    // Client mode cleanup
     for (final socketId in _sockets.keys.toList()) {
       _subscriptions[socketId]?.cancel();
       try {
@@ -241,6 +428,22 @@ class WebSocketService extends BaseFuickService {
     }
     _subscriptions.clear();
     _sockets.clear();
+
+    // Server mode cleanup
+    for (final serverId in _servers.keys.toList()) {
+      final clients = _serverClients.remove(serverId) ?? {};
+      for (final ws in clients.values) {
+        try {
+          ws.close();
+        } catch (_) {}
+      }
+      try {
+        _servers[serverId]?.close(force: true);
+      } catch (_) {}
+    }
+    _servers.clear();
+    _serverClients.clear();
+
     super.dispose();
   }
 }

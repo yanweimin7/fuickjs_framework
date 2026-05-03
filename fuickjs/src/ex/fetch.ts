@@ -103,6 +103,16 @@ export async function fetch(url: string, options: FetchOptions = {}): Promise<Fe
 
 function createResponse(result: any): FetchResponse {
   const textEncoder = new TextEncoder();
+  if (!result) {
+    return {
+      status: 0,
+      ok: false,
+      headers: new Headers(),
+      text: async () => '',
+      json: async () => { throw new Error('Empty response'); },
+      arrayBuffer: async () => new ArrayBuffer(0),
+    };
+  }
   let bodyText: string;
   if (typeof result.body === 'string') {
     bodyText = result.body;

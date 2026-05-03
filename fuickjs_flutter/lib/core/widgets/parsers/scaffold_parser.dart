@@ -36,8 +36,9 @@ class ScaffoldParser extends WidgetParser {
       );
     }
 
-    return Scaffold(
-      backgroundColor: WidgetUtils.colorFromHex(backgroundColorProp),
+    final bgColor = WidgetUtils.colorFromHex(backgroundColorProp);
+    final scaffold = Scaffold(
+      backgroundColor: bgColor,
       appBar: appBar,
       body: body,
       floatingActionButton:
@@ -52,5 +53,10 @@ class ScaffoldParser extends WidgetParser {
           ? factory.build(context, bottomSheetDsl)
           : null,
     );
+    // 用 ColoredBox 包裹，确保首帧即有正确背景色，避免 Material 颜色动画造成白屏闪烁
+    if (bgColor != null) {
+      return ColoredBox(color: bgColor, child: scaffold);
+    }
+    return scaffold;
   }
 }

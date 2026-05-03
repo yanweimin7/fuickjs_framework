@@ -1,3 +1,4 @@
+import '../logger.dart';
 import '../utils/extensions.dart';
 import 'base_fuick_service.dart';
 
@@ -19,6 +20,45 @@ class NavigationService extends BaseFuickService {
             path, Map<String, dynamic>.from(params),
             pageId: pageId, rootNavigator: rootNavigator);
         return result;
+      }
+      return null;
+    });
+
+    // prewarm：预热目标页面，最多等待 prewarmMs 毫秒后返回
+    // JS 侧先 await prewarm，再调 push，确保 DSL 在动画开始前就绪
+    registerAsyncMethod('prewarm', (args) async {
+      final m = args is Map ? Map<String, dynamic>.from(args) : <String, dynamic>{};
+      final path = (m['path'] ?? '') as String;
+      final params = Map<String, dynamic>.from(m['params'] ?? {});
+      final prewarmMs = asIntOrNull(m['prewarmMs']) ?? 20;
+
+      if (path.isEmpty) return null;
+
+      controller?.page.prewarmPage(path, params);
+      final entry = controller?.page.getPrewarmEntry(path);
+      if (entry != null && !entry.hasDsl) {
+        final sw = Stopwatch()..start();
+        bool timedOut = false;
+        await entry.future.timeout(
+          Duration(milliseconds: prewarmMs),
+          onTimeout: () { timedOut = true; return {}; },
+        );
+        if (timedOut) {
+          logger.w('[Prewarm] $path exceeded ${prewarmMs}ms (${sw.elapsedMilliseconds}ms)');
+        } else {
+          logger.d('[Prewarm] $path ready in ${sw.elapsedMilliseconds}ms');
+        }
+      }
+      return null;
+    });
+
+    // cancelPrewarm：取消预热，清理缓存，避免 tap cancel 后残留 DSL
+    registerMethod('cancelPrewarm', (args) {
+      final m = args is Map ? args : {};
+      final path = m['path']?.toString() ?? '';
+      if (path.isNotEmpty) {
+        controller?.page.cancelPrewarm(path);
+        logger.d('[Prewarm] cancelled for $path');
       }
       return null;
     });
