@@ -127,8 +127,9 @@ class FuickAppContextManager {
     for (final page in pages) {
       context.prewarmPage(page.path, page.params);
     }
-    _contexts[appName] = context;
-    _refCounts[appName] = 0;
+    // 走 registerContext 统一处理：若旧的在 _pendingDestroy 中会立即销毁，
+    // 并正确设置引用计数，避免 5s 延迟回调误销毁新 context
+    registerContext(appName, context);
     return context.init();
   }
 }

@@ -126,6 +126,11 @@ export class WebSocket extends EventTarget {
     return WebSocketReadyState.CLOSED;
   }
 
+  /** Remove the globalThis reference so this instance can be GC'd */
+  private _cleanupGlobalRef(): void {
+    delete (globalThis as unknown as Record<string, unknown>)[`_ws_${this._socketId}`];
+  }
+
   private async _initConnection(): Promise<void> {
     try {
       if (typeof dartCallNativeAsync !== 'function') {
@@ -168,6 +173,8 @@ export class WebSocket extends EventTarget {
         if (this.onclose) {
           this.onclose(closeEvent);
         }
+
+        this._cleanupGlobalRef();
       }
     } catch (error) {
       this._readyState = WebSocketReadyState.CLOSED;
@@ -186,6 +193,8 @@ export class WebSocket extends EventTarget {
       if (this.onclose) {
         this.onclose(closeEvent);
       }
+
+      this._cleanupGlobalRef();
     }
   }
 
@@ -213,7 +222,7 @@ export class WebSocket extends EventTarget {
     }
 
     // Clean up global reference
-    delete (globalThis as unknown as Record<string, unknown>)[`_ws_${this._socketId}`];
+    this._cleanupGlobalRef();
   }
 
   // Called by native when an error occurs
