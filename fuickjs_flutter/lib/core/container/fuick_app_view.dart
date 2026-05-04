@@ -143,7 +143,14 @@ class _FuickAppViewState extends State<FuickAppView> {
   @override
   Widget build(BuildContext context) {
     if (!_isReady) {
-      return ColoredBox(color: widget.loadingBackgroundColor);
+      return ColoredBox(
+        color: widget.loadingBackgroundColor,
+        child: Center(
+          child: CupertinoActivityIndicator(
+            radius: 14,
+          ),
+        ),
+      );
     }
     return PopScope(
       // 仅当内层 Navigator 没有可 pop 的页面时，才允许外层 pop（退出整个容器）

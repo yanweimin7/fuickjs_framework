@@ -153,7 +153,6 @@ class _FuickPageViewState extends State<FuickPageView>
 
   @override
   void dispose() {
-    logger.d('[FuickPageView] dispose refId=${widget.refId}');
     _stopAutoplay();
     widget.onDispose?.call(_controller);
     _controller.dispose();

@@ -35,7 +35,6 @@ class BottomNavigationBarParser extends WidgetParser {
               factory,
             );
           } else {
-            // Fallback for flat structure if props is missing
             _parseItem(
               context,
               Map<String, dynamic>.from(itemDsl),

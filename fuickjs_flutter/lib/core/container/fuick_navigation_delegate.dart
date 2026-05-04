@@ -105,6 +105,7 @@ class FuickNavigationDelegate {
 
     final prewarmEntry = controller.claimPrewarm(path, params);
     final id = prewarmEntry?.pageId ?? nextPageId;
+    logger.d('[Prewarm] _push: path=$path, prewarmEntry=${prewarmEntry != null}, id=$id');
     registerNavigator(id, navKey!);
 
     final route = _createRoute(nav.context, path, params, id);

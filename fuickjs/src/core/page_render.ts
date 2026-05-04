@@ -88,6 +88,11 @@ export function getItemDSL(pageId: number, refId: string, index: number) {
   return r.getItemDSL(pageId, refId, index);
 }
 
+export function disposeItem(pageId: number, refId: string, index: number) {
+  const r = ensureRenderer();
+  r.disposeItem(pageId, refId, index);
+}
+
 export function elementToDsl(pageId: number, element: React.ReactNode) {
   const r = ensureRenderer();
   return r.elementToDsl(pageId, element);

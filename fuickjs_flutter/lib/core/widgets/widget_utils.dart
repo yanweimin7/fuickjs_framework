@@ -6,42 +6,55 @@ import '../utils/extensions.dart';
 class WidgetUtils {
   static final Map<String, Color> _colorCache = {};
 
+  static final RegExp _rgbaRegex = RegExp(
+      r'rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)');
+
   static Color? colorFromHex(String? hexString) {
     if (hexString == null || hexString.isEmpty) return null;
     final cached = _colorCache[hexString];
     if (cached != null) return cached;
 
-    if (hexString == 'white') return Colors.white;
-    if (hexString == 'black') return Colors.black;
-    if (hexString == 'transparent') return Colors.transparent;
-    if (hexString == 'grey') return Colors.grey;
-    if (hexString == 'red') return Colors.red;
-    if (hexString == 'blue') return Colors.blue;
-    if (hexString == 'green') return Colors.green;
-    if (hexString == 'yellow') return Colors.yellow;
-    if (hexString == 'orange') return Colors.orange;
+    switch (hexString) {
+      case 'white':
+        return Colors.white;
+      case 'black':
+        return Colors.black;
+      case 'transparent':
+        return Colors.transparent;
+      case 'grey':
+        return Colors.grey;
+      case 'red':
+        return Colors.red;
+      case 'blue':
+        return Colors.blue;
+      case 'green':
+        return Colors.green;
+      case 'yellow':
+        return Colors.yellow;
+      case 'orange':
+        return Colors.orange;
+    }
 
-    // rgba(r, g, b, a) 格式
-    final rgbaMatch = RegExp(r'rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)').firstMatch(hexString);
+    final rgbaMatch = _rgbaRegex.firstMatch(hexString);
     if (rgbaMatch != null) {
       final r = int.parse(rgbaMatch.group(1)!);
       final g = int.parse(rgbaMatch.group(2)!);
       final b = int.parse(rgbaMatch.group(3)!);
-      final a = rgbaMatch.group(4) != null ? (double.parse(rgbaMatch.group(4)!) * 255).round() : 255;
+      final a = rgbaMatch.group(4) != null
+          ? (double.parse(rgbaMatch.group(4)!) * 255).round()
+          : 255;
       final color = Color.fromARGB(a, r, g, b);
       _colorCache[hexString] = color;
       return color;
     }
 
     try {
-      final buffer = StringBuffer();
       String hex = hexString.replaceFirst('#', '');
       if (hex.length == 3) {
         hex = '${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}';
       }
-      if (hex.length == 6) buffer.write('ff');
-      buffer.write(hex);
-      final color = Color(int.parse(buffer.toString(), radix: 16));
+      final color =
+          Color(int.parse((hex.length == 6 ? 'ff' : '') + hex, radix: 16));
       _colorCache[hexString] = color;
       return color;
     } catch (e) {
@@ -107,8 +120,12 @@ class WidgetUtils {
 
       // 当 horizontal/vertical 与 top/bottom/left/right 混合时（3-value shorthand），
       // 展开 horizontal/vertical 为具体方向后用 fromLTRB
-      if (left != null || top != null || right != null || bottom != null ||
-          horizontal != null || vertical != null) {
+      if (left != null ||
+          top != null ||
+          right != null ||
+          bottom != null ||
+          horizontal != null ||
+          vertical != null) {
         return EdgeInsets.fromLTRB(
           left ?? horizontal ?? 0.0,
           top ?? vertical ?? 0.0,
@@ -377,6 +394,15 @@ class WidgetUtils {
     final gradientProp = dec != null ? dec['gradient'] : props['gradient'];
     final imageProp = dec != null ? dec['image'] : null;
 
+    if (colorStr == null &&
+        borderRadiusProp == null &&
+        borderProp == null &&
+        boxShadowProp == null &&
+        gradientProp == null &&
+        imageProp == null) {
+      return null;
+    }
+
     final color = colorFromHex(colorStr);
     final borderRadius = getBorderRadius(borderRadiusProp);
     final border = getBorder(borderProp);
@@ -445,23 +471,42 @@ class WidgetUtils {
     final fitStr = m['fit'] as String?;
     final BoxFit fit;
     switch (fitStr) {
-      case 'cover': fit = BoxFit.cover; break;
-      case 'contain': fit = BoxFit.contain; break;
-      case 'fill': fit = BoxFit.fill; break;
-      case 'none': fit = BoxFit.none; break;
-      case 'scaleDown': fit = BoxFit.scaleDown; break;
-      default: fit = BoxFit.cover;
+      case 'cover':
+        fit = BoxFit.cover;
+        break;
+      case 'contain':
+        fit = BoxFit.contain;
+        break;
+      case 'fill':
+        fit = BoxFit.fill;
+        break;
+      case 'none':
+        fit = BoxFit.none;
+        break;
+      case 'scaleDown':
+        fit = BoxFit.scaleDown;
+        break;
+      default:
+        fit = BoxFit.cover;
     }
 
-    final alignment = WidgetUtils.alignment(m['alignment'] as String?) ?? Alignment.center;
+    final alignment =
+        WidgetUtils.alignment(m['alignment'] as String?) ?? Alignment.center;
 
     final repeatStr = m['repeat'] as String?;
     final ImageRepeat repeat;
     switch (repeatStr) {
-      case 'repeat': repeat = ImageRepeat.repeat; break;
-      case 'repeatX': repeat = ImageRepeat.repeatX; break;
-      case 'repeatY': repeat = ImageRepeat.repeatY; break;
-      default: repeat = ImageRepeat.noRepeat;
+      case 'repeat':
+        repeat = ImageRepeat.repeat;
+        break;
+      case 'repeatX':
+        repeat = ImageRepeat.repeatX;
+        break;
+      case 'repeatY':
+        repeat = ImageRepeat.repeatY;
+        break;
+      default:
+        repeat = ImageRepeat.noRepeat;
     }
 
     final ImageProvider provider = url.startsWith('http')
@@ -481,7 +526,8 @@ class WidgetUtils {
       case 'dashed':
       case 'dotted':
       case 'solid':
-        return BorderStyle.solid; // Flutter only supports solid; dashed/dotted need CustomPainter
+        return BorderStyle
+            .solid; // Flutter only supports solid; dashed/dotted need CustomPainter
       case 'none':
         return BorderStyle.none;
       default:
@@ -489,7 +535,8 @@ class WidgetUtils {
     }
   }
 
-  static BorderSide _borderSide(Map<String, dynamic> m, {BorderSide fallback = BorderSide.none}) {
+  static BorderSide _borderSide(Map<String, dynamic> m,
+      {BorderSide fallback = BorderSide.none}) {
     final color = colorFromHex(m['color'] as String?);
     final width = sizeNum(m['width']);
     final style = _borderStyle(m['style'] as String?);
@@ -505,8 +552,10 @@ class WidgetUtils {
     if (v is Map) {
       final m = asMap(v);
       // 如果有单边 key，走单边模式
-      final hasDirectional = m.containsKey('top') || m.containsKey('right') ||
-          m.containsKey('bottom') || m.containsKey('left');
+      final hasDirectional = m.containsKey('top') ||
+          m.containsKey('right') ||
+          m.containsKey('bottom') ||
+          m.containsKey('left');
       if (hasDirectional) {
         final globalColor = colorFromHex(m['color'] as String?);
         final globalWidth = sizeNum(m['width']);
@@ -519,10 +568,18 @@ class WidgetUtils {
               )
             : BorderSide.none;
         return Border(
-          top: m.containsKey('top') ? _borderSide(asMap(m['top']), fallback: fallback) : fallback,
-          right: m.containsKey('right') ? _borderSide(asMap(m['right']), fallback: fallback) : fallback,
-          bottom: m.containsKey('bottom') ? _borderSide(asMap(m['bottom']), fallback: fallback) : fallback,
-          left: m.containsKey('left') ? _borderSide(asMap(m['left']), fallback: fallback) : fallback,
+          top: m.containsKey('top')
+              ? _borderSide(asMap(m['top']), fallback: fallback)
+              : fallback,
+          right: m.containsKey('right')
+              ? _borderSide(asMap(m['right']), fallback: fallback)
+              : fallback,
+          bottom: m.containsKey('bottom')
+              ? _borderSide(asMap(m['bottom']), fallback: fallback)
+              : fallback,
+          left: m.containsKey('left')
+              ? _borderSide(asMap(m['left']), fallback: fallback)
+              : fallback,
         );
       }
       final color = colorFromHex(m['color'] as String?) ?? Colors.black;
@@ -579,10 +636,17 @@ class WidgetUtils {
     final decorations = <TextDecoration>[];
     for (final part in parts) {
       switch (part) {
-        case 'underline': decorations.add(TextDecoration.underline); break;
-        case 'lineThrough': decorations.add(TextDecoration.lineThrough); break;
-        case 'overline': decorations.add(TextDecoration.overline); break;
-        case 'none': return TextDecoration.none;
+        case 'underline':
+          decorations.add(TextDecoration.underline);
+          break;
+        case 'lineThrough':
+          decorations.add(TextDecoration.lineThrough);
+          break;
+        case 'overline':
+          decorations.add(TextDecoration.overline);
+          break;
+        case 'none':
+          return TextDecoration.none;
       }
     }
     if (decorations.isEmpty) return null;
@@ -592,16 +656,26 @@ class WidgetUtils {
 
   static FontWeight fontWeight(String? v) {
     switch (v) {
-      case 'w100': return FontWeight.w100;
-      case 'w200': return FontWeight.w200;
-      case 'w300': return FontWeight.w300;
-      case 'normal': return FontWeight.normal;
-      case 'w500': return FontWeight.w500;
-      case 'w600': return FontWeight.w600;
-      case 'bold': return FontWeight.bold;
-      case 'w800': return FontWeight.w800;
-      case 'w900': return FontWeight.w900;
-      default: return FontWeight.normal;
+      case 'w100':
+        return FontWeight.w100;
+      case 'w200':
+        return FontWeight.w200;
+      case 'w300':
+        return FontWeight.w300;
+      case 'normal':
+        return FontWeight.normal;
+      case 'w500':
+        return FontWeight.w500;
+      case 'w600':
+        return FontWeight.w600;
+      case 'bold':
+        return FontWeight.bold;
+      case 'w800':
+        return FontWeight.w800;
+      case 'w900':
+        return FontWeight.w900;
+      default:
+        return FontWeight.normal;
     }
   }
 
@@ -641,11 +715,12 @@ class WidgetUtils {
 
   /// 解析 CSS transform 字符串为 Matrix4
   /// 支持: translate(x,y) translateX(x) translateY(y) rotate(angle) scale(x,y) skew(x,y)
+  static final RegExp _transformRegex = RegExp(r'(\w+)\(([^)]+)\)');
+
   static Matrix4? parseTransformString(String? v) {
     if (v == null || v.isEmpty || v == 'none') return null;
     final matrix = Matrix4.identity();
-    final regex = RegExp(r'(\w+)\(([^)]+)\)');
-    for (final match in regex.allMatches(v)) {
+    for (final match in _transformRegex.allMatches(v)) {
       final fn = match.group(1)!;
       final args = match.group(2)!.split(',').map((s) {
         s = s.trim();
@@ -654,26 +729,33 @@ class WidgetUtils {
           return s.endsWith('rpx') ? n / 2 : n;
         }
         if (s.endsWith('deg')) {
-          return (double.tryParse(s.replaceAll('deg', '')) ?? 0) * 3.14159265358979 / 180;
+          return (double.tryParse(s.replaceAll('deg', '')) ?? 0) *
+              3.14159265358979 /
+              180;
         }
         if (s.endsWith('rad')) {
           return double.tryParse(s.replaceAll('rad', '')) ?? 0;
         }
         if (s.endsWith('turn')) {
-          return (double.tryParse(s.replaceAll('turn', '')) ?? 0) * 2 * 3.14159265358979;
+          return (double.tryParse(s.replaceAll('turn', '')) ?? 0) *
+              2 *
+              3.14159265358979;
         }
         return double.tryParse(s) ?? 0;
       }).toList();
 
       switch (fn) {
         case 'translate':
-          matrix.translateByDouble(args.isNotEmpty ? args[0] : 0.0, args.length > 1 ? args[1] : 0.0, 0.0, 1.0);
+          matrix.translateByDouble(args.isNotEmpty ? args[0] : 0.0,
+              args.length > 1 ? args[1] : 0.0, 0.0, 1.0);
           break;
         case 'translateX':
-          matrix.translateByDouble(args.isNotEmpty ? args[0] : 0.0, 0.0, 0.0, 1.0);
+          matrix.translateByDouble(
+              args.isNotEmpty ? args[0] : 0.0, 0.0, 0.0, 1.0);
           break;
         case 'translateY':
-          matrix.translateByDouble(0.0, args.isNotEmpty ? args[0] : 0.0, 0.0, 1.0);
+          matrix.translateByDouble(
+              0.0, args.isNotEmpty ? args[0] : 0.0, 0.0, 1.0);
           break;
         case 'translate3d':
           matrix.translateByDouble(

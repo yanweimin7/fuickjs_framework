@@ -21,6 +21,10 @@ class FuickJsProxy {
     return ctx.invoke('fuickjs', 'getItemDSL', [pageId, refId, index]);
   }
 
+  void disposeItem(int pageId, String refId, int index) {
+    ctx.invoke('fuickjs', 'disposeItem', [pageId, refId, index]);
+  }
+
   void dispatchEvent(dynamic eventObj, dynamic payload) {
     ctx.invoke('fuickjs', 'dispatchEvent', [eventObj, payload]);
   }

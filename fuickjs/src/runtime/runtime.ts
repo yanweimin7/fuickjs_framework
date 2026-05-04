@@ -10,6 +10,7 @@ export function bindGlobals() {
       render: PageRender.render,
       destroy: PageRender.destroy,
       getItemDSL: PageRender.getItemDSL,
+      disposeItem: PageRender.disposeItem,
       notifyLifecycle: PageRender.notifyLifecycle,
       dispatchEvent: (eventObj: unknown, payload: unknown) => {
         const r = PageRender.ensureRenderer();

@@ -9,6 +9,8 @@ export interface ListViewProps extends WidgetProps {
   itemCount?: number;
   itemBuilder?: (index: number) => ReactNode;
   cacheKey?: unknown;
+  /** 是否为有状态列表（走 reconciler sub-root，支持 useState/useEffect）。默认 false。设为 true 则走 reconciler，拥有完整生命周期。 */
+  stateful?: boolean;
 }
 
 export class ListView extends ScrollableBaseWidget<ListViewProps> {
@@ -28,6 +30,7 @@ export class ListView extends ScrollableBaseWidget<ListViewProps> {
       {
         ...rest,
         hasBuilder: !!this.props.itemBuilder,
+        stateful: this.props.stateful === true,
         refId: this.scopedRefId,
         isBoundary: true,
       },

@@ -111,6 +111,9 @@ class FuickAppController {
   dynamic getItemDSL(int pageId, String refId, int index) =>
       page.getItemDSL(pageId, refId, index);
 
+  void disposeItem(int pageId, String refId, int index) =>
+      page.disposeItem(pageId, refId, index);
+
   void dispose() {
     // 先销毁 service（如 Timer、WebSocket），再销毁 context
     // JsContextDelegate.dispose() 通过 isolate 消息队列发送 disposeContext，

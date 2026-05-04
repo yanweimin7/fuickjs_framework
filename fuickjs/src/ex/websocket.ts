@@ -128,23 +128,31 @@ export class WebSocket extends EventTarget {
 
   /** Remove the globalThis reference so this instance can be GC'd */
   private _cleanupGlobalRef(): void {
-    delete (globalThis as unknown as Record<string, unknown>)[`_ws_${this._socketId}`];
+    const key = `_ws_${this._socketId}`;
+    const existed = (globalThis as unknown as Record<string, unknown>)[key] !== undefined;
+    delete (globalThis as unknown as Record<string, unknown>)[key];
+    console.log(`[WebSocket] _cleanupGlobalRef() socketId=${this._socketId}, key=${key}, existed=${existed}`);
   }
 
   private async _initConnection(): Promise<void> {
+    console.log(`[WebSocket] _initConnection() socketId=${this._socketId}, url=${this._url}`);
     try {
       if (typeof dartCallNativeAsync !== 'function') {
         throw new Error('dartCallNativeAsync is not available.');
       }
 
       // Register this socket instance globally so native can send events back
-      (globalThis as unknown as Record<string, unknown>)[`_ws_${this._socketId}`] = this;
+      const globalKey = `_ws_${this._socketId}`;
+      (globalThis as unknown as Record<string, unknown>)[globalKey] = this;
+      console.log(`[WebSocket] Registered on globalThis: ${globalKey}`);
 
       const result = (await dartCallNativeAsync('WebSocket.connect', {
         socketId: this._socketId,
         url: this._url,
         protocols: Array.isArray(this._protocols) ? this._protocols : [this._protocols],
       })) as { success: boolean; protocol?: string; extensions?: string; error?: string };
+
+      console.log(`[WebSocket] connect result for socketId=${this._socketId}: success=${result.success}, error=${result.error}`);
 
       if (result.success) {
         this._readyState = WebSocketReadyState.OPEN;
@@ -158,6 +166,7 @@ export class WebSocket extends EventTarget {
         }
       } else {
         this._readyState = WebSocketReadyState.CLOSED;
+        console.warn(`[WebSocket] Connection failed for socketId=${this._socketId}: ${result.error}`);
         const errorEvent = new Event('error');
         this.dispatchEvent(errorEvent);
         if (this.onerror) {
@@ -178,6 +187,7 @@ export class WebSocket extends EventTarget {
       }
     } catch (error) {
       this._readyState = WebSocketReadyState.CLOSED;
+      console.error(`[WebSocket] Exception in _initConnection for socketId=${this._socketId}:`, error);
       const errorEvent = new Event('error');
       this.dispatchEvent(errorEvent);
       if (this.onerror) {
@@ -213,6 +223,7 @@ export class WebSocket extends EventTarget {
 
   // Called by native when the connection is closed
   _handleClose(code: number, reason: string, wasClean: boolean): void {
+    console.log(`[WebSocket] _handleClose() socketId=${this._socketId}, code=${code}, reason=${reason}, wasClean=${wasClean}`);
     this._readyState = WebSocketReadyState.CLOSED;
 
     const closeEvent = new CloseEvent('close', { code, reason, wasClean });
@@ -227,6 +238,7 @@ export class WebSocket extends EventTarget {
 
   // Called by native when an error occurs
   _handleError(): void {
+    console.warn(`[WebSocket] _handleError() socketId=${this._socketId}, readyState=${this._readyState}`);
     const errorEvent = new Event('error');
     this.dispatchEvent(errorEvent);
     if (this.onerror) {
@@ -241,6 +253,7 @@ export class WebSocket extends EventTarget {
 
     if (this._readyState !== WebSocketReadyState.OPEN) {
       // Silently fail if not open (per WebSocket spec)
+      console.warn(`[WebSocket] send() called on non-OPEN socket socketId=${this._socketId}, state=${this._readyState}`);
       return;
     }
 
@@ -274,9 +287,11 @@ export class WebSocket extends EventTarget {
 
   close(code?: number, reason?: string): void {
     if (this._readyState === WebSocketReadyState.CLOSING || this._readyState === WebSocketReadyState.CLOSED) {
+      console.log(`[WebSocket] close() called but already closing/closed socketId=${this._socketId}, state=${this._readyState}`);
       return;
     }
 
+    console.log(`[WebSocket] close() socketId=${this._socketId}, code=${code ?? 1000}`);
     this._readyState = WebSocketReadyState.CLOSING;
 
     // Send close through native service

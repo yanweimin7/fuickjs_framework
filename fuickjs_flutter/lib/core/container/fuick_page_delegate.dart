@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
+import '../logger.dart';
 import '../widgets/fuick_node.dart';
 import 'fuick_app_controller.dart';
 
@@ -69,12 +69,16 @@ class FuickPageDelegate {
   void prewarmPage(String path, Map<String, dynamic> params) {
     final existing = _prewarmCache[path];
     if (existing != null) {
-      if (_paramsEqual(existing.params, params)) return; // 完全一致，幂等
+      if (_paramsEqual(existing.params, params)) {
+        logger.d('[Prewarm] prewarmPage: $path already cached, skipping');
+        return; // 完全一致，幂等
+      }
       // 参数不同，取消旧的重新来
       _cancelEntry(existing);
     }
 
     final id = nextPageId;
+    logger.d('[Prewarm] prewarmPage: path=$path, pageId=$id');
     final entry = PrewarmEntry(id, path, params);
     _prewarmCache[path] = entry;
 
@@ -94,10 +98,17 @@ class FuickPageDelegate {
   /// 从 path 缓存移到 pageId 缓存，返回 entry 以便取 pageId。
   PrewarmEntry? claimPrewarm(String path, Map<String, dynamic> params) {
     final entry = _prewarmCache[path];
-    if (entry == null) return null;
-    if (!_paramsEqual(entry.params, params)) return null;
+    if (entry == null) {
+      logger.d('[Prewarm] claimPrewarm: $path entry=null (not found)');
+      return null;
+    }
+    if (!_paramsEqual(entry.params, params)) {
+      logger.d('[Prewarm] claimPrewarm: $path params mismatch');
+      return null;
+    }
     _prewarmCache.remove(path);
     _claimedEntries[entry.pageId] = entry;
+    logger.d('[Prewarm] claimPrewarm: $path claimed pageId=${entry.pageId}');
     return entry;
   }
 
@@ -119,8 +130,30 @@ class FuickPageDelegate {
   }
 
   bool _paramsEqual(Map<String, dynamic> a, Map<String, dynamic> b) {
-    // 用 JSON 序列化做深度比较，正确处理嵌套 Map/List
-    return jsonEncode(a) == jsonEncode(b);
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key)) return false;
+      final av = a[key];
+      final bv = b[key];
+      if (av is Map<String, dynamic> && bv is Map<String, dynamic>) {
+        if (!_paramsEqual(av, bv)) return false;
+      } else if (av is List && bv is List) {
+        if (av.length != bv.length) return false;
+        for (int i = 0; i < av.length; i++) {
+          if (av[i] is Map<String, dynamic> && bv[i] is Map<String, dynamic>) {
+            if (!_paramsEqual(
+                av[i] as Map<String, dynamic>, bv[i] as Map<String, dynamic>)) {
+              return false;
+            }
+          } else if (av[i] != bv[i]) {
+            return false;
+          }
+        }
+      } else if (av != bv) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void destroyPage(int pageId) {
@@ -133,5 +166,9 @@ class FuickPageDelegate {
 
   dynamic getItemDSL(int pageId, String refId, int index) {
     return controller.jsProxy.getItemDSL(pageId, refId, index);
+  }
+
+  void disposeItem(int pageId, String refId, int index) {
+    controller.jsProxy.disposeItem(pageId, refId, index);
   }
 }

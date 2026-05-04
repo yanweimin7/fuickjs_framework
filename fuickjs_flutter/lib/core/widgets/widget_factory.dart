@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../logger.dart';
 import 'fuick_node.dart';
+import 'widget_utils.dart';
 import 'parsers/alert_dialog_parser.dart';
 import 'parsers/animated_align_parser.dart';
 import 'parsers/animated_container_parser.dart';
@@ -244,6 +245,144 @@ class WidgetFactory {
   void resetParseCost() => _parseCostMicros = 0;
 
   int get parseCostMicros => _parseCostMicros;
+
+  static final Map<String, Map<String, dynamic>> _warmupProps = {
+    'Text': {'text': 'w', 'fontSize': 14, 'color': '#000000'},
+    'Container': {'width': 100, 'height': 100, 'color': '#FFFFFF'},
+    'Column': {'mainAxisAlignment': 'center'},
+    'Row': {'mainAxisAlignment': 'center'},
+    'Flex': {'direction': 'horizontal'},
+    'Padding': {'padding': 8},
+    'Center': {},
+    'SizedBox': {'width': 10, 'height': 10},
+    'Stack': {},
+    'Positioned': {'left': 0, 'top': 0},
+    'Expanded': {},
+    'Flexible': {},
+    'Opacity': {'opacity': 1.0},
+    'GestureDetector': {},
+    'InkWell': {},
+    'Image': {'src': 'w'},
+    'Icon': {'icon': 0xe88a, 'size': 24, 'color': '#000000'},
+    'Scaffold': {},
+    'AppBar': {},
+    'SafeArea': {},
+    'SingleChildScrollView': {},
+    'ListView': {},
+    'GridView': {'crossAxisCount': 2},
+    'Material': {},
+    'Visibility': {},
+    'IgnorePointer': {},
+    'ClipRRect': {'borderRadius': 8},
+    'Transform': {},
+    'ConstrainedBox': {
+      'constraints': {
+        'minWidth': 0,
+        'maxWidth': 100,
+        'minHeight': 0,
+        'maxHeight': 100
+      }
+    },
+    'FittedBox': {},
+    'Wrap': {},
+    'Card': {},
+    'Divider': {},
+    'RepaintBoundary': {},
+    'Button': {},
+    'FloatingActionButton': {},
+    'Checkbox': {},
+    'Switch': {},
+    'Slider': {},
+    'Radio': {},
+    'TextField': {},
+    'ListTile': {},
+    'BottomNavigationBar': {
+      'items': [
+        {'icon': 'circle', 'label': 'tab1'},
+        {'icon': 'circle', 'label': 'tab2'},
+      ]
+    },
+    'CircularProgressIndicator': {},
+    'LinearProgressIndicator': {},
+    'KeepAlive': {},
+    'PopScope': {},
+    'IntrinsicHeight': {},
+    'IntrinsicWidth': {},
+    'AspectRatio': {'aspectRatio': 1.0},
+    'FractionallySizedBox': {},
+    'RotatedBox': {'quarterTurns': 1},
+    'AnimatedContainer': {'duration': 300},
+    'AnimatedOpacity': {'opacity': 1.0, 'duration': 300},
+    'AnimatedAlign': {'alignment': 'center', 'duration': 300},
+    'AnimatedPadding': {'padding': 8, 'duration': 300},
+    'AnimatedScale': {'scale': 1.0, 'duration': 300},
+    'AnimatedSlide': {
+      'offset': [0, 0],
+      'duration': 300
+    },
+    'AnimatedRotation': {'turns': 0.0, 'duration': 300},
+    'AnimatedPositioned': {'left': 0, 'top': 0, 'duration': 300},
+    'AnimatedSwitcher': {'duration': 300},
+    'AnimatedCrossFade': {
+      'firstChild': null,
+      'secondChild': null,
+      'duration': 300
+    },
+    'ScaleTransition': {},
+    'RotationTransition': {},
+    'SlideTransition': {},
+    'RefreshIndicator': {},
+    'RichText': {},
+    'CustomPaint': {},
+    'CustomScrollView': {},
+    'SliverToBoxAdapter': {},
+    'SliverList': {},
+    'SliverGrid': {'crossAxisCount': 2},
+    'SliverAppBar': {},
+    'SliverPersistentHeader': {},
+    'TabBar': {},
+    'TabBarView': {},
+    'DefaultTabController': {'length': 1},
+    'Tab': {},
+    'Drawer': {},
+    'AlertDialog': {},
+    'Dialog': {},
+    'Overlay': {},
+    'PageView': {},
+    'PointerListener': {},
+    'BackdropFilter': {},
+    'ImageFiltered': {},
+    'DecoratedBoxOutline': {},
+    'ClipPath': {},
+    'ColorFiltered': {},
+    'NestedScrollView': {},
+  };
+
+  void warmup(BuildContext context) {
+    for (final entry in _parsers.entries) {
+      try {
+        final props = _warmupProps[entry.key] ?? <String, dynamic>{};
+        entry.value
+            .parse(context, Map<String, dynamic>.from(props), const [], this);
+      } catch (_) {}
+    }
+
+    WidgetUtils.colorFromHex('#FF5722');
+    WidgetUtils.edgeInsets(8);
+    WidgetUtils.boxDecorationFromProps({'color': '#FFFFFF', 'borderRadius': 8});
+    WidgetUtils.getBorderRadius(8);
+    WidgetUtils.getBorder({'color': '#000000', 'width': 1});
+    WidgetUtils.getBoxShadow({
+      'color': '#000000',
+      'blurRadius': 4,
+      'offset': {'dx': 0, 'dy': 2}
+    });
+    WidgetUtils.getGradient({
+      'type': 'linear',
+      'colors': ['#FFFFFF', '#000000']
+    });
+    WidgetUtils.parseTransformString('translate(10,20) rotate(45)');
+  }
 
   Widget buildInternal(
     BuildContext context,

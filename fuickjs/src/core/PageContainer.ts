@@ -19,7 +19,14 @@ export class PageContainer {
   private onInvisibleCallbacks: Set<(...args: unknown[]) => unknown> = new Set();
   private nodes: Map<number | string, Node> = new Map();
   private nodesByRefId: Map<string, Node> = new Map();
-  private virtualNodeIdCounter: number = 1000000; // Start high for virtual nodes
+  private _virtualNodeIdCounter: number = 1000000; // Start high for virtual nodes
+
+  public get virtualNodeIdCounter(): number {
+    return this._virtualNodeIdCounter;
+  }
+  public set virtualNodeIdCounter(val: number) {
+    this._virtualNodeIdCounter = val;
+  }
   private isVisible: boolean = false;
 
   constructor(pageId: number) {

@@ -3,12 +3,14 @@ import React from 'react';
 import { createHostConfig } from './hostConfig';
 import { PageContainer } from './PageContainer';
 import { ErrorHandler } from './ErrorHandler';
+import { ListItemManager } from './ListItemManager';
 
 export interface Renderer {
   update(element: React.ReactNode, pageId: number): void;
   destroy(pageId: number): void;
   dispatchEvent(eventObj: unknown, payload: unknown): void;
   getItemDSL(pageId: number, refId: string, index: number): unknown;
+  disposeItem(pageId: number, refId: string, index: number): void;
   notifyLifecycle(pageId: number, type: 'visible' | 'invisible'): void;
   elementToDsl(pageId: number, element: React.ReactNode): unknown;
   getContainer(pageId: number): PageContainer | undefined;
@@ -68,6 +70,10 @@ export function createRenderer(): Renderer {
     ErrorHandler.notify(error, 'render', errorInfo);
   };
 
+  // ListItemManager 管理 getItemDSL 渲染的列表项的 reconciler sub-root，
+  // 使列表项拥有完整的 React 生命周期（useState, useEffect 等）。
+  const listItemManager = new ListItemManager(reconciler, handleRecoverableError);
+
   function ensureRoot(pageId: number) {
     if (roots[pageId]) return roots[pageId];
 
@@ -92,6 +98,7 @@ export function createRenderer(): Renderer {
     update(element: React.ReactNode, pageId: number) {
       const root = ensureRoot(pageId);
       const isFirstRender = !renderedPages.has(pageId);
+      console.log(`[Renderer] update() called for pageId=${pageId}, isFirstRender=${isFirstRender}, roots=${Object.keys(roots).join(',')}`);
       let retryCount = 0;
       const maxRetries = 100; // Prevent infinite loop
 
@@ -107,13 +114,20 @@ export function createRenderer(): Renderer {
             // Use async rendering for subsequent updates
             reconciler.updateContainer(element, root, null, null);
           }
+          console.log(`[Renderer] update() succeeded for pageId=${pageId}, retries=${retryCount}`);
           retryCount = 0; // Reset on success
         } catch (e: unknown) {
           const msg = (e as Error).message || String(e);
           console.error(`[Renderer] Error in updateContainer for page ${pageId}:`, msg);
           if (isRenderInProgressError(msg) && retryCount < maxRetries) {
             retryCount++;
-            globalThis.setTimeout(performUpdate, 16);
+            if (retryCount <= 3 || retryCount % 10 === 0) {
+              console.warn(`[Renderer] Retrying update for pageId=${pageId}, retry #${retryCount}`);
+            }
+            // Use Promise microtask for retry — same reason as destroy():
+            // globalThis.setTimeout depends on Dart TimerService which may
+            // be unavailable during context disposal.
+            Promise.resolve().then(performUpdate);
           } else {
             if (retryCount >= maxRetries) {
               console.error(`[Renderer] Max retries exceeded for page ${pageId}`);
@@ -129,36 +143,61 @@ export function createRenderer(): Renderer {
 
     destroy(pageId: number) {
       const root = roots[pageId];
+      console.log(`[Renderer] destroy() called for pageId=${pageId}, hasRoot=${!!root}, containers=${Object.keys(containers).join(',')}`);
       if (root) {
         let retryCount = 0;
         const maxRetries = 100; // Prevent infinite loop
 
         const performDestroy = () => {
           try {
+            console.log(`[Renderer] destroy() performing updateContainer(null) for pageId=${pageId}, retry=${retryCount}`);
             reconciler.updateContainer(null, root, null, null);
+            console.log(`[Renderer] destroy() succeeded for pageId=${pageId}, retries=${retryCount}`);
             delete roots[pageId];
             delete containers[pageId];
           } catch (e: unknown) {
             const msg = (e as Error).message || String(e);
             if (isRenderInProgressError(msg) && retryCount < maxRetries) {
               retryCount++;
-              globalThis.setTimeout(performDestroy, 16);
+              if (retryCount <= 3 || retryCount % 10 === 0) {
+                console.warn(`[Renderer] Retrying destroy for pageId=${pageId}, retry #${retryCount}`);
+              }
+              // Use Promise microtask for retry instead of globalThis.setTimeout,
+              // which depends on Dart-side TimerService and may be unavailable
+              // during context disposal, breaking the retry chain and leaving
+              // React component tree unmounted — causing useEffect cleanup
+              // (e.g. clearInterval) to never execute.
+              Promise.resolve().then(performDestroy);
             } else {
               if (retryCount >= maxRetries) {
                 console.error(`[Renderer] Max retries exceeded for destroying page ${pageId}`);
               }
               console.error(`[Renderer] Error destroying page ${pageId}:`, e);
               ErrorHandler.notify(e, 'render', { pageId });
+              // Even on fatal error, still try to unmount the component tree
+              // so that useEffect cleanup (clearInterval etc.) can execute.
+              try {
+                console.warn(`[Renderer] Best-effort unmount for pageId=${pageId} after fatal error`);
+                reconciler.updateContainer(null, root, null, null);
+              } catch (_) {
+                // Best effort — if this also fails, nothing more we can do
+                console.error(`[Renderer] Best-effort unmount also failed for pageId=${pageId}`);
+              }
               delete roots[pageId];
               delete containers[pageId];
             }
           }
         };
         performDestroy();
+        // 同时清理该页面所有列表项的 sub-root
+        listItemManager.disposePageItems(pageId);
       } else {
         // Even if no root, check if we have a temporary container to cleanup
         if (containers[pageId]) {
+          console.warn(`[Renderer] destroy() pageId=${pageId} has no root but has orphaned container, cleaning up.`);
           delete containers[pageId];
+        } else {
+          console.warn(`[Renderer] destroy() pageId=${pageId} has no root and no container, nothing to destroy.`);
         }
       }
     },
@@ -166,10 +205,40 @@ export function createRenderer(): Renderer {
     dispatchEvent,
     getItemDSL(pageId: number, refId: string, index: number) {
       const container = containers[pageId];
-      if (container) {
-        return container.getItemDSL(refId, index);
+      if (!container) return null;
+
+      // 查找 itemBuilder
+      const node = container.getNodeByRefId(refId);
+      if (!node) return null;
+
+      const itemBuilder = (node.props as Record<string, unknown>)?.itemBuilder;
+      if (typeof itemBuilder !== 'function') return null;
+
+      // 检查是否为有状态列表（走 reconciler sub-root）
+      const stateful = (node.props as Record<string, unknown>)?.stateful === true;
+
+      if (stateful) {
+        // 通过 ListItemManager 渲染，使列表项拥有完整 React 生命周期
+        return listItemManager.getItemDSL(
+          pageId,
+          refId,
+          index,
+          itemBuilder as (index: number) => React.ReactNode,
+          container,
+        );
+      } else {
+        // 无状态模式：直接通过 elementToDsl 渲染，无生命周期
+        try {
+          const element = (itemBuilder as (index: number) => React.ReactNode)(index);
+          return container.elementToDsl(element);
+        } catch (e) {
+          console.error(`[Renderer] Error in stateless getItemDSL for refId ${refId} at index ${index}:`, e);
+          return null;
+        }
       }
-      return null;
+    },
+    disposeItem(pageId: number, refId: string, index: number) {
+      listItemManager.disposeItem(pageId, refId, index);
     },
     elementToDsl(pageId: number, element: React.ReactNode) {
       let container = containers[pageId];
