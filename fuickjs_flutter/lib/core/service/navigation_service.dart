@@ -7,17 +7,36 @@ class NavigationService extends BaseFuickService {
   String get name => 'Navigator';
 
   NavigationService() {
-    registerMethod('push', (args) async {
+    registerAsyncMethod('push', (args) async {
       final m =
           args is Map ? Map<String, dynamic>.from(args) : <String, dynamic>{};
       final path = (m['path'] ?? '') as String;
-      final params = m['params'] ?? {};
+      final params = Map<String, dynamic>.from(m['params'] ?? {});
       final pageId = asIntOrNull(m['pageId']);
       final rootNavigator = m['rootNavigator'] == true;
+      final prewarmMs = asIntOrNull(m['prewarmMs']);
 
       if (path.isNotEmpty) {
+        if (prewarmMs != null && prewarmMs > 0) {
+          controller?.page.prewarmPage(path, params);
+          final entry = controller?.page.getPrewarmEntry(path);
+          if (entry != null && !entry.hasDsl) {
+            final sw = Stopwatch()..start();
+            bool timedOut = false;
+            await entry.future.timeout(
+              Duration(milliseconds: prewarmMs),
+              onTimeout: () { timedOut = true; return {}; },
+            );
+            if (timedOut) {
+              logger.w('[Prewarm] $path exceeded ${prewarmMs}ms (${sw.elapsedMilliseconds}ms)');
+            } else {
+              logger.d('[Prewarm] $path ready in ${sw.elapsedMilliseconds}ms');
+            }
+          }
+        }
+
         final result = await controller?.pushWithPath(
-            path, Map<String, dynamic>.from(params),
+            path, params,
             pageId: pageId, rootNavigator: rootNavigator);
         return result;
       }

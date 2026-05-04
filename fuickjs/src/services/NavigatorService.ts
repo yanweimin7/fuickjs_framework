@@ -1,5 +1,6 @@
 import React from 'react';
 import ComponentStore from '../store/ComponentStore';
+import { getConfig } from '../router/router';
 
 export class NavigatorService {
   static async push(
@@ -9,10 +10,14 @@ export class NavigatorService {
     rootNavigator?: boolean,
     prewarmMs?: number,
   ): Promise<unknown> {
-    if (prewarmMs != null && prewarmMs > 0) {
-      await NavigatorService.prewarmAndWait(path, params, pageId, prewarmMs);
-    }
-    return dartCallNative('Navigator.push', { path, params, pageId, rootNavigator });
+    const effectivePrewarmMs = prewarmMs ?? getConfig(path)?.prewarmMs;
+    return dartCallNativeAsync('Navigator.push', {
+      path,
+      params,
+      pageId,
+      rootNavigator,
+      prewarmMs: effectivePrewarmMs,
+    });
   }
 
   static pushReplace(path: string, params: unknown, pageId?: number | null, rootNavigator?: boolean): Promise<unknown> {
