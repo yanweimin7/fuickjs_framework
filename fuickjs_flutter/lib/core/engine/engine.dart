@@ -11,6 +11,7 @@ class EngineInit {
   static QuickJsFFI? get qjs => _qjs;
   static QuickJsRuntime? runtime;
 
+  ///只需要在isolate中初始化
   static initQjs() {
     if (_qjs == null) {
       try {
@@ -27,6 +28,9 @@ class EngineInit {
 
   static Future<void> initIsolate() async {
     await IsolateWorker.instance.ensureInitialized();
+  }
+  static Future<void> preload(){
+    return initIsolate();
   }
 
   static void setUseBinaryProtocol(bool use) {

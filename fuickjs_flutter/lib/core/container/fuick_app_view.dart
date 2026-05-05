@@ -15,15 +15,11 @@ class FuickAppView extends StatefulWidget {
   final String? debugBusinessCode;
   final String? initialRoute;
   final Map<String, dynamic>? initialParams;
-  /// 宿主集成第三方路由（go_router / auto_route 等）时的 root push 钩子，可选。
   final Future<dynamic> Function(String path, Map<String, dynamic> params)?
       onRootPush;
-
-  /// 页面转场动画类型，默认 cupertino
   final FuickPageTransition pageTransition;
-
-  /// 页面 DSL 尚未就绪时的占位背景色，默认白色
   final Color loadingBackgroundColor;
+  final bool useAotCode;
 
   const FuickAppView({
     super.key,
@@ -34,6 +30,7 @@ class FuickAppView extends StatefulWidget {
     this.onRootPush,
     this.pageTransition = FuickPageTransition.cupertino,
     this.loadingBackgroundColor = const Color(0xFFFFFFFF),
+    this.useAotCode = true,
   });
 
   @override
@@ -46,7 +43,6 @@ class _FuickAppViewState extends State<FuickAppView> {
   bool _isReady = false;
   FuickAppContext? appContext;
 
-  // 保存 isReady listener 引用，以便在 dispose 时移除
   VoidCallback? _isReadyListener;
   FuickAppContext? _pendingListenContext;
 
@@ -67,13 +63,10 @@ class _FuickAppViewState extends State<FuickAppView> {
     final nav = _navKey.currentState;
     if (nav == null) return false;
     if (!nav.canPop()) return false;
-    // 检查内层当前 route 是否允许 pop。
-    // PopScope(canPop:false) 会让 route.popDisposition == doNotPop，
-    // 此时外层 PopScope 也不应该允许 pop（否则系统返回键绕过了内层 PopScope）。
     Route<dynamic>? currentRoute;
     nav.popUntil((route) {
       currentRoute = route;
-      return true; // 立即停止，只是为了拿到当前 route
+      return true;
     });
     if (currentRoute != null &&
         currentRoute!.popDisposition == RoutePopDisposition.doNotPop) {
@@ -94,17 +87,17 @@ class _FuickAppViewState extends State<FuickAppView> {
       appContext = FuickAppContext(
         appName: widget.appName,
         debugBusinessCode: widget.debugBusinessCode,
+        useAotCode: widget.useAotCode,
       );
       FuickAppContextManager().registerContext(widget.appName, appContext!);
     } else {
       FuickAppContextManager().retainContext(widget.appName);
     }
-    // 如果上下文未初始化，进行初始化
+
     if (!appContext!.isReady.value) {
       await appContext!.init();
     }
 
-    // 2. 此时 context 已经不为空 (要么是外部传入，要么是 Manager 获取/创建)
     final currentContext = appContext;
     if (currentContext == null) {
       logger.e('[FuickAppView] Context is null after initialization');
@@ -123,6 +116,7 @@ class _FuickAppViewState extends State<FuickAppView> {
           if (mounted) _setupWithContext(currentContext);
         }
       }
+
       _isReadyListener = listener;
       currentContext.isReady.addListener(listener);
     }
@@ -153,14 +147,12 @@ class _FuickAppViewState extends State<FuickAppView> {
       );
     }
     return PopScope(
-      // 仅当内层 Navigator 没有可 pop 的页面时，才允许外层 pop（退出整个容器）
       canPop: !_canInnerPop,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
         final NavigatorState? nav = _navKey.currentState;
         if (nav == null) return;
         if (nav.canPop()) {
-          // 用 maybePop 代替 pop，让内层 PopScope(canPop:false) 能拦截
           nav.maybePop();
         }
       },
@@ -188,7 +180,6 @@ class _FuickAppViewState extends State<FuickAppView> {
 
   @override
   void dispose() {
-    // 移除 isReady listener，防止在 context 未就绪时 widget 已被销毁后仍触发
     if (_isReadyListener != null) {
       _pendingListenContext?.isReady.removeListener(_isReadyListener!);
       _isReadyListener = null;
