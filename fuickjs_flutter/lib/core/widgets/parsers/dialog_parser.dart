@@ -11,7 +11,7 @@ class DialogParser extends WidgetParser {
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
     final childWidgets = factory.buildChildren(context, children);
-    final child = childWidgets.isNotEmpty
+    final childContent = childWidgets.isNotEmpty
         ? Column(mainAxisSize: MainAxisSize.min, children: childWidgets)
         : const SizedBox.shrink();
 
@@ -21,23 +21,29 @@ class DialogParser extends WidgetParser {
       inset = EdgeInsets.all(insetPadding.toDouble());
     } else if (insetPadding is Map) {
       inset = EdgeInsets.symmetric(
-        horizontal: (insetPadding['horizontal'] as num?)?.toDouble() ?? 40.0,
+        horizontal:
+            (insetPadding['horizontal'] as num?)?.toDouble() ?? 40.0,
         vertical: (insetPadding['vertical'] as num?)?.toDouble() ?? 24.0,
       );
     } else {
       inset = const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0);
     }
 
-    return Dialog(
-      elevation: (props['elevation'] as num?)?.toDouble() ?? 8.0,
-      backgroundColor:
-          WidgetUtils.colorFromHex(props['backgroundColor'] as String?),
-      insetPadding: inset,
-      shape: RoundedRectangleBorder(
-        borderRadius: WidgetUtils.getBorderRadius(props['borderRadius']) ??
-            BorderRadius.circular(28),
+    return Align(
+      alignment: Alignment.center,
+      child: Padding(
+        padding: inset,
+        child: Material(
+          elevation: (props['elevation'] as num?)?.toDouble() ?? 8.0,
+          color: WidgetUtils.colorFromHex(props['backgroundColor'] as String?),
+          shape: RoundedRectangleBorder(
+            borderRadius: WidgetUtils.getBorderRadius(props['borderRadius']) ??
+                BorderRadius.circular(28),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: IntrinsicWidth(child: childContent),
+        ),
       ),
-      child: child,
     );
   }
 }

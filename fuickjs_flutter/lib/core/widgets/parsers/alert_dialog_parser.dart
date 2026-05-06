@@ -20,6 +20,9 @@ class AlertDialogParser extends WidgetParser {
       actions: props['actions'] != null
           ? factory.buildChildren(context, props['actions'])
           : null,
+      insetPadding: WidgetUtils.edgeInsets(props['insetPadding']),
+      titlePadding: WidgetUtils.edgeInsets(props['titlePadding']),
+      contentPadding: WidgetUtils.edgeInsets(props['contentPadding']),
       actionsPadding: WidgetUtils.edgeInsets(props['actionsPadding']),
       actionsAlignment: WidgetUtils.mainAxis(props['actionsAlignment']),
       backgroundColor:

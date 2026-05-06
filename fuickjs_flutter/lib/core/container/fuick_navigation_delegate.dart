@@ -105,7 +105,8 @@ class FuickNavigationDelegate {
 
     final prewarmEntry = controller.claimPrewarm(path, params);
     final id = prewarmEntry?.pageId ?? nextPageId;
-    logger.d('[Prewarm] _push: path=$path, prewarmEntry=${prewarmEntry != null}, id=$id');
+    logger.d(
+        '[Prewarm] _push: path=$path, prewarmEntry=${prewarmEntry != null}, id=$id');
     registerNavigator(id, navKey!);
 
     final route = _createRoute(nav.context, path, params, id);
@@ -125,7 +126,10 @@ class FuickNavigationDelegate {
 
     if (presentation == 'dialog') {
       return DialogRoute(
-          context: context, settings: settings, builder: (_) => page);
+          context: context,
+          settings: settings,
+          useSafeArea: false,
+          builder: (_) => page);
     } else if (presentation == 'bottomSheet') {
       final screenHeight = MediaQuery.of(context).size.height;
       final rawMin = (params['minHeight'] as num?)?.toDouble();
@@ -142,16 +146,22 @@ class FuickNavigationDelegate {
         settings: settings,
         isScrollControlled: true,
         backgroundColor: bgColor != null
-            ? WidgetUtils.colorFromHex(bgColor) ?? Theme.of(context).dialogTheme.backgroundColor ?? Theme.of(context).colorScheme.surface
-            : Theme.of(context).dialogTheme.backgroundColor ?? Theme.of(context).colorScheme.surface,
+            ? WidgetUtils.colorFromHex(bgColor) ??
+                Theme.of(context).dialogTheme.backgroundColor ??
+                Theme.of(context).colorScheme.surface
+            : Theme.of(context).dialogTheme.backgroundColor ??
+                Theme.of(context).colorScheme.surface,
         constraints: BoxConstraints(
           minHeight: minHeight,
           maxHeight: maxHeight,
         ),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (_) => page,
+        builder: (_) => SizedBox(
+          width: MediaQuery.of(_).size.width,
+          child: page,
+        ),
       );
     }
 
@@ -221,9 +231,7 @@ class FuickNavigationDelegate {
 
   /// 弹出所有路由，回到根页面（用于 reLaunch）
   void popAll({int? pageId}) {
-    getNavigatorKey(pageId)
-        ?.currentState
-        ?.popUntil((route) => route.isFirst);
+    getNavigatorKey(pageId)?.currentState?.popUntil((route) => route.isFirst);
   }
 
   /// 切换 TabBar（通知 tabbar 状态变化，Phase 1 仅做 popAll + push）

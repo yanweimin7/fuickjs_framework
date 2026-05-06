@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import ComponentStore from '../store/ComponentStore';
 import { Container } from './Container';
 import { Text } from './Text';
-import { Dialog } from './Dialog';
 import { Column } from './Column';
 
 interface GenericPageProps {
@@ -30,17 +29,7 @@ export function GenericPage(props: GenericPageProps) {
     );
   }
 
-  if (presentation === 'bottomSheet') {
-    return (
-      <Column mainAxisSize="min" padding={{ top: 12 }}>
-        {component}
-      </Column>
-    );
-  }
-
-  return (
-    <Dialog elevation={8} borderRadius={28}>
-      {component}
-    </Dialog>
-  );
+  // dialog presentation: DialogRoute already wraps content in a Dialog widget,
+  // so we just render the component directly to avoid nested dialog padding.
+  return <>{component}</>;
 }

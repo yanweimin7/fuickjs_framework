@@ -1,3 +1,4 @@
+import './crypto-random';
 import './process';
 import './buffer';
 import './crypto';

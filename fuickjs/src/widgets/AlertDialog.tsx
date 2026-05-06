@@ -6,7 +6,10 @@ export interface AlertDialogProps extends WidgetProps {
   title?: ReactNode;
   content?: ReactNode;
   actions?: ReactNode[];
-  actionsPadding?: number | number[]; // padding for actions
+  insetPadding?: number | number[];
+  titlePadding?: number | number[];
+  contentPadding?: number | number[];
+  actionsPadding?: number | number[];
   actionsAlignment?: 'start' | 'end' | 'center' | 'spaceBetween' | 'spaceAround' | 'spaceEvenly';
   shape?: unknown; // To be defined more strictly if needed
   backgroundColor?: string;
