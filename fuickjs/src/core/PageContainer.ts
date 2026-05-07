@@ -19,7 +19,7 @@ export class PageContainer {
   private onInvisibleCallbacks: Set<(...args: unknown[]) => unknown> = new Set();
   private nodes: Map<number | string, Node> = new Map();
   private nodesByRefId: Map<string, Node> = new Map();
-  private _virtualNodeIdCounter: number = 1000000; // Start high for virtual nodes
+  private _virtualNodeIdCounter: number = 0;
 
   public get virtualNodeIdCounter(): number {
     return this._virtualNodeIdCounter;
@@ -402,9 +402,8 @@ export class PageContainer {
         // It's a primitive (string) type
         const { children, ...props } = originalProps;
 
-        // Ensure we have a nodeId for event mapping
-        const nodeId = typeof props.id === 'number' ? props.id : ++this.virtualNodeIdCounter;
-        if (!props.id || typeof props.id !== 'number') props.id = nodeId;
+        // Ensure we have a nodeId for event mapping (always use framework-generated id)
+        const nodeId = ++this.virtualNodeIdCounter;
 
         // Process props using the common logic
         const processedProps = this.processProps(nodeId, props, String(type), [], depth + 1);

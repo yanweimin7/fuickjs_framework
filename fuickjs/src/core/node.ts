@@ -2,7 +2,6 @@ import React from 'react';
 import { PageContainer } from './PageContainer';
 
 export const TEXT_TYPE = 'Text';
-let nextNodeId = 1;
 
 export class Node {
   id: number;
@@ -19,7 +18,8 @@ export class Node {
   private _childrenDslCacheDirty: boolean = true;
 
   constructor(type: string, props: Record<string, unknown> | null, container?: PageContainer) {
-    this.id = props && typeof props.id === 'number' ? props.id : nextNodeId++;
+    // Use container's virtualNodeIdCounter to ensure unified id space
+    this.id = container ? ++container.virtualNodeIdCounter : 1;
     this.type = type;
     this.props = {}; // Initialize empty props
     this.container = container;

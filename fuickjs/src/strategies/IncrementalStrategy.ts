@@ -106,7 +106,6 @@ export class IncrementalStrategy {
   public commit() {
     if (this.mutationQueue.length === 0) return;
 
-    const commitStart = Date.now();
     const pageId = this.container.pageId;
 
     const optimizedOps: (MutationOp | null)[] = [];
@@ -147,9 +146,7 @@ export class IncrementalStrategy {
       }
     }
     UIService.patchOps(Number(pageId), flattenedOps);
-    console.log(
-      `[JS Performance] commit(patchOps) page=${pageId} `,
-    );
+    console.log('[JS] commit(patchOps) page=', pageId, ' ops=', flattenedOps);
     this.mutationQueue = [];
   }
 

@@ -50,7 +50,6 @@ export interface BoxConstraints {
 }
 
 export interface BaseProps {
-  id?: string | number;
   key?: string | number;
   children?: import('react').ReactNode;
   refId?: string;

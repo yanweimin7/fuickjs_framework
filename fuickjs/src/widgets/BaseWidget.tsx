@@ -13,12 +13,7 @@ export abstract class BaseWidget<
   private _internalRefId = refsId();
 
   public get rawRefId(): string {
-    return (
-      this.props.refId ||
-      this.props.id?.toString() ||
-      (this.props as { key?: React.Key }).key?.toString() ||
-      this._internalRefId
-    );
+    return this.props.refId || (this.props as { key?: React.Key }).key?.toString() || this._internalRefId;
   }
 
   public get pageId(): number {
