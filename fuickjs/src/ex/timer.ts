@@ -2,7 +2,7 @@ import { TimerService } from '../services/TimerService';
 import { ErrorHandler } from '../core/ErrorHandler';
 
 let nextTimerId = 1;
-const timerMap = new Map<number, { fn: (...args: any[]) => unknown; type: 'timeout' | 'interval' }>();
+const timerMap = new Map<number, { fn: (...args: any[]) => unknown; type: 'timeout' | 'interval'; native?: boolean }>();
 
 export function setTimeout(fn: (...args: any[]) => unknown, ms?: number): number {
   const id = nextTimerId++;
@@ -17,10 +17,11 @@ export function setTimeout(fn: (...args: any[]) => unknown, ms?: number): number
         ErrorHandler.notify(e, 'timer', { id });
       }
     });
+    timerMap.set(id, { fn, type: 'timeout', native: false });
     return id;
   }
 
-  timerMap.set(id, { fn, type: 'timeout' });
+  timerMap.set(id, { fn, type: 'timeout', native: true });
 
   try {
     TimerService.createTimer(id, delay, false);
@@ -38,17 +39,21 @@ export function setTimeout(fn: (...args: any[]) => unknown, ms?: number): number
 }
 
 export function clearTimeout(id: number) {
+  if (id == null || id === undefined) return;
+  const entry = timerMap.get(id);
   timerMap.delete(id);
-  try {
-    TimerService.deleteTimer(id);
-  } catch (e) {
-    console.warn(`[Timer] clearTimeout(${id}) native deleteTimer failed:`, e);
+  if (entry?.native !== false) {
+    try {
+      TimerService.deleteTimer(id);
+    } catch (e) {
+      console.warn(`[Timer] clearTimeout(${id}) native deleteTimer failed:`, e);
+    }
   }
 }
 
 export function setInterval(fn: (...args: any[]) => unknown, ms?: number): number {
   const id = nextTimerId++;
-  timerMap.set(id, { fn, type: 'interval' });
+  timerMap.set(id, { fn, type: 'interval', native: true });
   try {
     TimerService.createTimer(id, ms || 0, true);
   } catch (e) {
@@ -58,11 +63,15 @@ export function setInterval(fn: (...args: any[]) => unknown, ms?: number): numbe
 }
 
 export function clearInterval(id: number) {
+  if (id == null || id === undefined) return;
+  const entry = timerMap.get(id);
   timerMap.delete(id);
-  try {
-    TimerService.deleteTimer(id);
-  } catch (e) {
-    console.warn(`[Timer] clearInterval(${id}) native deleteTimer failed:`, e);
+  if (entry?.native !== false) {
+    try {
+      TimerService.deleteTimer(id);
+    } catch (e) {
+      console.warn(`[Timer] clearInterval(${id}) native deleteTimer failed:`, e);
+    }
   }
 }
 
