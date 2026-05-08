@@ -18,8 +18,8 @@ export class Node {
   private _childrenDslCacheDirty: boolean = true;
 
   constructor(type: string, props: Record<string, unknown> | null, container?: PageContainer) {
-    // Use container's virtualNodeIdCounter to ensure unified id space
-    this.id = container ? ++container.virtualNodeIdCounter : 1;
+    // Use container's nextNodeId to ensure unified id space
+    this.id = container ? ++container.nextNodeId : 1;
     this.type = type;
     this.props = {}; // Initialize empty props
     this.container = container;

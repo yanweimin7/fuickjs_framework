@@ -32,7 +32,8 @@ class FuickNavigationDelegate {
 
   /// 宿主集成第三方路由（go_router / auto_route 等）时的 root push 钩子。
   /// 未设置时回退到 Navigator.of(context, rootNavigator: true)。
-  Future<dynamic> Function(String path, Map<String, dynamic> params)?
+  /// 静态属性，宿主 app 启动时设置一次即可，不会被 FuickAppView 覆盖。
+  static Future<dynamic> Function(String path, Map<String, dynamic> params)?
       onRootPush;
 
   /// 页面 DSL 尚未就绪时的占位背景色
@@ -83,20 +84,28 @@ class FuickNavigationDelegate {
       bool rootNavigator = false}) async {
     if (rootNavigator) {
       if (onRootPush != null) {
-        return onRootPush!(path, params);
-      }
-      final context = _pageContexts[pageId] ?? _pageContexts.values.lastOrNull;
-      if (context != null) {
         try {
-          final nav = Navigator.of(context, rootNavigator: true);
+          return onRootPush!(path, params);
+        } catch (e) {
+          logger.w('onRootPush failed, fallback to root navigator: $e');
+        }
+      }
+      final navKey = getNavigatorKey(pageId);
+      final nav = navKey?.currentState;
+      if (nav != null) {
+        try {
+          final rootNav = Navigator.of(nav.context, rootNavigator: true);
           final prewarmEntry = controller.claimPrewarm(path, params);
           final id = prewarmEntry?.pageId ?? nextPageId;
-          final route = _createRoute(context, path, params, id);
-          return replacement ? nav.pushReplacement(route) : nav.push(route);
+          final route = _createRoute(nav.context, path, params, id);
+          return replacement
+              ? rootNav.pushReplacement(route)
+              : rootNav.push(route);
         } catch (e) {
           logger.w('Failed to push to root navigator: $e');
         }
       }
+      return null;
     }
 
     final navKey = getNavigatorKey(pageId);
@@ -193,34 +202,16 @@ class FuickNavigationDelegate {
   }
 
   void pop({int? pageId, dynamic result}) {
-    if (_tryPopContext(pageId, result)) return;
-
     final nav = getNavigatorKey(pageId)?.currentState;
     if (nav == null) return;
 
     if (nav.canPop()) {
       nav.pop(result);
     } else {
-      // 内层 Navigator 栈底，穿透到外层 Flutter Navigator 退出整个容器
       try {
-        Navigator.of(nav.context).pop(result);
+        Navigator.of(nav.context, rootNavigator: true).pop(result);
       } catch (_) {}
     }
-  }
-
-  bool _tryPopContext(int? pageId, dynamic result) {
-    if (pageId != null) {
-      final context = _pageContexts[pageId];
-      if (context != null && context.mounted) {
-        try {
-          Navigator.of(context).pop(result);
-          return true;
-        } catch (e) {
-          logger.w('Failed to pop context: $e');
-        }
-      }
-    }
-    return false;
   }
 
   void popTo(String name, {int? pageId}) {

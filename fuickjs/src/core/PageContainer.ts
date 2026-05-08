@@ -19,14 +19,23 @@ export class PageContainer {
   private onInvisibleCallbacks: Set<(...args: unknown[]) => unknown> = new Set();
   private nodes: Map<number | string, Node> = new Map();
   private nodesByRefId: Map<string, Node> = new Map();
-  private _virtualNodeIdCounter: number = 0;
+  private _nextNodeId: number = 0;
+  private _elementToDslIdCounter: number = 100000000;
 
-  public get virtualNodeIdCounter(): number {
-    return this._virtualNodeIdCounter;
+  public get nextNodeId(): number {
+    return this._nextNodeId;
   }
-  public set virtualNodeIdCounter(val: number) {
-    this._virtualNodeIdCounter = val;
+  public set nextNodeId(val: number) {
+    this._nextNodeId = val;
   }
+
+  public get elementToDslIdCounter(): number {
+    return this._elementToDslIdCounter;
+  }
+  public set elementToDslIdCounter(val: number) {
+    this._elementToDslIdCounter = val;
+  }
+
   private isVisible: boolean = false;
 
   constructor(pageId: number) {
@@ -403,7 +412,7 @@ export class PageContainer {
         const { children, ...props } = originalProps;
 
         // Ensure we have a nodeId for event mapping (always use framework-generated id)
-        const nodeId = ++this.virtualNodeIdCounter;
+        const nodeId = ++this.elementToDslIdCounter;
 
         // Process props using the common logic
         const processedProps = this.processProps(nodeId, props, String(type), [], depth + 1);

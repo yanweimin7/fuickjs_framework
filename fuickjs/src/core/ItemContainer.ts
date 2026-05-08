@@ -1,6 +1,4 @@
-import React from 'react';
 import { PageContainer } from './PageContainer';
-import { Node } from './node';
 
 /**
  * ItemContainer 是 PageContainer 的轻量子类，专门用于列表项的 reconciler sub-root。
@@ -9,7 +7,7 @@ import { Node } from './node';
  * 1. 初始渲染 commit 是空操作 — DSL 由 getItemDSL() 通过 toDsl() 手动提取返回
  * 2. 后续状态变更 commit 发送增量补丁 — 让 Flutter 侧列表项能响应 useState/useEffect 更新
  * 3. 事件回调转发到主 PageContainer — 确保事件派发时能找到回调
- * 4. 共享主 container 的 virtualNodeIdCounter — 避免 nodeId 冲突
+ * 4. 共享主 container 的 nextNodeId — 避免 nodeId 冲突
  * 5. toDsl() 从已提交的 Node 树提取 DSL — 给 getItemDSL 返回
  */
 export class ItemContainer extends PageContainer {
@@ -96,14 +94,21 @@ export class ItemContainer extends PageContainer {
   }
 
   /**
-   * 重写：共享主 container 的 virtualNodeIdCounter，避免 nodeId 冲突。
+   * 重写：共享主 container 的 nextNodeId，避免 nodeId 冲突。
    * elementToDsl 路径中自增的 nodeId 会走这里。
    */
-  public override get virtualNodeIdCounter(): number {
-    return this.mainContainer.virtualNodeIdCounter;
+  public override get nextNodeId(): number {
+    return this.mainContainer.nextNodeId;
   }
-  public override set virtualNodeIdCounter(val: number) {
-    this.mainContainer.virtualNodeIdCounter = val;
+  public override set nextNodeId(val: number) {
+    this.mainContainer.nextNodeId = val;
+  }
+
+  public override get elementToDslIdCounter(): number {
+    return this.mainContainer.elementToDslIdCounter;
+  }
+  public override set elementToDslIdCounter(val: number) {
+    this.mainContainer.elementToDslIdCounter = val;
   }
 
   /**
