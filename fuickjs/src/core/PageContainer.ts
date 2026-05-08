@@ -20,7 +20,7 @@ export class PageContainer {
   private nodes: Map<number | string, Node> = new Map();
   private nodesByRefId: Map<string, Node> = new Map();
   private _nextNodeId: number = 0;
-  private _elementToDslIdCounter: number = 100000000;
+  private _elementToDslNextNodeId: number = 100000000;
 
   public get nextNodeId(): number {
     return this._nextNodeId;
@@ -29,11 +29,11 @@ export class PageContainer {
     this._nextNodeId = val;
   }
 
-  public get elementToDslIdCounter(): number {
-    return this._elementToDslIdCounter;
+  public get elementToDslNextNodeId(): number {
+    return this._elementToDslNextNodeId;
   }
-  public set elementToDslIdCounter(val: number) {
-    this._elementToDslIdCounter = val;
+  public set elementToDslNextNodeId(val: number) {
+    this._elementToDslNextNodeId = val;
   }
 
   private isVisible: boolean = false;
@@ -412,7 +412,7 @@ export class PageContainer {
         const { children, ...props } = originalProps;
 
         // Ensure we have a nodeId for event mapping (always use framework-generated id)
-        const nodeId = ++this.elementToDslIdCounter;
+        const nodeId = ++this.elementToDslNextNodeId;
 
         // Process props using the common logic
         const processedProps = this.processProps(nodeId, props, String(type), [], depth + 1);

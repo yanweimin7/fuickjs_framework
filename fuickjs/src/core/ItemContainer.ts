@@ -104,11 +104,11 @@ export class ItemContainer extends PageContainer {
     this.mainContainer.nextNodeId = val;
   }
 
-  public override get elementToDslIdCounter(): number {
-    return this.mainContainer.elementToDslIdCounter;
+  public override get elementToDslNextNodeId(): number {
+    return this.mainContainer.elementToDslNextNodeId;
   }
-  public override set elementToDslIdCounter(val: number) {
-    this.mainContainer.elementToDslIdCounter = val;
+  public override set elementToDslNextNodeId(val: number) {
+    this.mainContainer.elementToDslNextNodeId = val;
   }
 
   /**
