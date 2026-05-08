@@ -2,6 +2,24 @@ import * as PageRender from '../core/page_render';
 import * as Timer from '../ex/timer';
 import '../polyfill';
 
+export interface FuickConfig {
+  prewarm?: boolean;
+  prewarmMs?: number;
+}
+
+let _config: FuickConfig = {
+  prewarm: false,
+  prewarmMs: 50,
+};
+
+export function configure(options: FuickConfig) {
+  _config = { ..._config, ...options };
+}
+
+export function getRuntimeConfig(): FuickConfig {
+  return _config;
+}
+
 export function bindGlobals() {
   Object.assign(globalThis, {
     window: globalThis,
@@ -17,10 +35,14 @@ export function bindGlobals() {
         r.dispatchEvent(eventObj, payload);
       },
       handleTimer: Timer.handleTimer,
+      configure,
+      getConfig: getRuntimeConfig,
     },
   });
 }
 
 export const Runtime = {
   bindGlobals,
+  configure,
+  getConfig: getRuntimeConfig,
 };

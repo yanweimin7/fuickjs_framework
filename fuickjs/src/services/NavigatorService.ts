@@ -1,6 +1,7 @@
 import React from 'react';
 import ComponentStore from '../store/ComponentStore';
 import { getConfig } from '../router/router';
+import { getRuntimeConfig } from '../runtime/runtime';
 
 export class NavigatorService {
   static async push(
@@ -10,7 +11,14 @@ export class NavigatorService {
     rootNavigator?: boolean,
     prewarmMs?: number,
   ): Promise<unknown> {
-    const effectivePrewarmMs = prewarmMs ?? getConfig(path)?.prewarmMs;
+    const routeConfig = getConfig(path);
+    const runtimeConfig = getRuntimeConfig();
+
+    let effectivePrewarmMs = prewarmMs ?? routeConfig?.prewarmMs;
+    if (effectivePrewarmMs == null && runtimeConfig.prewarm) {
+      effectivePrewarmMs = runtimeConfig.prewarmMs;
+    }
+
     return dartCallNativeAsync('Navigator.push', {
       path,
       params,
@@ -24,17 +32,27 @@ export class NavigatorService {
     return dartCallNative('Navigator.pushReplace', { path, params, pageId, rootNavigator });
   }
 
-  static showDialog(component: React.ReactNode, params?: unknown, pageId?: number | null, rootNavigator?: boolean): Promise<unknown> {
+  static showDialog(
+    component: React.ReactNode,
+    params?: unknown,
+    pageId?: number | null,
+    rootNavigator?: boolean,
+  ): Promise<unknown> {
     const id = ComponentStore.getInstance().register(component);
     const finalParams = {
-      ...(params as object || {}),
+      ...((params as object) || {}),
       componentId: id,
       presentation: 'dialog',
     };
     return NavigatorService.push('/_generic_dialog', finalParams, pageId, rootNavigator);
   }
 
-  static showBottomSheet(component: React.ReactNode, options?: { minHeight?: number; maxHeight?: number; backgroundColor?: string }, pageId?: number | null, rootNavigator?: boolean): Promise<unknown> {
+  static showBottomSheet(
+    component: React.ReactNode,
+    options?: { minHeight?: number; maxHeight?: number; backgroundColor?: string },
+    pageId?: number | null,
+    rootNavigator?: boolean,
+  ): Promise<unknown> {
     const id = ComponentStore.getInstance().register(component);
     const finalParams = {
       componentId: id,
