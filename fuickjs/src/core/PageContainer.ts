@@ -37,6 +37,7 @@ export class PageContainer {
   }
 
   private isVisible: boolean = false;
+  public isFirstRender: boolean = true;
 
   constructor(pageId: number) {
     this.pageId = pageId;
@@ -171,6 +172,10 @@ export class PageContainer {
   }
 
   public markChanged(node: Node | null) {
+    if (this.isFirstRender) {
+      if (node) this.diffStrategy.changedNodes.add(node);
+      return;
+    }
     this.diffStrategy.markChanged(node);
   }
 
@@ -284,8 +289,6 @@ export class PageContainer {
   appendChildToContainer(child: Node) {
     this.root = child;
     this.markChanged(child);
-    // Force a full render since the root has changed.
-    // This ensures that even in incremental mode, the new root is sent to Flutter via renderUI.
     this.diffStrategy.rendered = false;
   }
 
@@ -319,6 +322,9 @@ export class PageContainer {
         this.incrementalStrategy.commit();
       } else {
         this.diffStrategy.commit();
+      }
+      if (this.diffStrategy.rendered && this.isFirstRender) {
+        this.isFirstRender = false;
       }
     } catch (e) {
       console.error(`[PageContainer] Error during commit for page ${this.pageId}:`, e);

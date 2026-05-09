@@ -28,14 +28,12 @@ export class Node {
   }
 
   applyProps(newProps: Record<string, unknown> | null) {
-    // Unregister old refId if it exists
     const oldRefId = this.props?.refId;
     if (oldRefId && typeof oldRefId === 'string') {
       this.container?.unregisterNode(this);
     }
 
     this.clearCallbacks();
-    // Re-initialize props to ensure deleted props are removed
     this.props = {};
 
     if (newProps) {
@@ -46,16 +44,14 @@ export class Node {
         this.props[key] = value;
       }
 
-      // Recursively register callbacks to handle nested props and top-level callbacks
-      this.registerCallbacksRecursive(newProps);
+      if (!this.container?.isFirstRender) {
+        this.registerCallbacksRecursive(newProps);
+      }
     }
 
-    // Re-register with new refId
     this.container?.registerNode(this);
 
-    // 标记 DSL 缓存需要重新计算
     this._dslCacheDirty = true;
-    // 通知父节点子树有变化
     this._invalidateParentDslCache();
   }
 

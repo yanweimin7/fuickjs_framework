@@ -3,6 +3,7 @@ import { createRenderer, Renderer } from './renderer';
 import * as Router from '../router/router';
 import { PageContext } from './PageContext';
 import { ErrorBoundary } from './ErrorBoundary';
+import { perfLog } from '../utils/log';
 
 let renderer: Renderer | null = null;
 let globalErrorFallback: ((error: Error) => React.ReactNode) | null = null;
@@ -20,7 +21,7 @@ export function ensureRenderer() {
 export function render(pageId: number, path: string, params: unknown) {
   const startTime = Date.now();
   const r = ensureRenderer();
-  console.log(`[JS Performance] render start for ${path}, pageId: ${pageId}`);
+  perfLog(`[JS Performance] render start for ${path}, pageId: ${pageId}`);
   const factory = Router.match(path);
 
   let app: React.ReactNode;
@@ -75,7 +76,7 @@ export function render(pageId: number, path: string, params: unknown) {
   );
   r.update(wrappedApp, pageId);
 
-  console.log(`[JS Performance] render total cost for ${path}: ${Date.now() - startTime}ms`);
+  perfLog(`[JS Performance] render total cost for ${path}: ${Date.now() - startTime}ms`);
 }
 
 export function destroy(pageId: number) {

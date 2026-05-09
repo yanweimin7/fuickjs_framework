@@ -1,6 +1,7 @@
 import { Node } from '../core/node';
 import { PageContainer } from '../core/PageContainer';
 import { UIService } from '../services/UIService';
+import { perfLog } from '../utils/log';
 
 export class DiffStrategy {
   private container: PageContainer;
@@ -20,7 +21,7 @@ export class DiffStrategy {
     }
     this.changedNodes.add(current);
     if (current === this.container.root) {
-      console.log(`[JS Performance] Root node (id=${current.id}, type=${current.type}) marked as changed!`);
+      perfLog(`[JS Performance] Root node (id=${current.id}, type=${current.type}) marked as changed!`);
     }
   }
 
@@ -29,25 +30,18 @@ export class DiffStrategy {
   }
 
   public commit() {
-    if (this.changedNodes.size === 0) {
+    if (!this.container.root) {
       return;
     }
-    if (!this.container.root) {
+
+    if (this.changedNodes.size === 0 && this.rendered) {
       return;
     }
 
     const commitStart = Date.now();
     const pageId = this.container.pageId;
 
-    // If root node is in changedNodes or it's the initial render, use renderUI
     const rootChanged = this.container.root && this.changedNodes.has(this.container.root);
-    if (rootChanged) {
-      console.log(
-        `[JS Performance] rootChanged is true for page ${pageId}. Root node:`,
-        this.container.root?.type,
-        this.container.root?.id,
-      );
-    }
 
     if (!this.rendered || rootChanged) {
       const dslStart = Date.now();
@@ -56,7 +50,7 @@ export class DiffStrategy {
       if (dsl && (dsl as { type: unknown }).type) {
         UIService.renderUI(Number(pageId), dsl);
         this.rendered = true;
-        console.log(
+        perfLog(
           `[JS Performance] commit(full) page=${pageId} total=${Date.now() - commitStart}ms (dsl=${dslEnd - dslStart}ms)`,
         );
       }
@@ -110,7 +104,7 @@ export class DiffStrategy {
         const changedNodeTypes = Array.from(topLevelNodes)
           .map((n) => n.type)
           .join(', ');
-        console.log(
+        perfLog(
           `[JS Performance] commit(patchUI) page=${pageId} nodes=${topLevelNodes.size} types=[${changedNodeTypes}] total=${Date.now() - commitStart}ms (dsl=${dslEnd - dslStart}ms)`,
         );
       }
@@ -118,5 +112,4 @@ export class DiffStrategy {
 
     this.clear();
   }
-
 }

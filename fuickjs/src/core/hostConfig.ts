@@ -1,6 +1,7 @@
 import React from 'react';
 import { PageContainer } from './PageContainer';
 import { Node } from './node';
+import { perfLog } from '../utils/log';
 
 function deepEqual(objA: unknown, objB: unknown): boolean {
   if (objA === objB) return true;
@@ -296,10 +297,11 @@ export const createHostConfig = (): any => {
       if (updatePayload && updatePayload.hasDslChanges && instance.container) {
         const container = instance.container;
         if (instance === container.root) {
-          const changedKeys = updatePayload.payload ? updatePayload.payload.filter((_, i) => i % 2 === 0) : [];
-          console.log(
-            `[HostConfig] markChanged ROOT node=${instance.id} type=${instance.type} due to DSL changes in props:`,
-            changedKeys,
+          const changedKeys = updatePayload.payload
+            ? updatePayload.payload.filter((_: unknown, i: number) => i % 2 === 0)
+            : [];
+          perfLog(
+            `[HostConfig] markChanged ROOT node=${instance.id} type=${instance.type} due to DSL changes in props: ${changedKeys.join(',')}`,
           );
         }
 

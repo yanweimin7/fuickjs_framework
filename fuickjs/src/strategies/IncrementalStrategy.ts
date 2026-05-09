@@ -2,6 +2,7 @@ import { Node } from '../core/node';
 import { PageContainer } from '../core/PageContainer';
 import { UIService } from '../services/UIService';
 import { MutationOp } from './types';
+import { perfLog } from '../utils/log';
 
 export class IncrementalStrategy {
   private container: PageContainer;
@@ -146,7 +147,7 @@ export class IncrementalStrategy {
       }
     }
     UIService.patchOps(Number(pageId), flattenedOps);
-    console.log('[JS] commit(patchOps) page=', pageId);
+    perfLog(`[JS] commit(patchOps) page=${pageId}`);
     this.mutationQueue = [];
   }
 

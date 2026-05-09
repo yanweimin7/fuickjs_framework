@@ -4,6 +4,7 @@ import { createHostConfig } from './hostConfig';
 import { PageContainer } from './PageContainer';
 import { ErrorHandler } from './ErrorHandler';
 import { ListItemManager } from './ListItemManager';
+import { perfLog } from '../utils/log';
 
 export interface Renderer {
   update(element: React.ReactNode, pageId: number): void;
@@ -98,7 +99,9 @@ export function createRenderer(): Renderer {
     update(element: React.ReactNode, pageId: number) {
       const root = ensureRoot(pageId);
       const isFirstRender = !renderedPages.has(pageId);
-      console.log(`[Renderer] update() called for pageId=${pageId}, isFirstRender=${isFirstRender}, roots=${Object.keys(roots).join(',')}`);
+      perfLog(
+        `[Renderer] update() called for pageId=${pageId}, isFirstRender=${isFirstRender}, roots=${Object.keys(roots).join(',')}`,
+      );
       let retryCount = 0;
       const maxRetries = 100; // Prevent infinite loop
 
@@ -114,7 +117,7 @@ export function createRenderer(): Renderer {
             // Use async rendering for subsequent updates
             reconciler.updateContainer(element, root, null, null);
           }
-          console.log(`[Renderer] update() succeeded for pageId=${pageId}, retries=${retryCount}`);
+          perfLog(`[Renderer] update() succeeded for pageId=${pageId}, retries=${retryCount}`);
           retryCount = 0; // Reset on success
         } catch (e: unknown) {
           const msg = (e as Error).message || String(e);
@@ -150,7 +153,7 @@ export function createRenderer(): Renderer {
         const performDestroy = () => {
           try {
             reconciler.updateContainer(null, root, null, null);
-            console.log(`[Renderer] destroy() succeeded for pageId=${pageId}, retries=${retryCount}`);
+            perfLog(`[Renderer] destroy() succeeded for pageId=${pageId}, retries=${retryCount}`);
             delete roots[pageId];
             delete containers[pageId];
           } catch (e: unknown) {
@@ -177,7 +180,8 @@ export function createRenderer(): Renderer {
               try {
                 console.warn(`[Renderer] Best-effort unmount for pageId=${pageId} after fatal error`);
                 reconciler.updateContainer(null, root, null, null);
-              } catch (_) {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              } catch (_e) {
                 // Best effort — if this also fails, nothing more we can do
                 console.error(`[Renderer] Best-effort unmount also failed for pageId=${pageId}`);
               }
