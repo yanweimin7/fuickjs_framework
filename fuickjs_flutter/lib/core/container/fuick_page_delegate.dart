@@ -45,18 +45,71 @@ class FuickPageDelegate {
   /// key: pageId, value: 已被 navigation delegate 认领、等待 FuickPageView 消费的条目
   final Map<int, PrewarmEntry> _claimedEntries = {};
 
+  /// key: pageId, 缓存回调未注册时到达的 patch 数据
+  final Map<int, List<List<dynamic>>> _pendingPatches = {};
+  final Map<int, List<List<dynamic>>> _pendingPatchOps = {};
+
+  /// key: pageId, 缓存回调未注册时到达的 render DSL
+  final Map<int, Map<String, dynamic>> _pendingRenders = {};
+
   FuickPageDelegate(this.controller);
 
   void render(int pageId, Map<String, dynamic> dsl) {
-    onPageRender[pageId]?.call(dsl);
+    final callback = onPageRender[pageId];
+    if (callback != null) {
+      callback(dsl);
+    } else {
+      _pendingRenders[pageId] = dsl;
+    }
   }
 
   void patch(int pageId, List<dynamic> patches) {
-    onPagePatch[pageId]?.call(patches);
+    final callback = onPagePatch[pageId];
+    if (callback != null) {
+      callback(patches);
+    } else {
+      _pendingPatches.putIfAbsent(pageId, () => []).add(patches);
+    }
   }
 
   void patchOps(int pageId, List<dynamic> ops) {
-    onPagePatchOps[pageId]?.call(ops);
+    final callback = onPagePatchOps[pageId];
+    if (callback != null) {
+      callback(ops);
+    } else {
+      _pendingPatchOps.putIfAbsent(pageId, () => []).add(ops);
+    }
+  }
+
+  void flushPendingUpdates(int pageId) {
+    final renderCallback = onPageRender[pageId];
+    final pendingRender = _pendingRenders.remove(pageId);
+    if (renderCallback != null && pendingRender != null) {
+      renderCallback(pendingRender);
+    }
+
+    final patchCallback = onPagePatch[pageId];
+    final pendingPatchList = _pendingPatches.remove(pageId);
+    if (patchCallback != null && pendingPatchList != null) {
+      for (final patches in pendingPatchList) {
+        patchCallback(patches);
+      }
+    }
+
+    final patchOpsCallback = onPagePatchOps[pageId];
+    final pendingOpsList = _pendingPatchOps.remove(pageId);
+    if (patchOpsCallback != null && pendingOpsList != null) {
+      for (final ops in pendingOpsList) {
+        patchOpsCallback(ops);
+      }
+    }
+  }
+
+  /// 移除指定 pageId 的缓存数据（页面销毁时调用）
+  void removePendingUpdates(int pageId) {
+    _pendingRenders.remove(pageId);
+    _pendingPatches.remove(pageId);
+    _pendingPatchOps.remove(pageId);
   }
 
   void renderPage(int pageId, String path, Map<String, dynamic> params) {
@@ -82,10 +135,9 @@ class FuickPageDelegate {
     final entry = PrewarmEntry(id, path, params);
     _prewarmCache[path] = entry;
 
-    // 临时 render 回调：捕获 DSL 后移除自身，等真实 FuickPageView 注册
+    // 临时 render 回调：持续更新 entry DSL，直到被 FuickPageView 覆盖
     onPageRender[id] = (dsl) {
       entry.resolveDsl(dsl);
-      onPageRender.remove(id);
     };
 
     controller.jsProxy.render(id, path, params);

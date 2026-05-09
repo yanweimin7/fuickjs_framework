@@ -1,10 +1,12 @@
 import * as PageRender from '../core/page_render';
 import * as Timer from '../ex/timer';
+import { setDebug } from '../utils/log';
 import '../polyfill';
 
 export interface FuickConfig {
   prewarm?: boolean;
   prewarmMs?: number;
+  debug?: boolean;
 }
 
 let _config: FuickConfig = {
@@ -14,6 +16,9 @@ let _config: FuickConfig = {
 
 export function configure(options: FuickConfig) {
   _config = { ..._config, ...options };
+  if (options.debug !== undefined) {
+    setDebug(options.debug);
+  }
 }
 
 export function getRuntimeConfig(): FuickConfig {

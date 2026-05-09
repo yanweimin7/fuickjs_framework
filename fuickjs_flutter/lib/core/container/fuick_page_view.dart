@@ -66,6 +66,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     widget.controller.onPageRender.remove(widget.pageId);
     widget.controller.onPagePatch.remove(widget.pageId);
     widget.controller.onPagePatchOps.remove(widget.pageId);
+    widget.controller.page.removePendingUpdates(widget.pageId);
     super.dispose();
   }
 
@@ -139,18 +140,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   void initState() {
     super.initState();
 
-    // patch 回调：两条路径（预渲染 / 普通）都需要
-    widget.controller.onPagePatch[widget.pageId] = (patches) {
-      nodeManager.applyPatches(patches, nodeManager);
-    };
-    widget.controller.onPagePatchOps[widget.pageId] = (ops) {
-      nodeManager.applyOps(ops, nodeManager);
-    };
-
-    // 注册 render 回调（覆盖预渲染阶段的临时回调）
-    widget.controller.onPageRender[widget.pageId] = _handleRenderDsl;
-
-    // 检查是否有预渲染的 DSL 缓存（navigation delegate 已认领并复用了 pageId）
+    // 先消费 prewarm entry，确定正确的 nodeManager
     final prewarm = widget.controller.page.consumeByPageId(widget.pageId);
     logger.d(
         '[Prewarm] pageId=${widget.pageId}, prewarm=${prewarm != null}, hasPrebuiltNodes=${prewarm?.hasPrebuiltNodes ?? false}');
@@ -167,6 +157,22 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
           if (mounted) _handleRenderDsl(dsl);
         });
       }
+    }
+
+    // patch 回调：闭包捕获正确的 nodeManager
+    widget.controller.onPagePatch[widget.pageId] = (patches) {
+      nodeManager.applyPatches(patches, nodeManager);
+    };
+    widget.controller.onPagePatchOps[widget.pageId] = (ops) {
+      nodeManager.applyOps(ops, nodeManager);
+    };
+
+    // 注册 render 回调（覆盖预渲染阶段的临时回调）
+    widget.controller.onPageRender[widget.pageId] = _handleRenderDsl;
+
+    widget.controller.page.flushPendingUpdates(widget.pageId);
+
+    if (prewarm != null) {
       widget.controller.isBundleLoaded.addListener(_checkAndRender);
       return;
     }

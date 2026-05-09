@@ -143,14 +143,12 @@ export function createRenderer(): Renderer {
 
     destroy(pageId: number) {
       const root = roots[pageId];
-      console.log(`[Renderer] destroy() called for pageId=${pageId}, hasRoot=${!!root}, containers=${Object.keys(containers).join(',')}`);
       if (root) {
         let retryCount = 0;
         const maxRetries = 100; // Prevent infinite loop
 
         const performDestroy = () => {
           try {
-            console.log(`[Renderer] destroy() performing updateContainer(null) for pageId=${pageId}, retry=${retryCount}`);
             reconciler.updateContainer(null, root, null, null);
             console.log(`[Renderer] destroy() succeeded for pageId=${pageId}, retries=${retryCount}`);
             delete roots[pageId];
