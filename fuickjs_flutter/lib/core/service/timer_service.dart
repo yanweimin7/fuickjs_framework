@@ -31,14 +31,11 @@ class TimerService extends BaseFuickService {
       final existing = timers.remove(id);
       if (existing != null) {
         existing.cancel();
-        logger.w('TimerService: createTimer($id) — cancelled existing timer with same id.');
       }
 
       final delay = asIntOrNull(m['delay']) ?? 0;
       final isInterval = (m['isInterval'] ?? false) as bool;
-      logger.d('TimerService: createTimer(id=$id, delay=${delay}ms, isInterval=$isInterval), '
-          'activeTimers=${timers.length}');
-
+    
       if (isInterval) {
         timers[id] = Timer.periodic(Duration(milliseconds: delay), (
           timer,
@@ -65,7 +62,6 @@ class TimerService extends BaseFuickService {
             return;
           }
           timers.remove(id);
-          logger.d('TimerService: Timeout timer $id fired, remainingTimers=${timers.length}');
           try {
             // 在 Isolate 模式下 controller 为空，直接通过 ctx 调用
             // controller?.jsProxy.handleTimer(id);
@@ -84,11 +80,6 @@ class TimerService extends BaseFuickService {
       final removed = timers.remove(id);
       if (removed != null) {
         removed.cancel();
-        logger.d('TimerService: deleteTimer($id) — cancelled and removed. '
-            'remainingTimers=${timers.length}');
-      } else {
-        logger.w('TimerService: deleteTimer($id) — timer not found. '
-            'activeIds=${timers.keys.toList()}, remainingTimers=${timers.length}');
       }
       return null;
     });

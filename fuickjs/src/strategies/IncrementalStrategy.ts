@@ -146,7 +146,7 @@ export class IncrementalStrategy {
       }
     }
     UIService.patchOps(Number(pageId), flattenedOps);
-    console.log('[JS] commit(patchOps) page=', pageId, ' ops=', flattenedOps);
+    console.log('[JS] commit(patchOps) page=', pageId);
     this.mutationQueue = [];
   }
 

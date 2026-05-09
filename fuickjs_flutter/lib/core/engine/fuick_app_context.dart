@@ -116,7 +116,8 @@ class FuickAppContext {
   Future<void> _loadSingleBundle(String bundleName) async {
     try {
       // consume() 等待 IO 完成后立即释放 BundlePreloader 内的引用
-      final content = await BundlePreloader().consume(bundleName, useAot: useAotCode);
+      final content =
+          await BundlePreloader().consume(bundleName, useAot: useAotCode);
       if (content.bytecode != null) {
         await ctx.evalBinary(content.bytecode!, returnValue: false);
       } else if (content.source != null) {

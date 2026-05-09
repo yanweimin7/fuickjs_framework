@@ -73,5 +73,9 @@ class UIService extends BaseFuickService {
       }
       return false;
     });
+
+    registerMethod('getRegisteredWidgets', (args) {
+      return widgetFactory.registeredTypes;
+    });
   }
 }

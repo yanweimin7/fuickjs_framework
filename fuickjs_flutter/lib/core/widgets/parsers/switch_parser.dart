@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../container/fuick_action.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
@@ -9,7 +10,8 @@ class SwitchParser extends WidgetParser {
   String get type => 'Switch';
 
   @override
-  Widget parse(BuildContext context, Map<String, dynamic> props, dynamic children, WidgetFactory factory) {
+  Widget parse(BuildContext context, Map<String, dynamic> props,
+      dynamic children, WidgetFactory factory) {
     final v = props['value'] == true;
     final onChangedEvent = props['onChanged'];
     return WidgetUtils.wrapPadding(

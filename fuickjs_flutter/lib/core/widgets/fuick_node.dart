@@ -59,7 +59,8 @@ class FuickNode {
   }
 
   /// 按需处理属性中的节点升级
-  dynamic _resolveValue(dynamic value, FuickNodeManager manager, [int depth = 0]) {
+  dynamic _resolveValue(dynamic value, FuickNodeManager manager,
+      [int depth = 0]) {
     if (depth > 64) return value; // Prevent infinite recursion
     if (value is Map) {
       final type = value['type'];
@@ -167,7 +168,6 @@ class FuickNodeManager {
       return existingNode;
     }
 
-    // 3. Create new node if not found or type mismatch
     FuickNode node = FuickNode(
       id: id,
       type: type,
@@ -202,7 +202,6 @@ class FuickNodeManager {
         final newProps = ops[i++] as Map;
         final node = _nodes[id];
         if (node != null) {
-          // 增量更新 props
           final mergedProps = Map<String, dynamic>.from(node.props);
           newProps.forEach((k, v) => mergedProps[k.toString()] = v);
           node.update(mergedProps, node.children, manager);

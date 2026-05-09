@@ -15,6 +15,7 @@
 
 ## 文档索引
 
+- [技术介绍（原理、架构、功能、使用示例）](./introduction.md)
 - [UI 组件 (Widgets)](./widgets.md)
 - [原生服务 & 浏览器 API](./services.md)
 - [Community 扩展包](./community.md)

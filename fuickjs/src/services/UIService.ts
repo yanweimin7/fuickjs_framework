@@ -1,4 +1,6 @@
 export class UIService {
+  private static _registeredWidgets: Set<string> | null = null;
+
   static renderUI(pageId: number, renderData: unknown) {
     dartCallNative('UI.renderUI', { pageId, renderData });
   }
@@ -21,7 +23,15 @@ export class UIService {
     });
   }
 
+  static getRegisteredWidgets(): string[] {
+    return dartCallNative<string[]>('UI.getRegisteredWidgets', []);
+  }
+
   static isWidgetRegistered(type: string): boolean {
-    return dartCallNative('UI.isWidgetRegistered', [type]);
+    if (UIService._registeredWidgets === null) {
+      const list = UIService.getRegisteredWidgets();
+      UIService._registeredWidgets = new Set(list);
+    }
+    return UIService._registeredWidgets.has(type);
   }
 }

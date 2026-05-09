@@ -2,54 +2,67 @@ import 'package:flutter/material.dart';
 
 import '../logger.dart';
 import 'fuick_node.dart';
-import 'widget_utils.dart';
 import 'parsers/alert_dialog_parser.dart';
 import 'parsers/animated_align_parser.dart';
 import 'parsers/animated_container_parser.dart';
+import 'parsers/animated_cross_fade_parser.dart';
 import 'parsers/animated_opacity_parser.dart';
 import 'parsers/animated_padding_parser.dart';
 import 'parsers/animated_positioned_parser.dart';
 import 'parsers/animated_rotation_parser.dart';
 import 'parsers/animated_scale_parser.dart';
 import 'parsers/animated_slide_parser.dart';
+import 'parsers/animated_switcher_parser.dart';
 import 'parsers/app_bar_parser.dart';
+import 'parsers/aspect_ratio_parser.dart';
+import 'parsers/backdrop_filter_parser.dart';
 import 'parsers/bottom_navigation_bar_parser.dart';
 import 'parsers/button_parser.dart';
 import 'parsers/card_parser.dart';
 import 'parsers/center_parser.dart';
 import 'parsers/checkbox_parser.dart';
 import 'parsers/circular_progress_indicator_parser.dart';
+import 'parsers/clip_path_parser.dart';
 import 'parsers/clip_r_rect_parser.dart';
+import 'parsers/color_filtered_parser.dart';
 import 'parsers/column_parser.dart';
 import 'parsers/constrained_box_parser.dart';
 import 'parsers/container_parser.dart';
 import 'parsers/custom_paint_parser.dart';
 import 'parsers/custom_scroll_view_parser.dart';
+import 'parsers/decorated_box_outline_parser.dart';
+import 'parsers/dialog_parser.dart';
 import 'parsers/divider_parser.dart';
+import 'parsers/drawer_parser.dart';
 import 'parsers/expanded_parser.dart';
 import 'parsers/fitted_box_parser.dart';
 import 'parsers/flex_parser.dart';
 import 'parsers/flexible_parser.dart';
 import 'parsers/floating_action_button_parser.dart';
+import 'parsers/fractionally_sized_box_parser.dart';
 import 'parsers/gesture_detector_parser.dart';
-import 'parsers/ignore_pointer_parser.dart';
 import 'parsers/grid_view_parser.dart';
 import 'parsers/icon_parser.dart';
+import 'parsers/ignore_pointer_parser.dart';
 import 'parsers/image_filtered_parser.dart';
 import 'parsers/image_parser.dart';
 import 'parsers/ink_well_parser.dart';
 import 'parsers/intrinsic_height_parser.dart';
 import 'parsers/intrinsic_width_parser.dart';
 import 'parsers/keep_alive_parser.dart';
+import 'parsers/linear_progress_indicator_parser.dart';
 import 'parsers/list_tile_parser.dart';
 import 'parsers/list_view_parser.dart';
 import 'parsers/material_parser.dart';
+import 'parsers/nested_scroll_view_parser.dart';
 import 'parsers/opacity_parser.dart';
+import 'parsers/overlay_parser.dart';
 import 'parsers/padding_parser.dart';
 import 'parsers/page_view_parser.dart';
-import 'parsers/pop_scope_parser.dart';
 import 'parsers/pointer_listener_parser.dart';
+import 'parsers/pop_scope_parser.dart';
 import 'parsers/positioned_parser.dart';
+import 'parsers/radio_parser.dart';
 import 'parsers/refresh_indicator_parser.dart';
 import 'parsers/repaint_boundary_parser.dart';
 import 'parsers/rich_text_parser.dart';
@@ -62,6 +75,7 @@ import 'parsers/scale_transition_parser.dart';
 import 'parsers/single_child_scroll_view_parser.dart';
 import 'parsers/sized_box_parser.dart';
 import 'parsers/slide_transition_parser.dart';
+import 'parsers/slider_parser.dart';
 import 'parsers/sliver_app_bar_parser.dart';
 import 'parsers/sliver_grid_parser.dart';
 import 'parsers/sliver_list_parser.dart';
@@ -77,21 +91,7 @@ import 'parsers/transform_parser.dart';
 import 'parsers/visibility_parser.dart';
 import 'parsers/widget_parser.dart';
 import 'parsers/wrap_parser.dart';
-import 'parsers/slider_parser.dart';
-import 'parsers/linear_progress_indicator_parser.dart';
-import 'parsers/radio_parser.dart';
-import 'parsers/aspect_ratio_parser.dart';
-import 'parsers/fractionally_sized_box_parser.dart';
-import 'parsers/drawer_parser.dart';
-import 'parsers/backdrop_filter_parser.dart';
-import 'parsers/animated_switcher_parser.dart';
-import 'parsers/animated_cross_fade_parser.dart';
-import 'parsers/nested_scroll_view_parser.dart';
-import 'parsers/decorated_box_outline_parser.dart';
-import 'parsers/clip_path_parser.dart';
-import 'parsers/color_filtered_parser.dart';
-import 'parsers/overlay_parser.dart';
-import 'parsers/dialog_parser.dart';
+import 'widget_utils.dart';
 
 class WidgetFactory {
   WidgetFactory() {
@@ -200,6 +200,8 @@ class WidgetFactory {
   bool hasWidget(String type) {
     return _parsers.containsKey(type);
   }
+
+  List<String> get registeredTypes => _parsers.keys.toList();
 
   Widget build(BuildContext context, dynamic dslOrNode) {
     if (dslOrNode is FuickNode) {
