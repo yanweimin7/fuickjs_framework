@@ -132,6 +132,7 @@ class _FuickAppViewState extends State<FuickAppView> {
 
   @override
   Widget build(BuildContext context) {
+    print('wine app view build');
     if (!_isReady) {
       return ColoredBox(
         color: widget.loadingBackgroundColor,

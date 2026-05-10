@@ -20,6 +20,12 @@ export interface ImageProps extends WidgetProps {
   height?: number;
 
   /**
+   * 图片圆角（支持圆形时设为 width/2）
+   * 底层自动用 ClipRRect 实现
+   */
+  borderRadius?: number;
+
+  /**
    * 图片缩放模式（对应 Flutter BoxFit）
    * - `cover`     等比缩放并裁剪，填满容器
    * - `contain`   等比缩放，完整显示，不裁剪

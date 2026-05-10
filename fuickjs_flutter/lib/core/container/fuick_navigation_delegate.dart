@@ -97,7 +97,14 @@ class FuickNavigationDelegate {
           final rootNav = Navigator.of(nav.context, rootNavigator: true);
           final prewarmEntry = controller.claimPrewarm(path, params);
           final id = prewarmEntry?.pageId ?? nextPageId;
+          controller.page.startTransition(id);
           final route = _createRoute(nav.context, path, params, id);
+          final duration = route is PageRoute
+              ? route.transitionDuration
+              : const Duration(milliseconds: 350);
+          Future.delayed(duration, () {
+            controller.page.isTransitioning = false;
+          });
           return replacement
               ? rootNav.pushReplacement(route)
               : rootNav.push(route);
@@ -114,11 +121,16 @@ class FuickNavigationDelegate {
 
     final prewarmEntry = controller.claimPrewarm(path, params);
     final id = prewarmEntry?.pageId ?? nextPageId;
-    logger.d(
-        '[Prewarm] _push: path=$path, prewarmEntry=${prewarmEntry != null}, id=$id');
+    controller.page.startTransition(id);
     registerNavigator(id, navKey!);
 
     final route = _createRoute(nav.context, path, params, id);
+    final duration = route is PageRoute
+        ? route.transitionDuration
+        : const Duration(milliseconds: 350);
+    Future.delayed(duration, () {
+      controller.page.isTransitioning = false;
+    });
     return replacement ? nav.pushReplacement(route) : nav.push(route);
   }
 

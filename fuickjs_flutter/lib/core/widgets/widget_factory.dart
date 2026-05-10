@@ -242,12 +242,6 @@ class WidgetFactory {
     );
   }
 
-  int _parseCostMicros = 0;
-
-  void resetParseCost() => _parseCostMicros = 0;
-
-  int get parseCostMicros => _parseCostMicros;
-
   static final Map<String, Map<String, dynamic>> _warmupProps = {
     'Text': {'text': 'w', 'fontSize': 14, 'color': '#000000'},
     'Container': {'width': 100, 'height': 100, 'color': '#FFFFFF'},
@@ -394,10 +388,7 @@ class WidgetFactory {
   ) {
     final parser = _parsers[type];
     if (parser != null) {
-      final sw = Stopwatch()..start();
-      final result = parser.parse(context, props, children, this);
-      _parseCostMicros += sw.elapsedMicroseconds;
-      return result;
+      return parser.parse(context, props, children, this);
     }
     throw Exception('Unknown widget type: $type');
   }

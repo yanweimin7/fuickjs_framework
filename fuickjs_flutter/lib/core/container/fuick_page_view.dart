@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' hide widgetFactory;
 
-import '../logger.dart';
 import '../widgets/fuick_node.dart';
 import '../widgets/widget_factory.dart';
 import 'fuick_app_controller.dart';
@@ -127,8 +126,6 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     final dslParseStart = DateTime.now();
     final newNode = nodeManager.createNode(dsl, nodeManager);
     _dslParseCost = DateTime.now().difference(dslParseStart).inMilliseconds;
-    logger.d(
-        '[Performance] DSL Parse Cost: ${_dslParseCost}ms (nodes: ${_countNodes(newNode)})');
 
     if (rootNode != newNode && mounted) {
       rootNode = newNode;
@@ -142,8 +139,6 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
 
     // 先消费 prewarm entry，确定正确的 nodeManager
     final prewarm = widget.controller.page.consumeByPageId(widget.pageId);
-    logger.d(
-        '[Prewarm] pageId=${widget.pageId}, prewarm=${prewarm != null}, hasPrebuiltNodes=${prewarm?.hasPrebuiltNodes ?? false}');
     if (prewarm != null) {
       _hasRendered = true;
       if (prewarm.hasPrebuiltNodes) {
@@ -203,6 +198,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
 
     if (_cachedChild == null || _lastBuiltNode != rootNode) {
       _lastBuiltNode = rootNode;
+      final buildSw = Stopwatch()..start();
       _cachedChild = RepaintBoundary(
         child: FuickNodeManagerProvider(
           manager: nodeManager,
@@ -219,27 +215,10 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
           ),
         ),
       );
+      final buildCostMs = buildSw.elapsedMilliseconds;
 
-      if (_isFirstRender && _receiveDataTime != null) {
+      if (_isFirstRender) {
         _isFirstRender = false;
-        final parseCostMicros = widgetFactory.parseCostMicros;
-        widgetFactory.resetParseCost();
-        final buildEndTime = DateTime.now();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final frameEndTime = DateTime.now();
-          final totalCost =
-              frameEndTime.difference(_receiveDataTime!).inMilliseconds;
-          final layoutCost =
-              frameEndTime.difference(buildEndTime).inMilliseconds;
-          final parseCostMs = (parseCostMicros / 1000).toStringAsFixed(1);
-
-          logger.d(
-              '[Performance] Page First Render (ID: ${widget.pageId}, Path: ${widget.routeInfo.path}):');
-          logger.d('  - Total Cost: ${totalCost}ms');
-          logger.d('  - DSL Parse Cost: ${_dslParseCost}ms (createNode)');
-          logger.d('  - Node→Widget Cost: ${parseCostMs}ms (parser.parse × N)');
-          logger.d('  - Layout Cost: ${layoutCost}ms');
-        });
       }
     }
 

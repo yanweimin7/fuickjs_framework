@@ -4,6 +4,11 @@ import '../logger.dart';
 import '../widgets/fuick_node.dart';
 import 'fuick_app_controller.dart';
 
+class _BufferedUpdates {
+  final List<List<dynamic>> patches = [];
+  final List<List<dynamic>> patchOps = [];
+}
+
 class PrewarmEntry {
   final int pageId;
   final String path;
@@ -39,6 +44,60 @@ class FuickPageDelegate {
   final Map<int, Function(List<dynamic>)> onPagePatch = {};
   final Map<int, Function(List<dynamic>)> onPagePatchOps = {};
 
+  bool _isTransitioning = false;
+  int? _transitioningPageId;
+
+  bool get isTransitioning => _isTransitioning;
+  set isTransitioning(bool value) {
+    if (_isTransitioning == value) return;
+    _isTransitioning = value;
+    if (!value) {
+      _transitioningPageId = null;
+      _flushAllBufferedUpdates();
+    }
+  }
+
+  void startTransition(int pageId) {
+    _transitioningPageId = pageId;
+    isTransitioning = true;
+  }
+
+  void _flushAllBufferedUpdates() {
+    for (final entry in _allBuffered.entries.toList()) {
+      final pageId = entry.key;
+      final buffer = entry.value;
+      final patchCallback = onPagePatch[pageId];
+      if (patchCallback != null) {
+        for (final patches in buffer.patches) {
+          patchCallback(patches);
+        }
+      }
+      final patchOpsCallback = onPagePatchOps[pageId];
+      if (patchOpsCallback != null) {
+        for (final ops in buffer.patchOps) {
+          patchOpsCallback(ops);
+        }
+      }
+    }
+    _allBuffered.clear();
+  }
+
+  final Map<int, _BufferedUpdates> _allBuffered = {};
+
+  void bufferPatch(int pageId, List<dynamic> patches) {
+    _allBuffered
+        .putIfAbsent(pageId, () => _BufferedUpdates())
+        .patches
+        .add(patches);
+  }
+
+  void bufferPatchOps(int pageId, List<dynamic> ops) {
+    _allBuffered
+        .putIfAbsent(pageId, () => _BufferedUpdates())
+        .patchOps
+        .add(ops);
+  }
+
   /// key: path, value: 预渲染条目（只保留参数匹配的）
   final Map<String, PrewarmEntry> _prewarmCache = {};
 
@@ -64,6 +123,10 @@ class FuickPageDelegate {
   }
 
   void patch(int pageId, List<dynamic> patches) {
+    if (_isTransitioning && pageId != _transitioningPageId) {
+      bufferPatch(pageId, patches);
+      return;
+    }
     final callback = onPagePatch[pageId];
     if (callback != null) {
       callback(patches);
@@ -73,6 +136,10 @@ class FuickPageDelegate {
   }
 
   void patchOps(int pageId, List<dynamic> ops) {
+    if (_isTransitioning && pageId != _transitioningPageId) {
+      bufferPatchOps(pageId, ops);
+      return;
+    }
     final callback = onPagePatchOps[pageId];
     if (callback != null) {
       callback(ops);
