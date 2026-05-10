@@ -99,9 +99,7 @@ class FuickNavigationDelegate {
           final id = prewarmEntry?.pageId ?? nextPageId;
           controller.page.startTransition(id);
           final route = _createRoute(nav.context, path, params, id);
-          final duration = route is PageRoute
-              ? route.transitionDuration
-              : const Duration(milliseconds: 350);
+          final duration = const Duration(milliseconds: 350);
           Future.delayed(duration, () {
             controller.page.isTransitioning = false;
           });
@@ -125,9 +123,7 @@ class FuickNavigationDelegate {
     registerNavigator(id, navKey!);
 
     final route = _createRoute(nav.context, path, params, id);
-    final duration = route is PageRoute
-        ? route.transitionDuration
-        : const Duration(milliseconds: 350);
+    final duration = const Duration(milliseconds: 350);
     Future.delayed(duration, () {
       controller.page.isTransitioning = false;
     });

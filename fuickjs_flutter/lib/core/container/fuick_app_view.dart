@@ -130,7 +130,6 @@ class _FuickAppViewState extends State<FuickAppView> {
 
   @override
   Widget build(BuildContext context) {
-    print('wine app view build');
     if (!_isReady) {
       return ColoredBox(
         color: widget.loadingBackgroundColor,
@@ -143,18 +142,17 @@ class _FuickAppViewState extends State<FuickAppView> {
     }
     return ValueListenableBuilder(
       valueListenable: _canInnerPop,
-      builder: (_, __, child) =>
-          PopScope(
-              canPop: !_canInnerPop.value,
-              onPopInvokedWithResult: (bool didPop, dynamic result) async {
-                if (didPop) return;
-                final NavigatorState? nav = _navKey.currentState;
-                if (nav == null) return;
-                if (nav.canPop()) {
-                  nav.maybePop();
-                }
-              },
-              child: child!),
+      builder: (_, __, child) => PopScope(
+          canPop: !_canInnerPop.value,
+          onPopInvokedWithResult: (bool didPop, dynamic result) async {
+            if (didPop) return;
+            final NavigatorState? nav = _navKey.currentState;
+            if (nav == null) return;
+            if (nav.canPop()) {
+              nav.maybePop();
+            }
+          },
+          child: child!),
       child: Navigator(
         key: _navKey,
         observers: [_observer],
@@ -163,14 +161,13 @@ class _FuickAppViewState extends State<FuickAppView> {
             PageRouteBuilder(
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
-              pageBuilder: (_, __, ___) =>
-                  FuickPage(
-                    pageId: rootPageId,
-                    controller: appContext!.appController,
-                    routeInfo: RouteInfo(
-                        widget.initialRoute ?? '/', widget.initialParams ?? {}),
-                    loadingBackgroundColor: widget.loadingBackgroundColor,
-                  ),
+              pageBuilder: (_, __, ___) => FuickPage(
+                pageId: rootPageId,
+                controller: appContext!.appController,
+                routeInfo: RouteInfo(
+                    widget.initialRoute ?? '/', widget.initialParams ?? {}),
+                loadingBackgroundColor: widget.loadingBackgroundColor,
+              ),
             ),
           ];
         },
@@ -218,5 +215,48 @@ class _FuickNavigatorObserver extends NavigatorObserver {
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
     onStateChanged();
+  }
+}
+
+// 放在你的路由文件里
+class SimpleCupertinoPageRoute<T> extends PageRoute<T> {
+  SimpleCupertinoPageRoute({
+    required this.builder,
+    super.settings,
+    this.title,
+  });
+
+  final WidgetBuilder builder;
+  final String? title;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 300);
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Widget buildPage(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation) {
+    return builder(context);
+  }
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    // 关键修改：新页面滑入，旧页面不再有视差效果
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(1.0, 0.0), // 从右侧开始
+        end: Offset.zero,
+      ).animate(animation),
+      child: child,
+    );
   }
 }
