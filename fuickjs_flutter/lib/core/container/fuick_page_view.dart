@@ -34,9 +34,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   FuickNode? rootNode;
   bool _hasRendered = false;
   bool _isVisible = false;
-  DateTime? _receiveDataTime;
   bool _isFirstRender = true;
-  int _dslParseCost = 0;
 
   Widget? _cachedChild;
   FuickNode? _lastBuiltNode;
@@ -107,25 +105,12 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     }
   }
 
-  /// 递归计算节点数量
-  int _countNodes(FuickNode node) {
-    int count = 1;
-    for (final child in node.children) {
-      count += _countNodes(child);
-    }
-    return count;
-  }
-
   void _handleRenderDsl(Map<String, dynamic> dsl) {
-    _receiveDataTime = DateTime.now();
-
     if (mounted && _isVisible) {
       widget.controller.notifyLifecycle(widget.pageId, 'visible');
     }
 
-    final dslParseStart = DateTime.now();
     final newNode = nodeManager.createNode(dsl, nodeManager);
-    _dslParseCost = DateTime.now().difference(dslParseStart).inMilliseconds;
 
     if (rootNode != newNode && mounted) {
       rootNode = newNode;
@@ -198,7 +183,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
 
     if (_cachedChild == null || _lastBuiltNode != rootNode) {
       _lastBuiltNode = rootNode;
-      final buildSw = Stopwatch()..start();
+
       _cachedChild = RepaintBoundary(
         child: FuickNodeManagerProvider(
           manager: nodeManager,
@@ -215,7 +200,6 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
           ),
         ),
       );
-      final buildCostMs = buildSw.elapsedMilliseconds;
 
       if (_isFirstRender) {
         _isFirstRender = false;
