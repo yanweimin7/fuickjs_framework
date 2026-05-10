@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' hide widgetFactory;
+import 'package:flutter/cupertino.dart' hide widgetFactory;
 
 import '../widgets/fuick_node.dart';
 import '../widgets/widget_factory.dart';
@@ -35,6 +35,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   bool _hasRendered = false;
   bool _isVisible = false;
   bool _isFirstRender = true;
+  bool _routeSubscribed = false;
 
   Widget? _cachedChild;
   FuickNode? _lastBuiltNode;
@@ -46,13 +47,17 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
         oldWidget.pageId != widget.pageId) {
       _cachedChild = null;
       _lastBuiltNode = null;
+      _routeSubscribed = false;
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    widget.controller.routeObserver.subscribe(this, ModalRoute.of(context)!);
+    if (!_routeSubscribed) {
+      _routeSubscribed = true;
+      widget.controller.routeObserver.subscribe(this, ModalRoute.of(context)!);
+    }
   }
 
   @override
@@ -178,24 +183,28 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   @override
   Widget build(BuildContext context) {
     if (rootNode == null) {
-      return ColoredBox(color: widget.loadingBackgroundColor);
+      return ColoredBox(
+        color: widget.loadingBackgroundColor,
+        child: Center(
+          child: CupertinoActivityIndicator(
+            radius: 14,
+          ),
+        ),
+      );
     }
-
-    if (_cachedChild == null || _lastBuiltNode != rootNode) {
+    final notCached = _cachedChild == null || _lastBuiltNode != rootNode;
+    if (notCached) {
       _lastBuiltNode = rootNode;
-
-      _cachedChild = RepaintBoundary(
-        child: FuickNodeManagerProvider(
-          manager: nodeManager,
-          child: FuickAppScope(
-            controller: widget.controller,
-            child: FuickPageScope(
-              pageId: widget.pageId,
-              child: widgetFactory.buildFromNode(
-                context,
-                rootNode!,
-                forceWrap: true,
-              ),
+      _cachedChild = FuickNodeManagerProvider(
+        manager: nodeManager,
+        child: FuickAppScope(
+          controller: widget.controller,
+          child: FuickPageScope(
+            pageId: widget.pageId,
+            child: widgetFactory.buildFromNode(
+              context,
+              rootNode!,
+              forceWrap: true,
             ),
           ),
         ),
@@ -205,7 +214,6 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
         _isFirstRender = false;
       }
     }
-
     return _cachedChild!;
   }
 }
