@@ -36,7 +36,7 @@ class FuickAppView extends StatefulWidget {
 
 class _FuickAppViewState extends State<FuickAppView> {
   late int rootPageId = nextPageId;
-  bool _canInnerPop = false;
+  final ValueNotifier<bool> _canInnerPop = ValueNotifier(false);
   bool _isReady = false;
   FuickAppContext? appContext;
 
@@ -46,13 +46,11 @@ class _FuickAppViewState extends State<FuickAppView> {
   final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
   late final NavigatorObserver _observer = _FuickNavigatorObserver(() {
-    if (mounted) {
-      final canPop = _canInnerNavigatorPop();
-      if (canPop != _canInnerPop) {
-        setState(() {
-          _canInnerPop = canPop;
-        });
-      }
+    if (!mounted) return;
+    final canPop = _canInnerNavigatorPop();
+    if (canPop == _canInnerPop.value) return;
+    if (mounted && canPop != _canInnerPop.value) {
+      _canInnerPop.value = canPop;
     }
   });
 
@@ -143,16 +141,20 @@ class _FuickAppViewState extends State<FuickAppView> {
         ),
       );
     }
-    return PopScope(
-      canPop: !_canInnerPop,
-      onPopInvokedWithResult: (bool didPop, dynamic result) async {
-        if (didPop) return;
-        final NavigatorState? nav = _navKey.currentState;
-        if (nav == null) return;
-        if (nav.canPop()) {
-          nav.maybePop();
-        }
-      },
+    return ValueListenableBuilder(
+      valueListenable: _canInnerPop,
+      builder: (_, __, child) =>
+          PopScope(
+              canPop: !_canInnerPop.value,
+              onPopInvokedWithResult: (bool didPop, dynamic result) async {
+                if (didPop) return;
+                final NavigatorState? nav = _navKey.currentState;
+                if (nav == null) return;
+                if (nav.canPop()) {
+                  nav.maybePop();
+                }
+              },
+              child: child!),
       child: Navigator(
         key: _navKey,
         observers: [_observer],
@@ -161,13 +163,14 @@ class _FuickAppViewState extends State<FuickAppView> {
             PageRouteBuilder(
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
-              pageBuilder: (_, __, ___) => FuickPage(
-                pageId: rootPageId,
-                controller: appContext!.appController,
-                routeInfo: RouteInfo(
-                    widget.initialRoute ?? '/', widget.initialParams ?? {}),
-                loadingBackgroundColor: widget.loadingBackgroundColor,
-              ),
+              pageBuilder: (_, __, ___) =>
+                  FuickPage(
+                    pageId: rootPageId,
+                    controller: appContext!.appController,
+                    routeInfo: RouteInfo(
+                        widget.initialRoute ?? '/', widget.initialParams ?? {}),
+                    loadingBackgroundColor: widget.loadingBackgroundColor,
+                  ),
             ),
           ];
         },
