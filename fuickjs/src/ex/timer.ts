@@ -15,6 +15,8 @@ export function setTimeout(fn: (...args: any[]) => unknown, ms?: number): number
       } catch (e) {
         console.error(`[Timer] Error in microtask timeout callback:`, e);
         ErrorHandler.notify(e, 'timer', { id });
+      } finally {
+        timerMap.delete(id);
       }
     });
     timerMap.set(id, { fn, type: 'timeout', native: false });
