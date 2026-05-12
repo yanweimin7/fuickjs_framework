@@ -13,12 +13,14 @@ export class NavigatorService {
   ): Promise<unknown> {
     const routeConfig = getConfig(path);
     const runtimeConfig = getRuntimeConfig();
-
     let effectivePrewarmMs = prewarmMs ?? routeConfig?.prewarmMs;
-    if (effectivePrewarmMs == null && runtimeConfig.prewarm) {
-      effectivePrewarmMs = runtimeConfig.prewarmMs;
+    if (!runtimeConfig.prewarm) {
+      effectivePrewarmMs = undefined;
+    } else {
+      if (!effectivePrewarmMs) {
+        effectivePrewarmMs = runtimeConfig.prewarmMs;
+      }
     }
-
     return dartCallNativeAsync('Navigator.push', {
       path,
       params,
