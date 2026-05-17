@@ -2,7 +2,6 @@ import { Node } from '../core/node';
 import { PageContainer } from '../core/PageContainer';
 import { UIService } from '../services/UIService';
 import { MutationOp } from './types';
-import { perfLog } from '../utils/log';
 
 export class IncrementalStrategy {
   private container: PageContainer;
@@ -107,6 +106,7 @@ export class IncrementalStrategy {
   public commit() {
     if (this.mutationQueue.length === 0) return;
 
+    const commitStart = Date.now();
     const pageId = this.container.pageId;
 
     const optimizedOps: (MutationOp | null)[] = [];
@@ -146,8 +146,12 @@ export class IncrementalStrategy {
         }
       }
     }
+    const sendStart = Date.now();
     UIService.patchOps(Number(pageId), flattenedOps);
-    perfLog(`[JS] commit(patchOps) page=${pageId}`);
+    const sendEnd = Date.now();
+    console.log(
+      `[Perf] page=${pageId} commit(patchOps) total=${sendEnd - commitStart}ms (sendToFlutter=${sendEnd - sendStart}ms, ops=${flattenedOps.length})`,
+    );
     this.mutationQueue = [];
   }
 

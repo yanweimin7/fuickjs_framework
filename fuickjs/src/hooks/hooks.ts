@@ -3,6 +3,7 @@ import { PageContext } from '../core/PageContext';
 import * as PageRender from '../core/page_render';
 
 import { NavigatorService } from '../services/NavigatorService';
+import { NativeEvent } from '../runtime/NativeEvent';
 
 export function usePageId() {
   const { pageId } = useContext(PageContext);
@@ -16,8 +17,11 @@ export function useNavigator() {
       NavigatorService.push(path, params, pageId, rootNavigator, prewarmMs),
     pushReplace: (path: string, params?: unknown, rootNavigator?: boolean) =>
       NavigatorService.pushReplace(path, params, pageId, rootNavigator),
-    showBottomSheet: (component: React.ReactNode, options?: { minHeight?: number; maxHeight?: number; backgroundColor?: string }, rootNavigator?: boolean) =>
-      NavigatorService.showBottomSheet(component, options, pageId, rootNavigator),
+    showBottomSheet: (
+      component: React.ReactNode,
+      options?: { minHeight?: number; maxHeight?: number; backgroundColor?: string },
+      rootNavigator?: boolean,
+    ) => NavigatorService.showBottomSheet(component, options, pageId, rootNavigator),
     showDialog: (component: React.ReactNode, params?: unknown, rootNavigator?: boolean) =>
       NavigatorService.showDialog(component, params, pageId, rootNavigator),
     pop: (result?: unknown) => {
@@ -74,4 +78,25 @@ export function usePageConfig(config: { incrementalMode?: boolean; dslCacheEnabl
       }
     }
   }, [pageId, config.incrementalMode, config.dslCacheEnabled]);
+}
+
+export interface RouteTransitionResult {
+  pageId: number;
+  path: string;
+}
+
+export function useRouteTransitionComplete(callback: (result: RouteTransitionResult) => void) {
+  const { pageId } = useContext(PageContext);
+
+  useEffect(() => {
+    const handler = (data: unknown) => {
+      if (data && typeof data === 'object' && 'pageId' in data) {
+        callback(data as RouteTransitionResult);
+      }
+    };
+    NativeEvent.on('routeTransitionComplete', handler);
+    return () => {
+      NativeEvent.off('routeTransitionComplete', handler);
+    };
+  }, [pageId, callback]);
 }

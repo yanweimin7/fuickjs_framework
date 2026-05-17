@@ -26,6 +26,7 @@ export * from './Stack';
 export * from './Positioned';
 export * from './Opacity';
 export * from './CircularProgressIndicator';
+export * from './LazyView';
 export * from './SafeArea';
 export * from './Scaffold';
 export * from './AppBar';
@@ -83,4 +84,3 @@ export * from './AnimatedSwitcher';
 export * from './AnimatedCrossFade';
 export * from './NestedScrollView';
 export * from './Overlay';
-

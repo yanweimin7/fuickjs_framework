@@ -103,22 +103,25 @@ export function createRenderer(): Renderer {
         `[Renderer] update() called for pageId=${pageId}, isFirstRender=${isFirstRender}, roots=${Object.keys(roots).join(',')}`,
       );
       let retryCount = 0;
-      const maxRetries = 100; // Prevent infinite loop
+      const maxRetries = 100;
 
       const performUpdate = () => {
+        const updateStart = Date.now();
         try {
           if (isFirstRender) {
-            // Use flushSync for first render to ensure page is displayed immediately
             reconciler.flushSync(() => {
               reconciler.updateContainer(element, root, null, null);
             });
             renderedPages.add(pageId);
           } else {
-            // Use async rendering for subsequent updates
             reconciler.updateContainer(element, root, null, null);
           }
+          const updateEnd = Date.now();
+          console.log(
+            `[Perf] page=${pageId} reconciler.updateContainer=${updateEnd - updateStart}ms (firstRender=${isFirstRender})`,
+          );
           perfLog(`[Renderer] update() succeeded for pageId=${pageId}, retries=${retryCount}`);
-          retryCount = 0; // Reset on success
+          retryCount = 0;
         } catch (e: unknown) {
           const msg = (e as Error).message || String(e);
           console.error(`[Renderer] Error in updateContainer for page ${pageId}:`, msg);

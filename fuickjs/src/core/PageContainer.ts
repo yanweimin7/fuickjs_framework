@@ -315,6 +315,7 @@ export class PageContainer {
   }
 
   public commit() {
+    const commitStart = Date.now();
     try {
       if (!this.diffStrategy.rendered) {
         this.diffStrategy.commit();
@@ -331,6 +332,7 @@ export class PageContainer {
     } finally {
       this.clear();
     }
+    console.log(`[Perf] page=${this.pageId} commit=${Date.now() - commitStart}ms`);
   }
 
   public getItemDSL(refId: string, index: number): unknown {

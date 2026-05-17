@@ -416,10 +416,10 @@ class WidgetFactory {
       [String? parentType]) {
     if (children is List) {
       if (children.length > 1) {
-        logger.w(
-            '[WidgetFactory] Warning: buildFirstChild called with ${children.length} children. '
-            'Automatically wrapping in Column (MainAxisSize.min). '
-            'Parent Widget: ${parentType ?? "Unknown"}');
+        // logger.w(
+        //     '[WidgetFactory] Warning: buildFirstChild called with ${children.length} children. '
+        //     'Automatically wrapping in Column (MainAxisSize.min). '
+        //     'Parent Widget: ${parentType ?? "Unknown"}');
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: buildChildren(context, children),

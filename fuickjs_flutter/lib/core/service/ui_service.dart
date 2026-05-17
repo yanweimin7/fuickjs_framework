@@ -1,4 +1,5 @@
 import '../container/fuick_app_controller.dart';
+import '../logger.dart';
 import '../utils/extensions.dart';
 import 'base_fuick_service.dart';
 
@@ -8,6 +9,7 @@ class UIService extends BaseFuickService {
 
   UIService() {
     registerMethod('renderUI', (args) {
+      final sw = Stopwatch()..start();
       final List listArgs = args is List ? args : [args];
       if (listArgs.length == 1 && listArgs[0] is Map) {
         final m = listArgs[0] as Map;
@@ -15,6 +17,9 @@ class UIService extends BaseFuickService {
         final renderData = asMap(m['renderData']);
         if (pageId != null) {
           controller?.render(pageId, renderData);
+          sw.stop();
+          logger.i(
+              '[Perf] Flutter renderUI page=$pageId dartSide=${sw.elapsedMilliseconds}ms');
           return true;
         }
       }
@@ -36,6 +41,7 @@ class UIService extends BaseFuickService {
     });
 
     registerMethod('patchOps', (args) {
+      final sw = Stopwatch()..start();
       final List listArgs = args is List ? args : [args];
       if (listArgs.length == 1 && listArgs[0] is Map) {
         final m = listArgs[0] as Map;
@@ -43,6 +49,9 @@ class UIService extends BaseFuickService {
         final ops = (m['ops'] as List?) ?? [];
         if (pageId != null) {
           controller?.patchOps(pageId, ops);
+          sw.stop();
+          logger.i(
+              '[Perf] Flutter patchOps page=$pageId ops=${ops.length} dartSide=${sw.elapsedMilliseconds}ms');
           return true;
         }
       }

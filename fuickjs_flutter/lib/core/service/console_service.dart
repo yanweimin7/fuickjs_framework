@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import '../logger.dart';
 import 'base_fuick_service.dart';
 
@@ -8,10 +7,11 @@ class ConsoleService extends BaseFuickService {
 
   ConsoleService() {
     registerMethod('console', (args) {
+      print('wine console $args');
       final m = args is Map ? args : {};
       final level = m['level'] ?? 'log';
       final message = m['message'] ?? '';
-      
+
       switch (level) {
         case 'error':
           logger.e('[JS] $message');

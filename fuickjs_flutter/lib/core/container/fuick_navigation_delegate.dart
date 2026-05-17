@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../logger.dart';
+import '../service/native_event_service.dart';
 import '../widgets/widget_utils.dart';
 import 'fuick_app_controller.dart';
 import 'fuick_page.dart';
@@ -99,9 +100,12 @@ class FuickNavigationDelegate {
           final id = prewarmEntry?.pageId ?? nextPageId;
           controller.page.startTransition(id);
           final route = _createRoute(nav.context, path, params, id);
-          final duration = const Duration(milliseconds: 350);
+          final duration = (route is PageRoute)
+              ? route.transitionDuration
+              : const Duration(milliseconds: 350);
           Future.delayed(duration, () {
             controller.page.isTransitioning = false;
+            _emitRouteTransitionComplete(id, path);
           });
           return replacement
               ? rootNav.pushReplacement(route)
@@ -123,11 +127,28 @@ class FuickNavigationDelegate {
     registerNavigator(id, navKey!);
 
     final route = _createRoute(nav.context, path, params, id);
-    final duration = const Duration(milliseconds: 350);
+    final duration = (route is PageRoute)
+        ? route.transitionDuration
+        : const Duration(milliseconds: 350);
     Future.delayed(duration, () {
       controller.page.isTransitioning = false;
+      _emitRouteTransitionComplete(id, path);
     });
     return replacement ? nav.pushReplacement(route) : nav.push(route);
+  }
+
+  void _emitRouteTransitionComplete(int pageId, String path) {
+    try {
+      final nativeEvent = controller.getService<NativeEventService>();
+      if (nativeEvent != null) {
+        nativeEvent.emit('routeTransitionComplete', {
+          'pageId': pageId,
+          'path': path,
+        });
+      }
+    } catch (e) {
+      logger.w('Failed to emit routeTransitionComplete: $e');
+    }
   }
 
   Route _createRoute(BuildContext context, String path,

@@ -48,10 +48,12 @@ export class DiffStrategy {
       const dsl = this.container.root?.toDsl();
       const dslEnd = Date.now();
       if (dsl && (dsl as { type: unknown }).type) {
+        const sendStart = Date.now();
         UIService.renderUI(Number(pageId), dsl);
+        const sendEnd = Date.now();
         this.rendered = true;
-        perfLog(
-          `[JS Performance] commit(full) page=${pageId} total=${Date.now() - commitStart}ms (dsl=${dslEnd - dslStart}ms)`,
+        console.log(
+          `[Perf] page=${pageId} commit(full) total=${sendEnd - commitStart}ms (toDsl=${dslEnd - dslStart}ms, sendToFlutter=${sendEnd - sendStart}ms)`,
         );
       }
     } else {
@@ -100,12 +102,14 @@ export class DiffStrategy {
       const dslEnd = Date.now();
 
       if (patches.length > 0) {
+        const sendStart = Date.now();
         UIService.patchUI(Number(pageId), patches);
+        const sendEnd = Date.now();
         const changedNodeTypes = Array.from(topLevelNodes)
           .map((n) => n.type)
           .join(', ');
-        perfLog(
-          `[JS Performance] commit(patchUI) page=${pageId} nodes=${topLevelNodes.size} types=[${changedNodeTypes}] total=${Date.now() - commitStart}ms (dsl=${dslEnd - dslStart}ms)`,
+        console.log(
+          `[Perf] page=${pageId} commit(patchUI) nodes=${topLevelNodes.size} types=[${changedNodeTypes}] total=${sendEnd - commitStart}ms (toDsl=${dslEnd - dslStart}ms, sendToFlutter=${sendEnd - sendStart}ms)`,
         );
       }
     }

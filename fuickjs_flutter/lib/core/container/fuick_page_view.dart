@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart' hide widgetFactory;
 
+import '../logger.dart';
 import '../widgets/fuick_node.dart';
 import '../widgets/widget_factory.dart';
 import 'fuick_app_controller.dart';
@@ -111,14 +112,18 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   }
 
   void _handleRenderDsl(Map<String, dynamic> dsl) {
+    final sw = Stopwatch()..start();
     if (mounted && _isVisible) {
       widget.controller.notifyLifecycle(widget.pageId, 'visible');
     }
 
     final newNode = nodeManager.createNode(dsl, nodeManager);
+    sw.stop();
 
     if (rootNode != newNode && mounted) {
       rootNode = newNode;
+      logger.i(
+          '[Perf] Flutter createNode+setState page=${widget.pageId} buildNode=${sw.elapsedMilliseconds}ms');
       setState(() {});
     }
   }

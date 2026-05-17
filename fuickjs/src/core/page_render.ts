@@ -3,7 +3,6 @@ import { createRenderer, Renderer } from './renderer';
 import * as Router from '../router/router';
 import { PageContext } from './PageContext';
 import { ErrorBoundary } from './ErrorBoundary';
-import { perfLog } from '../utils/log';
 
 let renderer: Renderer | null = null;
 let globalErrorFallback: ((error: Error) => React.ReactNode) | null = null;
@@ -19,10 +18,12 @@ export function ensureRenderer() {
 }
 
 export function render(pageId: number, path: string, params: unknown) {
-  const startTime = Date.now();
+  const t0 = Date.now();
   const r = ensureRenderer();
-  perfLog(`[JS Performance] render start for ${path}, pageId: ${pageId}`);
+
+  const t1 = Date.now();
   const factory = Router.match(path);
+  const t2 = Date.now();
 
   let app: React.ReactNode;
   if (typeof factory === 'function') {
@@ -34,8 +35,8 @@ export function render(pageId: number, path: string, params: unknown) {
       React.createElement('Text', { text: `Route ${path} not found`, fontSize: 16, color: '#cc0000' }),
     );
   }
+  const t3 = Date.now();
 
-  // Wrap with PageContext and ErrorBoundary
   const fallbackUI =
     globalErrorFallback ||
     ((error: Error) =>
@@ -74,9 +75,19 @@ export function render(pageId: number, path: string, params: unknown) {
       app,
     ),
   );
+  const t4 = Date.now();
+
   r.update(wrappedApp, pageId);
 
-  perfLog(`[JS Performance] render total cost for ${path}: ${Date.now() - startTime}ms`);
+  const t5 = Date.now();
+  console.log(
+    `[Perf] page=${pageId} path=${path} total=${t5 - t0}ms |` +
+      ` ensureRenderer=${t1 - t0}ms |` +
+      ` router.match=${t2 - t1}ms |` +
+      ` createElement=${t3 - t2}ms |` +
+      ` wrapContext=${t4 - t3}ms |` +
+      ` reconciler.update=${t5 - t4}ms`,
+  );
 }
 
 export function destroy(pageId: number) {
