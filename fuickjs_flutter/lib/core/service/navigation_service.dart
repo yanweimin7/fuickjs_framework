@@ -8,8 +8,9 @@ class NavigationService extends BaseFuickService {
 
   NavigationService() {
     registerAsyncMethod('push', (args) async {
-      final m =
-          args is Map ? Map<String, dynamic>.from(args) : <String, dynamic>{};
+      final m = args is Map
+          ? Map<String, dynamic>.from(args)
+          : <String, dynamic>{};
       final path = (m['path'] ?? '') as String;
       final params = Map<String, dynamic>.from(m['params'] ?? {});
       final pageId = asIntOrNull(m['pageId']);
@@ -25,10 +26,15 @@ class NavigationService extends BaseFuickService {
             bool timedOut = false;
             await entry.future.timeout(
               Duration(milliseconds: prewarmMs),
-              onTimeout: () { timedOut = true; return {}; },
+              onTimeout: () {
+                timedOut = true;
+                return {};
+              },
             );
             if (timedOut) {
-              logger.w('[Prewarm] $path exceeded ${prewarmMs}ms (${sw.elapsedMilliseconds}ms)');
+              logger.w(
+                '[Prewarm] $path exceeded ${prewarmMs}ms (${sw.elapsedMilliseconds}ms)',
+              );
             } else {
               logger.d('[Prewarm] $path ready in ${sw.elapsedMilliseconds}ms');
             }
@@ -36,8 +42,11 @@ class NavigationService extends BaseFuickService {
         }
 
         final result = await controller?.pushWithPath(
-            path, params,
-            pageId: pageId, rootNavigator: rootNavigator);
+          path,
+          params,
+          pageId: pageId,
+          rootNavigator: rootNavigator,
+        );
         return result;
       }
       return null;
@@ -46,7 +55,9 @@ class NavigationService extends BaseFuickService {
     // prewarm：预热目标页面，最多等待 prewarmMs 毫秒后返回
     // JS 侧先 await prewarm，再调 push，确保 DSL 在动画开始前就绪
     registerAsyncMethod('prewarm', (args) async {
-      final m = args is Map ? Map<String, dynamic>.from(args) : <String, dynamic>{};
+      final m = args is Map
+          ? Map<String, dynamic>.from(args)
+          : <String, dynamic>{};
       final path = (m['path'] ?? '') as String;
       final params = Map<String, dynamic>.from(m['params'] ?? {});
       final prewarmMs = asIntOrNull(m['prewarmMs']) ?? 20;
@@ -60,10 +71,15 @@ class NavigationService extends BaseFuickService {
         bool timedOut = false;
         await entry.future.timeout(
           Duration(milliseconds: prewarmMs),
-          onTimeout: () { timedOut = true; return {}; },
+          onTimeout: () {
+            timedOut = true;
+            return {};
+          },
         );
         if (timedOut) {
-          logger.w('[Prewarm] $path exceeded ${prewarmMs}ms (${sw.elapsedMilliseconds}ms)');
+          logger.w(
+            '[Prewarm] $path exceeded ${prewarmMs}ms (${sw.elapsedMilliseconds}ms)',
+          );
         } else {
           logger.d('[Prewarm] $path ready in ${sw.elapsedMilliseconds}ms');
         }
@@ -82,9 +98,10 @@ class NavigationService extends BaseFuickService {
       return null;
     });
 
-    registerAsyncMethod('pushReplace', (args) async {
-      final m =
-          args is Map ? Map<String, dynamic>.from(args) : <String, dynamic>{};
+    registerMethod('pushReplace', (args) async {
+      final m = args is Map
+          ? Map<String, dynamic>.from(args)
+          : <String, dynamic>{};
       final path = (m['path'] ?? '') as String;
       final params = m['params'] ?? {};
       final pageId = asIntOrNull(m['pageId']);
@@ -92,8 +109,11 @@ class NavigationService extends BaseFuickService {
 
       if (path.isNotEmpty) {
         final result = await controller?.pushReplacementWithPath(
-            path, Map<String, dynamic>.from(params),
-            pageId: pageId, rootNavigator: rootNavigator);
+          path,
+          Map<String, dynamic>.from(params),
+          pageId: pageId,
+          rootNavigator: rootNavigator,
+        );
         return result;
       }
       return null;
@@ -110,9 +130,10 @@ class NavigationService extends BaseFuickService {
     });
 
     // reLaunch: 清空路由栈并跳转到指定页面
-    registerAsyncMethod('reLaunch', (args) async {
-      final m =
-          args is Map ? Map<String, dynamic>.from(args) : <String, dynamic>{};
+    registerMethod('reLaunch', (args) async {
+      final m = args is Map
+          ? Map<String, dynamic>.from(args)
+          : <String, dynamic>{};
       final path = (m['path'] ?? '') as String;
       final params = m['params'] ?? {};
 
@@ -120,7 +141,9 @@ class NavigationService extends BaseFuickService {
         // 先 pop 所有页面，再 push 新页面
         controller?.popAll();
         final result = await controller?.pushWithPath(
-            path, Map<String, dynamic>.from(params));
+          path,
+          Map<String, dynamic>.from(params),
+        );
         return result;
       }
       return null;
@@ -134,6 +157,5 @@ class NavigationService extends BaseFuickService {
       controller?.switchTab(path);
       return true;
     });
-
   }
 }

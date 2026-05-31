@@ -50,6 +50,16 @@ class AppServiceBinder {
         } catch (e, s) {
           logger.e("failed to callNative $method $e , $s");
         }
+      } else if (_asyncHandlers.containsKey(method)) {
+        logger.w(
+          '[Service] Warning: Method "$method" is registered as async but called synchronously. '
+          'Consider using dartCallNativeAsync or registerMethod instead.',
+        );
+        try {
+          return _asyncHandlers[method]!(args);
+        } catch (e, s) {
+          logger.e("failed to callNative(async fallback) $method $e , $s");
+        }
       }
       return fallbackSync?.call(method, args);
     };
