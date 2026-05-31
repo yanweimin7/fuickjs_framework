@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 
 import 'package:easy_isolate/easy_isolate.dart';
@@ -6,11 +7,20 @@ import 'package:easy_isolate/easy_isolate.dart';
 import 'isolate_manager.dart';
 import 'jscontext_delegate.dart';
 
-/// Manages a single Isolate that can host multiple QuickJsContexts.
+/// Manages a single Isolate that can host multiple JS contexts.
 class IsolateWorker {
-  static final IsolateWorker instance = IsolateWorker._internal();
+  // Controlled via EngineInit.useJscOnIos — must be set before first access.
+  static bool useJscOnIos = true;
 
-  IsolateWorker._internal();
+  /// Platform-appropriate worker: JSC on iOS (when [EngineInit.useJscOnIos] is true), QuickJS elsewhere.
+  static IsolateWorker get instance => _instance ??= IsolateWorker._(
+    Platform.isIOS && useJscOnIos ? jscIsolateEntry : quickJsIsolateEntry,
+  );
+  static IsolateWorker? _instance;
+
+  IsolateWorker._(this._isolateEntry);
+
+  final FutureOr<void> Function(dynamic, SendPort, SendErrorFunction) _isolateEntry;
 
   final Worker _worker = Worker();
   final Completer<void> _ready = Completer<void>();
@@ -23,7 +33,7 @@ class IsolateWorker {
   Future<void> ensureInitialized() async {
     if (_initialized) return _ready.future;
     _initialized = true;
-    await _worker.init(_mainHandler, _isolateHandler);
+    await _worker.init(_mainHandler, _isolateEntry);
     _ready.complete();
   }
 
@@ -44,7 +54,7 @@ class IsolateWorker {
     final id = '${_requestId++}';
     final completer = Completer<dynamic>();
     _pendingRequests[id] = completer;
-    
+
     try {
       _worker.sendMessage({
         'contextId': contextId,
@@ -53,12 +63,10 @@ class IsolateWorker {
         'payload': payload,
       });
     } catch (e) {
-      // If send fails, remove the pending request and complete with error
       _pendingRequests.remove(id);
       completer.completeError(e);
     }
 
-    // Add timeout to prevent indefinite waiting
     return completer.future.timeout(
       const Duration(seconds: 30),
       onTimeout: () {
@@ -68,7 +76,6 @@ class IsolateWorker {
     );
   }
 
-  /// Main isolate handler for messages from child isolate
   FutureOr<void> _mainHandler(dynamic data, SendPort isolateSendPort) async {
     if (data is! Map) return;
 
@@ -106,27 +113,7 @@ class IsolateWorker {
     }
   }
 
-  static IsolateHandler? isolateHandler;
-
-  /// Child isolate handler
-  @pragma('vm:entry-point')
-  static FutureOr<void> _isolateHandler(
-    dynamic data,
-    SendPort mainSendPort,
-    SendErrorFunction onSendError,
-  ) {
-    isolateHandler ??= IsolateHandler(mainSendPort);
-    if (data is! Map) return null;
-    final contextId = data['contextId'] as String;
-    final type = data['type'];
-    final id = data['id'];
-    final payload = data['payload'];
-    isolateHandler!.handleMessage(contextId, type, id, payload);
-    return null;
-  }
-
   void dispose() {
-    isolateHandler = null;
     _worker.dispose();
   }
 }

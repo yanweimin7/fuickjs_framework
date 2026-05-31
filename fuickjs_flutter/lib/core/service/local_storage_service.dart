@@ -1,8 +1,6 @@
-import 'dart:convert';
-import 'dart:io';
+import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../logger.dart';
 import 'base_fuick_service.dart';
@@ -11,13 +9,12 @@ class LocalStorageService extends BaseFuickService {
   @override
   String get name => 'LocalStorage';
 
-  File? _file;
-  Map<String, dynamic> _cache = {};
-  bool _initialized = false;
+  SharedPreferences? _prefs;
+  Completer<void>? _initCompleter;
 
   LocalStorageService() {
     registerAsyncMethod('getItem', (args) async {
-      await _ensureInitialized();
+      final prefs = await _ensureInitialized();
       final String? key;
       if (args is Map) {
         key = args['key']?.toString();
@@ -27,11 +24,11 @@ class LocalStorageService extends BaseFuickService {
         key = args?.toString();
       }
       if (key == null) return null;
-      return _cache[key];
+      return prefs.get(key);
     });
 
     registerAsyncMethod('setItem', (args) async {
-      await _ensureInitialized();
+      final prefs = await _ensureInitialized();
       final String? key;
       final dynamic value;
       if (args is Map) {
@@ -44,13 +41,25 @@ class LocalStorageService extends BaseFuickService {
         return false;
       }
       if (key == null) return false;
-      _cache[key] = value;
-      await _flush();
+
+      if (value is bool) {
+        await prefs.setBool(key, value);
+      } else if (value is int) {
+        await prefs.setInt(key, value);
+      } else if (value is double) {
+        await prefs.setDouble(key, value);
+      } else if (value is String) {
+        await prefs.setString(key, value);
+      } else if (value is List<String>) {
+        await prefs.setStringList(key, value);
+      } else {
+        await prefs.setString(key, value.toString());
+      }
       return true;
     });
 
     registerAsyncMethod('removeItem', (args) async {
-      await _ensureInitialized();
+      final prefs = await _ensureInitialized();
       final String? key;
       if (args is Map) {
         key = args['key']?.toString();
@@ -60,46 +69,77 @@ class LocalStorageService extends BaseFuickService {
         key = args?.toString();
       }
       if (key == null) return false;
-      if (_cache.containsKey(key)) {
-        _cache.remove(key);
-        await _flush();
-        return true;
-      }
-      return false;
+      await prefs.remove(key);
+      return true;
     });
 
     registerAsyncMethod('clear', (args) async {
-      await _ensureInitialized();
-      _cache.clear();
-      await _flush();
+      final prefs = await _ensureInitialized();
+      await prefs.clear();
+      return true;
+    });
+
+    // JS 侧 microtask 合批后单次调用：一次 _ensureInitialized + 顺序写入，
+    // 避免 N 个 setItem 各自 await Completer。
+    registerAsyncMethod('setBatch', (args) async {
+      final prefs = await _ensureInitialized();
+      List entries;
+      if (args is List && args.isNotEmpty && args[0] is List) {
+        entries = args[0] as List;
+      } else if (args is List) {
+        entries = args;
+      } else {
+        return false;
+      }
+      for (final entry in entries) {
+        if (entry is! List || entry.length < 2) continue;
+        final key = entry[0]?.toString();
+        final value = entry[1];
+        if (key == null) continue;
+        if (value is bool) {
+          await prefs.setBool(key, value);
+        } else if (value is int) {
+          await prefs.setInt(key, value);
+        } else if (value is double) {
+          await prefs.setDouble(key, value);
+        } else if (value is String) {
+          await prefs.setString(key, value);
+        } else if (value is List<String>) {
+          await prefs.setStringList(key, value);
+        } else {
+          await prefs.setString(key, value.toString());
+        }
+      }
       return true;
     });
   }
 
-  Future<void> _ensureInitialized() async {
-    if (_initialized) return;
-    try {
-      final dir = await getApplicationDocumentsDirectory();
-      _file = File('${dir.path}/fuick_storage.json');
-      if (await _file!.exists()) {
-        final content = await _file!.readAsString();
-        if (content.isNotEmpty) {
-          _cache = jsonDecode(content) as Map<String, dynamic>;
-        }
-      }
-    } catch (e) {
-      logger.e('Error initializing storage: $e');
-    } finally {
-      _initialized = true;
+  Future<SharedPreferences> _ensureInitialized() async {
+    final cached = _prefs;
+    if (cached != null) return cached;
+    final inflight = _initCompleter;
+    if (inflight != null) {
+      await inflight.future;
+      return _prefs!;
     }
-  }
-
-  Future<void> _flush() async {
-    if (_file == null) return;
+    final completer = Completer<void>();
+    _initCompleter = completer;
     try {
-      await _file!.writeAsString(jsonEncode(_cache));
+      final prefs = await SharedPreferences.getInstance();
+      _prefs = prefs;
+      completer.complete();
+      return prefs;
     } catch (e) {
-      logger.e('Error writing storage: $e');
+      logger.e('[LocalStorage] Error initializing: $e');
+      completer.completeError(e);
+      // 失败后清空 completer，允许下一次调用重试，避免被永久 cached 的错误挡住。
+      _initCompleter = null;
+      rethrow;
+    } finally {
+      // 成功路径上 completer 已 complete；保留 _initCompleter 不为下次重置避免竞态丢失成功状态。
+      if (completer.isCompleted && _prefs != null) {
+        // 保持 _initCompleter 已完成状态，后续调用直接走 _prefs != null 快路径。
+      }
     }
   }
 }

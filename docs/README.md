@@ -175,3 +175,75 @@ const commonOptions = {
 ```
 
 **注意**：QuickJS 内部将 bundle 命名为 `input.js`，保存 stack 文件时需将 `input.js` 替换为 `bundle.js` 后再查询 sourcemap。
+
+---
+
+### 7. 本地字节码编译（运行时 compile）
+
+除了构建期用 `qjsc -b` 预编译 `.qjc` 外，引擎现在支持在运行时把 JS 源码本地编译为 QuickJS 字节码，并导出给 Dart 端使用。适用于：动态下发的源码在端上预编译缓存、热更新包落盘为字节码、按需把脚本编译后多次执行等场景。
+
+**Dart API**（`IQuickJsContext`）
+
+```dart
+/// 将 JS 源码本地编译为 QuickJS 字节码。
+/// isModule    : true 按 ES Module 编译，false 按全局脚本编译
+/// stripSource : 默认 true，去除内嵌源码文本以减小体积（不影响行列调试信息，
+///               sourcemap 堆栈还原仍可正常工作）
+Future<Uint8List> compile(String code, {bool isModule = false, bool stripSource = true});
+```
+
+**使用示例**
+
+```dart
+final ctx = runtime.createContext();
+
+// 1. 把源码编译成字节码
+final Uint8List bytecode = await ctx.compile('var x = 40 + 2; x;');
+
+// 2. 直接执行字节码
+final result = await ctx.evalBinary(bytecode, returnValue: true); // 42
+
+// 3. 或落盘缓存，下次启动直接加载执行
+await File('cache/bundle.qjc').writeAsBytes(bytecode);
+await ctx.evalBinaryFile('cache/bundle.qjc', returnValue: false);
+```
+
+底层链路：
+
+```
+ctx.compile(code)
+  → FFI qjs_compile_to_bytecode_out
+      → JS_Eval(JS_EVAL_FLAG_COMPILE_ONLY)
+      → JS_WriteObject(JS_WRITE_OBJ_BYTECODE)
+  → Uint8List（可传给 evalBinary / 落盘为 .qjc）
+```
+
+> **版本约束**：字节码与引擎 `BC_VERSION` 强绑定，只能被相同版本的引擎加载执行。升级 QuickJS 后需重新编译。
+> **平台说明**：QuickJS 引擎支持该能力；iOS/macOS 的 JSC 回退实现（`JscContext`）不支持字节码，调用 `compile` 会抛出 `UnsupportedError`。
+> **stripSource 与 sourcemap**：`stripSource`（默认 true）仅剥离内嵌源码文本，保留行列调试信息（pc2line），错误堆栈的 `行:列` 仍准确，sourcemap 还原不受影响。底层从不设置 `JS_WRITE_OBJ_STRIP_DEBUG`，后者才会破坏行列号。
+
+**Demo 体验**：演示 App 首页右上角「内存」图标进入「字节码编译测试」页（`fuickjs_demo/app/lib/compile_test_page.dart`），可输入任意 JS 源码，实时查看 `compile → evalBinary` 全流程的字节码大小、十六进制预览、执行结果及与直接 `eval` 的一致性对比。
+
+---
+
+### 8. ES Module 加载
+
+引擎支持注册命名模块，供 `import` 语句解析。先用 `registerModule(name, source)` 注册依赖模块源码，再用 `evalModule(entrySource)` 执行带 `import` 的入口模块；QuickJS 在解析 `import` 时通过模块加载器按名查找已注册的源码并编译。
+
+```dart
+// 注册被依赖的模块
+ctx.registerModule('math', 'export function add(a, b) { return a + b; }');
+
+// 执行引用该模块的入口
+await ctx.evalModule(
+  'import { add } from "math";'
+  'globalThis.result = add(2, 3);',
+);
+final r = await ctx.eval('globalThis.result'); // 5
+```
+
+要点：
+- 模块按上下文（`JSContext`）隔离，不同上下文注册的同名模块互不影响。
+- 必须先 `registerModule` 再 `evalModule`，否则 `import` 找不到模块。
+- 模块源码缓冲区在底层会以零结尾方式存储，满足 QuickJS `JS_Eval` 的零结尾约定。
+- **平台限制**：iOS/macOS 的 JSC 回退实现（`JscContext`）基于 `JSEvaluateScript`，不支持 ES Module 的 `import/export`，`registerModule` 会以脚本方式执行并报错。需要模块能力时请使用 QuickJS 引擎。

@@ -2,6 +2,7 @@ import React from 'react';
 import { Node, TEXT_TYPE } from './node';
 import { IncrementalStrategy } from '../strategies/IncrementalStrategy';
 import { DiffStrategy } from '../strategies/DiffStrategy';
+import { NativeEvent } from '../runtime/NativeEvent';
 
 export class PageContainer {
   pageId: number;
@@ -21,6 +22,11 @@ export class PageContainer {
   private nodesByRefId: Map<string, Node> = new Map();
   private _nextNodeId: number = 0;
   private _elementToDslNextNodeId: number = 100000000;
+
+  // 记录无状态列表项（elementToDsl 路径）渲染期间注册的合成回调 nodeId 区间，按 itemKey 分组。
+  // 合成 nodeId 没有对应 Node，不会被 Node.destroy 回收；若不主动清理会随每次 getItemDSL
+  // 单调增长导致 eventCallbacks 无界泄漏。这里在重渲染前 / disposeItem 时按 item 回收。
+  private itemSyntheticCallbackIds: Map<string, [number, number]> = new Map();
 
   public get nextNodeId(): number {
     return this._nextNodeId;
@@ -92,6 +98,34 @@ export class PageContainer {
    */
   public clearNodeCallbacks(nodeId: number | string) {
     this.eventCallbacks.delete(nodeId);
+  }
+
+  /**
+   * 无状态列表项专用渲染：先回收上一轮为该 item 注册的合成回调，再渲染并记录本轮
+   * 产生的合成 nodeId 区间。避免无状态 getItemDSL 反复渲染导致回调无界泄漏。
+   */
+  public elementToDslForItem(itemKey: string, element: React.ReactNode): unknown {
+    this.clearItemSyntheticCallbacks(itemKey);
+    const before = this.elementToDslNextNodeId;
+    const dsl = this.elementToDsl(element);
+    const after = this.elementToDslNextNodeId;
+    if (after > before) {
+      this.itemSyntheticCallbackIds.set(itemKey, [before + 1, after]);
+    }
+    return dsl;
+  }
+
+  /**
+   * 回收某个无状态列表项注册的合成回调（重渲染前或 disposeItem 时调用）。
+   */
+  public clearItemSyntheticCallbacks(itemKey: string) {
+    const range = this.itemSyntheticCallbackIds.get(itemKey);
+    if (!range) return;
+    const [start, end] = range;
+    for (let id = start; id <= end; id++) {
+      this.eventCallbacks.delete(id);
+    }
+    this.itemSyntheticCallbackIds.delete(itemKey);
   }
 
   public registerVisibleCallback(fn: (...args: unknown[]) => unknown) {
@@ -358,13 +392,25 @@ export class PageContainer {
 
   public static readonly MAX_ELEMENT_DEPTH = 512;
 
-  public elementToDsl(element: React.ReactNode, depth: number = 0): unknown {
+  public elementToDsl(element: React.ReactNode, depth: number = 0, visited?: WeakSet<object>): unknown {
     if (!element) return null;
     if (depth > PageContainer.MAX_ELEMENT_DEPTH) {
       console.warn(
         `[PageContainer] elementToDsl depth exceeded ${PageContainer.MAX_ELEMENT_DEPTH} on page ${this.pageId}; truncating`,
       );
       return null;
+    }
+    // 循环引用检测：业务代码可能在 props/数组中放回自身。WeakSet 仅在递归路径上记录，
+    // 退出分支不需要清理。仅对象/数组进入；string/number 不触发。
+    if (typeof element === 'object' && element !== null) {
+      if (!visited) visited = new WeakSet();
+      if (visited.has(element as object)) {
+        console.warn(
+          `[PageContainer] elementToDsl detected cycle on page ${this.pageId}; truncating`,
+        );
+        return null;
+      }
+      visited.add(element as object);
     }
 
     let currentElement: React.ReactNode = element;
@@ -377,7 +423,7 @@ export class PageContainer {
       }
 
       if (Array.isArray(currentElement)) {
-        return currentElement.map((e) => this.elementToDsl(e, depth + 1)).filter((e) => e !== null);
+        return currentElement.map((e) => this.elementToDsl(e, depth + 1, visited)).filter((e) => e !== null);
       }
 
       const elAny = currentElement as unknown as Record<string, unknown>;
@@ -423,13 +469,13 @@ export class PageContainer {
         const nodeId = ++this.elementToDslNextNodeId;
 
         // Process props using the common logic
-        const processedProps = this.processProps(nodeId, props, String(type), [], depth + 1);
+        const processedProps = this.processProps(nodeId, props, String(type), [], depth + 1, visited);
 
         const dslChildren: unknown[] = [];
         const childrenToProcess = Array.isArray(children) ? children : children ? [children] : [];
 
         for (const child of childrenToProcess) {
-          const childDsl = this.elementToDsl(child, depth + 1);
+          const childDsl = this.elementToDsl(child, depth + 1, visited);
           if (childDsl) {
             if (Array.isArray(childDsl)) {
               for (const item of childDsl) {
@@ -508,19 +554,30 @@ export class PageContainer {
     nodeType?: string,
     path: (string | number)[] = [],
     depth: number = 0,
+    visited?: WeakSet<object>,
   ): unknown {
     // Case 1: 基础类型或空值直接返回
     if (!props || typeof props !== 'object') return props;
 
+    // 循环引用检测：业务可能在 props 嵌套对象里放回自身，递归会打爆栈或无限循环。
+    if (!visited) visited = new WeakSet();
+    if (visited.has(props as object)) {
+      console.warn(
+        `[PageContainer] processProps detected cycle on page ${this.pageId} (path=${path.join('.')}); truncating`,
+      );
+      return null;
+    }
+    visited.add(props as object);
+
     // Case 2: 如果属性值是一个 React 元素，将其转换为 DSL 结构
     // 例如：AppBar 的 title 属性传入了一个 <Text> 组件
-    if (React.isValidElement(props)) return this.elementToDsl(props, depth + 1);
+    if (React.isValidElement(props)) return this.elementToDsl(props, depth + 1, visited);
 
     // Case 3: 处理数组，递归转换数组中的每个元素
     if (Array.isArray(props)) {
       return props.map((item, index) => {
         const newPath = [...path, index];
-        return this.processProps(nodeId, item, nodeType, newPath, depth + 1);
+        return this.processProps(nodeId, item, nodeType, newPath, depth + 1, visited);
       });
     }
 
@@ -561,7 +618,7 @@ export class PageContainer {
         // Case 7: 递归处理嵌套对象
         // 例如：decoration: { color: '#ff0000', border: { ... } }
         const newPath = [...path, key];
-        processedProps[key] = this.processProps(nodeId, value, nodeType, newPath, depth + 1);
+        processedProps[key] = this.processProps(nodeId, value, nodeType, newPath, depth + 1, visited);
       } else {
         // Case 8: 基础数据类型 (string, number, boolean) 直接赋值
         processedProps[key] = value;
@@ -586,5 +643,32 @@ export class PageContainer {
   clear() {
     this.diffStrategy.clear();
     this.incrementalStrategy.clear();
+  }
+
+  /**
+   * 页面销毁时调用：清空所有内部集合，断开 strategy 反向引用与生命周期回调闭包，
+   * 配合 Node.destroy() 让整棵节点树进入可 GC 状态。
+   */
+  public dispose() {
+    if (this.root) {
+      try {
+        this.root.destroy();
+      } catch (e) {
+        console.error(`[PageContainer] Error destroying root for page ${this.pageId}:`, e);
+      }
+      this.root = null;
+    }
+    this.eventCallbacks.clear();
+    this.itemSyntheticCallbackIds.clear();
+    this.onVisibleCallbacks.clear();
+    this.onInvisibleCallbacks.clear();
+    this.nodes.clear();
+    this.nodesByRefId.clear();
+    try {
+      NativeEvent.offAllForPage(this.pageId);
+    } catch (e) {
+      console.error(`[PageContainer] Error clearing NativeEvent listeners for page ${this.pageId}:`, e);
+    }
+    this.clear();
   }
 }

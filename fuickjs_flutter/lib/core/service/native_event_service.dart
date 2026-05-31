@@ -44,16 +44,15 @@ class NativeEventService extends BaseFuickService {
 
   // Flutter 端 API: 发送事件给 JS
   void emit(String event, dynamic data) {
-    // 调用 JS 端暴露的 NativeEvent.receive 方法
-    // 我们约定通过 ctx.invoke('NativeEvent', 'receive', ...)
-
-    // 检查 BaseFuickService 的实现，看看是否有 context 访问权限
-    if (!isDisposed) {
-      try {
-        ctx.invoke('NativeEvent', 'receive', [event, data]);
-      } catch (e) {
-        logger.e('Error emitting event to JS: $e');
-      }
+    if (isDisposed) {
+      // 之前的实现静默 drop，导致事件“神秘消失”后无法排查 lifecycle 时序。
+      logger.w('[NativeEvent] emit("$event") dropped: service already disposed');
+      return;
+    }
+    try {
+      ctx.invoke('NativeEvent', 'receive', [event, data]);
+    } catch (e) {
+      logger.e('Error emitting event to JS: $e');
     }
   }
 

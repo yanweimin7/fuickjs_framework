@@ -50,7 +50,7 @@ class FuickAppController {
   }
 
   T? getService<T extends BaseFuickService>() {
-    return serviceBinder.getService<T>(ctx);
+    return serviceBinder.getService<T>();
   }
 
   // --- Navigation Delegates ---
@@ -118,7 +118,7 @@ class FuickAppController {
     // 先销毁 service（如 Timer、WebSocket），再销毁 context
     // JsContextDelegate.dispose() 通过 isolate 消息队列发送 disposeContext，
     // 天然保证在所有 pending 操作之后执行，无需人为延迟
-    serviceBinder.dispose(ctx);
+    serviceBinder.dispose();
     ctx.dispose();
     isBundleLoaded.dispose();
   }

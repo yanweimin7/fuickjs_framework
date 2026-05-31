@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:fjs_engine/core/jscontext.dart';
+import 'package:easy_isolate/easy_isolate.dart';
+import 'package:fjs_engine/core/jscontext_interface.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -12,14 +13,16 @@ import '../service/file_system_service.dart';
 import '../service/timer_service.dart';
 import 'engine.dart';
 
+// ─── Generic IsolateHandler ────────────────────────────────────────────────
+
 class IsolateHandler {
   final SendPort mainSendPort;
+  final IQuickJsContext Function() contextFactory;
 
-  final Map<String, QuickJsContext> contexts = {};
+  final Map<String, IQuickJsContext> contexts = {};
+  final Map<String, AppServiceBinder> _binders = {};
 
-  IsolateHandler(this.mainSendPort);
-
-  final serviceBinder = AppServiceBinder();
+  IsolateHandler(this.mainSendPort, this.contextFactory);
 
   Future<dynamic> _waitForResponse(ReceivePort port) async {
     final result = await port.first;
@@ -36,53 +39,43 @@ class IsolateHandler {
     runZonedGuarded(
       () async {
         try {
-          if (EngineInit.qjs == null) {
-            EngineInit.initQjs();
-          }
           if (type == 'createContext') {
             if (!contexts.containsKey(contextId)) {
-              if (EngineInit.runtime == null) {
-                throw Exception(
-                  "Failed to initialize QuickJS runtime in isolate",
-                );
-              }
-              final ctx = EngineInit.runtime!.createContext();
+              final ctx = contextFactory();
               contexts[contextId] = ctx;
-              serviceBinder.init(
+
+              final binder = AppServiceBinder();
+              _binders[contextId] = binder;
+              binder.init(
                 ctx,
                 null,
                 allowedServices: [TimerService, ConsoleService, FileSystemService],
-              );
-
-              ctx.onCallNative = (method, args) {
-                try {
-                  if (serviceBinder.canHandle(ctx, method)) {
-                    return serviceBinder.handleNativeCall(ctx, method, args);
+                fallbackSync: (method, args) {
+                  try {
+                    final responsePort = ReceivePort();
+                    mainSendPort.send({
+                      'contextId': contextId,
+                      'type': 'callNative',
+                      'replyPort': responsePort.sendPort,
+                      'payload': {'method': method, 'args': args},
+                    });
+                    return _waitForResponse(responsePort);
+                  } catch (e, s) {
+                    logger.e("Isolate onCallNative error: $e\n$s");
+                    rethrow;
                   }
+                },
+                fallbackAsync: (method, args) async {
                   final responsePort = ReceivePort();
                   mainSendPort.send({
                     'contextId': contextId,
-                    'type': 'callNative',
+                    'type': 'callNativeAsync',
                     'replyPort': responsePort.sendPort,
                     'payload': {'method': method, 'args': args},
                   });
                   return _waitForResponse(responsePort);
-                } catch (e, s) {
-                  logger.e("Isolate onCallNative error: $e\n$s");
-                  rethrow;
-                }
-              };
-
-              ctx.onCallNativeAsync = (method, args) {
-                final responsePort = ReceivePort();
-                mainSendPort.send({
-                  'contextId': contextId,
-                  'type': 'callNativeAsync',
-                  'replyPort': responsePort.sendPort,
-                  'payload': {'method': method, 'args': args},
-                });
-                return _waitForResponse(responsePort);
-              };
+                },
+              );
 
               mainSendPort.send({
                 'type': 'response',
@@ -115,6 +108,12 @@ class IsolateHandler {
             final bytecode = payload['bytecode'] as Uint8List;
             final returnValue = payload['returnValue'] as bool? ?? false;
             result = await ctx!.evalBinary(bytecode, returnValue: returnValue);
+          } else if (type == 'compile') {
+            final code = payload['code'] as String;
+            final isModule = payload['isModule'] as bool? ?? false;
+            final stripSource = payload['stripSource'] as bool? ?? true;
+            result = await ctx!
+                .compile(code, isModule: isModule, stripSource: stripSource);
           } else if (type == 'runJobs') {
             result = await ctx!.runJobs();
           } else if (type == 'invoke') {
@@ -130,7 +129,7 @@ class IsolateHandler {
           } else if (type == 'disposeContext') {
             if (ctx != null) {
               contexts.remove(contextId);
-              serviceBinder.dispose(ctx);
+              _binders.remove(contextId)?.dispose();
               ctx.dispose();
             }
             result = null;
@@ -156,4 +155,59 @@ class IsolateHandler {
       },
     );
   }
+}
+
+// ─── QuickJS isolate entry point ───────────────────────────────────────────
+
+IsolateHandler? _quickJsHandler;
+
+@pragma('vm:entry-point')
+FutureOr<void> quickJsIsolateEntry(
+  dynamic data,
+  SendPort mainSendPort,
+  SendErrorFunction onSendError,
+) {
+  _quickJsHandler ??= IsolateHandler(mainSendPort, _createQuickJsContext);
+  if (data is! Map) return null;
+  _quickJsHandler!.handleMessage(
+    data['contextId'] as String,
+    data['type'] as String,
+    data['id'] as String,
+    data['payload'],
+  );
+  return null;
+}
+
+IQuickJsContext _createQuickJsContext() {
+  if (EngineInit.qjs == null) EngineInit.initQjs();
+  if (EngineInit.runtime == null) {
+    throw Exception('Failed to initialize QuickJS runtime in isolate');
+  }
+  return EngineInit.runtime!.createContext();
+}
+
+IQuickJsContext _createJscContext() {
+  if (EngineInit.jscRuntime == null) EngineInit.initJsc();
+  return EngineInit.jscRuntime!.createContext();
+}
+
+// ─── JSC isolate entry point ───────────────────────────────────────────────
+
+IsolateHandler? _jscHandler;
+
+@pragma('vm:entry-point')
+FutureOr<void> jscIsolateEntry(
+  dynamic data,
+  SendPort mainSendPort,
+  SendErrorFunction onSendError,
+) {
+  _jscHandler ??= IsolateHandler(mainSendPort, _createJscContext);
+  if (data is! Map) return null;
+  _jscHandler!.handleMessage(
+    data['contextId'] as String,
+    data['type'] as String,
+    data['id'] as String,
+    data['payload'],
+  );
+  return null;
 }

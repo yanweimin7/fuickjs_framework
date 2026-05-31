@@ -24,6 +24,11 @@ abstract class BaseFuickService {
   }
 
   void registerMethod(String method, SyncMethodHandler handler) {
+    if (syncMethods.containsKey(method) || asyncMethods.containsKey(method)) {
+      logger.w(
+        '[Service] $name.registerMethod: method "$method" already registered, overwriting old handler.',
+      );
+    }
     syncMethods[method] = (args) {
       if (_isDisposed) {
         logger.w(
@@ -36,6 +41,11 @@ abstract class BaseFuickService {
   }
 
   void registerAsyncMethod(String method, AsyncMethodHandler handler) {
+    if (asyncMethods.containsKey(method) || syncMethods.containsKey(method)) {
+      logger.w(
+        '[Service] $name.registerAsyncMethod: method "$method" already registered, overwriting old handler.',
+      );
+    }
     asyncMethods[method] = (args) async {
       if (_isDisposed) {
         logger.w(

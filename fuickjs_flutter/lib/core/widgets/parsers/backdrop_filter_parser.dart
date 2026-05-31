@@ -21,10 +21,15 @@ class BackdropFilterParser extends WidgetParser {
     final sigmaY = asDoubleOrNull(props['sigmaY']) ?? 0.0;
     final blendMode = _parseBlendMode(props['blendMode'] as String?);
 
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: sigmaX, sigmaY: sigmaY),
-      blendMode: blendMode,
-      child: factory.buildFirstChild(context, children, type),
+    // BackdropFilter 必须被 ClipRect/ClipRRect 之类创建 layer 的祖先包裹，
+    // 否则在 root layer 上模糊范围会失效或扩散到整个屏幕。这里主动用 ClipRect
+    // 包一层，确保即使外层未裁剪也能正确生效。
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: sigmaX, sigmaY: sigmaY),
+        blendMode: blendMode,
+        child: factory.buildFirstChild(context, children, type),
+      ),
     );
   }
 

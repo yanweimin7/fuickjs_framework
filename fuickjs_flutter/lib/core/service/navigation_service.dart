@@ -82,7 +82,7 @@ class NavigationService extends BaseFuickService {
       return null;
     });
 
-    registerMethod('pushReplace', (args) async {
+    registerAsyncMethod('pushReplace', (args) async {
       final m =
           args is Map ? Map<String, dynamic>.from(args) : <String, dynamic>{};
       final path = (m['path'] ?? '') as String;
@@ -110,7 +110,7 @@ class NavigationService extends BaseFuickService {
     });
 
     // reLaunch: 清空路由栈并跳转到指定页面
-    registerMethod('reLaunch', (args) async {
+    registerAsyncMethod('reLaunch', (args) async {
       final m =
           args is Map ? Map<String, dynamic>.from(args) : <String, dynamic>{};
       final path = (m['path'] ?? '') as String;

@@ -8,3 +8,4 @@ export * from './FileSystemService';
 export { NetworkService } from './NetworkService';
 export { NavigatorService } from './NavigatorService';
 export { UIService } from './UIService';
+export { SoundService } from './SoundService';

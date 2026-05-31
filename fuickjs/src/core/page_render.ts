@@ -7,6 +7,11 @@ import { ErrorBoundary } from './ErrorBoundary';
 let renderer: Renderer | null = null;
 let globalErrorFallback: ((error: Error) => React.ReactNode) | null = null;
 
+// 同 pageId 在途渲染状态：rendering=true 表示当前微任务正在 reconciler.update。
+// 若期间有新 render() 进入，仅记录 pending 参数，等当前 update 完成后再合并执行。
+type PendingRender = { path: string; params: unknown };
+const renderState: Record<number, { rendering: boolean; pending?: PendingRender }> = {};
+
 export function setGlobalErrorFallback(fallback: (error: Error) => React.ReactNode) {
   globalErrorFallback = fallback;
 }
@@ -17,7 +22,7 @@ export function ensureRenderer() {
   return renderer;
 }
 
-export function render(pageId: number, path: string, params: unknown) {
+function doRender(pageId: number, path: string, params: unknown) {
   const t0 = Date.now();
   const r = ensureRenderer();
 
@@ -90,8 +95,36 @@ export function render(pageId: number, path: string, params: unknown) {
   );
 }
 
+export function render(pageId: number, path: string, params: unknown) {
+  const state = renderState[pageId];
+  if (state && state.rendering) {
+    // 同 pageId 已有渲染在途，仅保留最新参数，等当前完成后合并执行，
+    // 避免 reconciler 嵌套触发 React #327 与中间帧抖动。
+    state.pending = { path, params };
+    console.warn(`[page_render] coalescing render for pageId=${pageId}, path=${path}`);
+    return;
+  }
+
+  renderState[pageId] = { rendering: true };
+  try {
+    doRender(pageId, path, params);
+  } finally {
+    // 处理在途累积的最新一笔；丢弃中间被覆盖的旧 pending（最新即正确）。
+    const next = renderState[pageId]?.pending;
+    if (next) {
+      renderState[pageId] = { rendering: false };
+      // 异步调度避免同步重入导致 reconciler 仍在 commit 阶段。
+      Promise.resolve().then(() => render(pageId, next.path, next.params));
+    } else {
+      delete renderState[pageId];
+    }
+  }
+}
+
 export function destroy(pageId: number) {
   const r = ensureRenderer();
+  // 清掉在途渲染记录，防止 destroy 后还触发 pending 重渲染。
+  delete renderState[pageId];
   r.destroy(pageId);
 }
 

@@ -1,3 +1,4 @@
+import 'package:fjs_engine/core/jsc_runtime.dart';
 import 'package:fjs_engine/core/quickjs_ffi.dart';
 import 'package:fjs_engine/core/runtime.dart';
 import 'package:flutter/cupertino.dart';
@@ -10,6 +11,7 @@ class EngineInit {
 
   static QuickJsFFI? get qjs => _qjs;
   static QuickJsRuntime? runtime;
+  static JscRuntime? jscRuntime;
 
   ///只需要在isolate中初始化
   static initQjs() {
@@ -25,6 +27,14 @@ class EngineInit {
       }
     }
   }
+
+  static void initJsc() {
+    jscRuntime ??= JscRuntime();
+  }
+
+  /// Set to false before [initIsolate] / [preload] to force QuickJS on iOS.
+  static bool get useJscOnIos => IsolateWorker.useJscOnIos;
+  static set useJscOnIos(bool value) => IsolateWorker.useJscOnIos = value;
 
   static Future<void> initIsolate() async {
     await IsolateWorker.instance.ensureInitialized();

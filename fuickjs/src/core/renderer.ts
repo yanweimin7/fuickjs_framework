@@ -19,6 +19,8 @@ export interface Renderer {
 
 const containers: Record<number, PageContainer> = {};
 const roots: Record<number, unknown> = {};
+// pageId 处于 destroying 状态时拒绝 update，防止 destroy retry 期间被并发 update 复用旧 root。
+const destroyingPages: Set<number> = new Set();
 
 export function dispatchEvent(eventObj: unknown, payload: unknown) {
   try {
@@ -97,6 +99,10 @@ export function createRenderer(): Renderer {
 
   return {
     update(element: React.ReactNode, pageId: number) {
+      if (destroyingPages.has(pageId)) {
+        console.warn(`[Renderer] update() ignored: pageId=${pageId} is destroying.`);
+        return;
+      }
       const root = ensureRoot(pageId);
       const isFirstRender = !renderedPages.has(pageId);
       perfLog(
@@ -150,15 +156,24 @@ export function createRenderer(): Renderer {
     destroy(pageId: number) {
       const root = roots[pageId];
       if (root) {
+        destroyingPages.add(pageId);
         let retryCount = 0;
         const maxRetries = 100; // Prevent infinite loop
+
+        const finalize = () => {
+          // 销毁容器内部状态（事件回调/onVisible 等），切断闭包持引。
+          containers[pageId]?.dispose();
+          delete roots[pageId];
+          delete containers[pageId];
+          renderedPages.delete(pageId);
+          destroyingPages.delete(pageId);
+        };
 
         const performDestroy = () => {
           try {
             reconciler.updateContainer(null, root, null, null);
             perfLog(`[Renderer] destroy() succeeded for pageId=${pageId}, retries=${retryCount}`);
-            delete roots[pageId];
-            delete containers[pageId];
+            finalize();
           } catch (e: unknown) {
             const msg = (e as Error).message || String(e);
             if (isRenderInProgressError(msg) && retryCount < maxRetries) {
@@ -188,8 +203,7 @@ export function createRenderer(): Renderer {
                 // Best effort — if this also fails, nothing more we can do
                 console.error(`[Renderer] Best-effort unmount also failed for pageId=${pageId}`);
               }
-              delete roots[pageId];
-              delete containers[pageId];
+              finalize();
             }
           }
         };
@@ -200,7 +214,9 @@ export function createRenderer(): Renderer {
         // Even if no root, check if we have a temporary container to cleanup
         if (containers[pageId]) {
           console.warn(`[Renderer] destroy() pageId=${pageId} has no root but has orphaned container, cleaning up.`);
+          containers[pageId]?.dispose();
           delete containers[pageId];
+          renderedPages.delete(pageId);
         } else {
           console.warn(`[Renderer] destroy() pageId=${pageId} has no root and no container, nothing to destroy.`);
         }
@@ -232,10 +248,11 @@ export function createRenderer(): Renderer {
           container,
         );
       } else {
-        // 无状态模式：直接通过 elementToDsl 渲染，无生命周期
+        // 无状态模式：直接通过 elementToDsl 渲染，无生命周期。
+        // 走 elementToDslForItem 以便按 (pageId,refId,index) 回收合成回调，避免泄漏。
         try {
           const element = (itemBuilder as (index: number) => React.ReactNode)(index);
-          return container.elementToDsl(element);
+          return container.elementToDslForItem(`${pageId}:${refId}:${index}`, element);
         } catch (e) {
           console.error(`[Renderer] Error in stateless getItemDSL for refId ${refId} at index ${index}:`, e);
           return null;
@@ -244,6 +261,8 @@ export function createRenderer(): Renderer {
     },
     disposeItem(pageId: number, refId: string, index: number) {
       listItemManager.disposeItem(pageId, refId, index);
+      // 同时回收无状态列表项注册的合成回调，防止 eventCallbacks 泄漏
+      containers[pageId]?.clearItemSyntheticCallbacks(`${pageId}:${refId}:${index}`);
     },
     elementToDsl(pageId: number, element: React.ReactNode) {
       let container = containers[pageId];

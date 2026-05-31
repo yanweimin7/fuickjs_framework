@@ -52,9 +52,23 @@ class WidgetUtils {
       String hex = hexString.replaceFirst('#', '');
       if (hex.length == 3) {
         hex = '${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}';
+      } else if (hex.length == 4) {
+        // CSS #RGBA 简写，扩展为 RRGGBBAA。
+        hex =
+            '${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}';
       }
-      final color =
-          Color(int.parse((hex.length == 6 ? 'ff' : '') + hex, radix: 16));
+      String argb;
+      if (hex.length == 8) {
+        // CSS 8 位 hex 是 RRGGBBAA，Flutter Color 需要 AARRGGBB。
+        final rgb = hex.substring(0, 6);
+        final a = hex.substring(6, 8);
+        argb = a + rgb;
+      } else if (hex.length == 6) {
+        argb = 'ff$hex';
+      } else {
+        argb = hex;
+      }
+      final color = Color(int.parse(argb, radix: 16));
       _colorCache[hexString] = color;
       return color;
     } catch (e) {

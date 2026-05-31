@@ -73,10 +73,11 @@ FuickJS 是一个基于 **React + QuickJS + Flutter** 的跨平台动态化渲�
 
 ### 3. 引擎层 (fuickjs_core)
 
-| 模块        | 职责                                 |
-| ----------- | ------------------------------------ |
-| QuickJS FFI | 通过 Flutter FFI 调用 QuickJS C 引擎 |
-| JSContext   | QuickJS 执行上下文管理               |
+| 模块        | 职责                                                              |
+| ----------- | ----------------------------------------------------------------- |
+| QuickJS FFI | 通过 Flutter FFI 调用 QuickJS C 引擎                              |
+| JSContext   | QuickJS 执行上下文管理，支持 `eval` / `evalBinary` / `compile`   |
+| 字节码编译  | `compile()` 在端上将 JS 源码本地编译为 QuickJS 字节码（详见 README） |
 
 ---
 

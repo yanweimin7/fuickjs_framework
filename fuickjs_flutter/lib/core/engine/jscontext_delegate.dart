@@ -6,12 +6,14 @@ import 'package:fuickjs_flutter/core/engine/worker.dart';
 
 class JsContextDelegate implements IQuickJsContext {
   final String contextId;
+  final IsolateWorker _worker;
 
   FutureOr<dynamic> Function(String method, dynamic args)? _onCallNative;
   FutureOr<dynamic> Function(String method, dynamic args)? _onCallNativeAsync;
 
-  JsContextDelegate(this.contextId) {
-    IsolateWorker.instance.registerDelegate(this);
+  JsContextDelegate(this.contextId, {IsolateWorker? worker})
+      : _worker = worker ?? IsolateWorker.instance {
+    _worker.registerDelegate(this);
   }
 
   @override
@@ -38,24 +40,35 @@ class JsContextDelegate implements IQuickJsContext {
   int get handleAddress => identityHashCode(this);
 
   Future<void> init() async {
-    await IsolateWorker.instance.sendRequest(contextId, 'createContext', null);
+    await _worker.sendRequest(contextId, 'createContext', null);
   }
 
   @override
   Future<dynamic> eval(String code, {bool returnValue = true}) =>
-      IsolateWorker.instance.sendRequest(contextId, 'eval', {'code': code, 'returnValue': returnValue});
+      _worker.sendRequest(contextId, 'eval', {'code': code, 'returnValue': returnValue});
 
   @override
   Future<dynamic> evalModule(String code) =>
-      IsolateWorker.instance.sendRequest(contextId, 'evalModule', code);
+      _worker.sendRequest(contextId, 'evalModule', code);
 
   @override
   Future<dynamic> evalBinary(Uint8List bytecode, {bool returnValue = false}) =>
-      IsolateWorker.instance.sendRequest(contextId, 'evalBinary', {'bytecode': bytecode, 'returnValue': returnValue});
+      _worker.sendRequest(contextId, 'evalBinary', {'bytecode': bytecode, 'returnValue': returnValue});
+
+  @override
+  Future<Uint8List> compile(String code,
+          {bool isModule = false, bool stripSource = true}) async {
+    final res = await _worker.sendRequest(contextId, 'compile', {
+      'code': code,
+      'isModule': isModule,
+      'stripSource': stripSource,
+    });
+    return res as Uint8List;
+  }
 
   @override
   dynamic invoke(String? objectName, String methodName, List<dynamic> args) =>
-      IsolateWorker.instance.sendRequest(contextId, 'invoke', {
+      _worker.sendRequest(contextId, 'invoke', {
         'objectName': objectName,
         'methodName': methodName,
         'args': args,
@@ -63,7 +76,7 @@ class JsContextDelegate implements IQuickJsContext {
 
   @override
   void registerModule(String name, String code) {
-    IsolateWorker.instance.sendRequest(contextId, 'registerModule', {
+    _worker.sendRequest(contextId, 'registerModule', {
       'name': name,
       'code': code,
     }).catchError((e) {
@@ -74,7 +87,7 @@ class JsContextDelegate implements IQuickJsContext {
 
   @override
   Future<int> runJobs() async {
-    final res = await IsolateWorker.instance.sendRequest(
+    final res = await _worker.sendRequest(
       contextId,
       'runJobs',
       null,
@@ -84,8 +97,8 @@ class JsContextDelegate implements IQuickJsContext {
 
   @override
   void dispose() {
-    IsolateWorker.instance.sendRequest(contextId, 'disposeContext', null);
-    IsolateWorker.instance.unregisterDelegate(contextId);
+    _worker.sendRequest(contextId, 'disposeContext', null);
+    _worker.unregisterDelegate(contextId);
   }
 
   @override

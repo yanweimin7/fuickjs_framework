@@ -236,6 +236,9 @@ export class Node {
       }
       // Clear children array to help GC and prevent double destruction
       node.children = [];
+      // 断开反向链，防止 parent/container 持有已销毁节点引用阻止整树 GC。
+      node.parent = undefined;
+      node.container = undefined;
     }
   }
 }

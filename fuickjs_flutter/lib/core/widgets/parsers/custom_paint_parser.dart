@@ -76,6 +76,9 @@ class FuickCustomPaint extends StatelessWidget {
 
 class FuickCustomPainter extends CustomPainter {
   final List commands;
+  // 缓存 paint 配置 → Paint 实例。Map.identity 比较：DSL 反序列化每次产出
+  // 新对象，identity 命中率有限，但同一帧内多次绘制（save/restore 嵌套）能复用。
+  final Map<dynamic, Paint> _paintCache = {};
 
   FuickCustomPainter(this.commands);
 
@@ -148,7 +151,11 @@ class FuickCustomPainter extends CustomPainter {
           }
           break;
         case 'drawPath':
-          // TODO: Implement drawPath
+          final path = _parsePath(cmd['path']);
+          final paint = _parsePaint(cmd['paint']);
+          if (path != null) {
+            canvas.drawPath(path, paint);
+          }
           break;
       }
     }
@@ -156,7 +163,10 @@ class FuickCustomPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant FuickCustomPainter oldDelegate) {
-    return true; // Always repaint when commands change
+    // commands List 由 DSL 反序列化产生：内容不变时 identity 不一定相同。
+    // 用引用相等可避免无变化时的重绘；新 painter 实例是从 props 变化而来，
+    // 这种情况下 oldDelegate.commands != commands，会触发重绘。
+    return !identical(oldDelegate.commands, commands);
   }
 
   Offset? _parseOffset(dynamic data) {
@@ -195,7 +205,74 @@ class FuickCustomPainter extends CustomPainter {
     return null;
   }
 
+  Path? _parsePath(dynamic data) {
+    if (data is! Map) return null;
+    final path = Path();
+    final operations = data['operations'] as List?;
+    if (operations == null) return null;
+
+    for (final op in operations) {
+      if (op is! Map) continue;
+      final opType = op['type'];
+      switch (opType) {
+        case 'moveTo':
+          path.moveTo(asDouble(op['x']), asDouble(op['y']));
+          break;
+        case 'lineTo':
+          path.lineTo(asDouble(op['x']), asDouble(op['y']));
+          break;
+        case 'quadraticBezierTo':
+          path.quadraticBezierTo(
+            asDouble(op['x1']), asDouble(op['y1']),
+            asDouble(op['x2']), asDouble(op['y2']),
+          );
+          break;
+        case 'cubicTo':
+          path.cubicTo(
+            asDouble(op['x1']), asDouble(op['y1']),
+            asDouble(op['x2']), asDouble(op['y2']),
+            asDouble(op['x3']), asDouble(op['y3']),
+          );
+          break;
+        case 'arcTo':
+          final rect = _parseRect(op['rect']);
+          final startAngle = asDouble(op['startAngle']);
+          final sweepAngle = asDouble(op['sweepAngle']);
+          final forceMoveTo = op['forceMoveTo'] == true;
+          if (rect != null) {
+            path.arcTo(rect, startAngle, sweepAngle, forceMoveTo);
+          }
+          break;
+        case 'addRect':
+          final rect = _parseRect(op['rect']);
+          if (rect != null) {
+            path.addRect(rect);
+          }
+          break;
+        case 'addOval':
+          final rect = _parseRect(op['rect']);
+          if (rect != null) {
+            path.addOval(rect);
+          }
+          break;
+        case 'addRRect':
+          final rrect = _parseRRect(op['rrect']);
+          if (rrect != null) {
+            path.addRRect(rrect);
+          }
+          break;
+        case 'close':
+          path.close();
+          break;
+      }
+    }
+    return path;
+  }
+
   Paint _parsePaint(dynamic data) {
+    if (data == null) return _paintCache[null] ??= Paint();
+    final cached = _paintCache[data];
+    if (cached != null) return cached;
     final paint = Paint();
     if (data is Map) {
       if (data['color'] != null) {
@@ -218,6 +295,7 @@ class FuickCustomPainter extends CustomPainter {
         paint.strokeCap = StrokeCap.square;
       }
     }
+    _paintCache[data] = paint;
     return paint;
   }
 }

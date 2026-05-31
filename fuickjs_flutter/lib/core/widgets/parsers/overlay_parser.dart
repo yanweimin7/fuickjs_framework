@@ -61,7 +61,11 @@ class _OverlayHostWidgetState extends State<_OverlayHostWidget> {
         _remove();
       }
     } else if (widget.visible && _entry != null) {
-      _entry!.markNeedsBuild();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _entry != null) {
+          _entry!.markNeedsBuild();
+        }
+      });
     }
   }
 
@@ -90,10 +94,7 @@ class _OverlayHostWidgetState extends State<_OverlayHostWidget> {
     _entry = OverlayEntry(
       builder: (overlayContext) {
         Widget child = widget.children.isNotEmpty
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                children: widget.children,
-              )
+            ? widget.children.first
             : const SizedBox.shrink();
 
         if (pageScope != null) {

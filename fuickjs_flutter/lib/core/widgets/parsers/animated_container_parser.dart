@@ -19,18 +19,37 @@ class AnimatedContainerParser extends WidgetParser {
   ) {
     final decoration = WidgetUtils.boxDecorationFromProps(props);
     final constraints = WidgetUtils.boxConstraints(props['constraints']);
-    Widget container = AnimatedContainer(
-      duration: Duration(milliseconds: asInt(props['duration'] ?? 300)),
-      curve: WidgetUtils.parseCurve(props['curve'] as String?),
-      width: WidgetUtils.sizeNum(props['width']),
-      height: WidgetUtils.sizeNum(props['height']),
-      constraints: constraints,
-      alignment: WidgetUtils.alignment(props['alignment'] as String?),
-      padding: WidgetUtils.edgeInsets(props['padding']),
-      margin: WidgetUtils.edgeInsets(props['margin']),
-      decoration: decoration,
-      child: factory.buildFirstChild(context, children, type),
-    );
+    final durationMs = asInt(props['duration'] ?? 300);
+    final width = WidgetUtils.sizeNum(props['width']);
+    final height = WidgetUtils.sizeNum(props['height']);
+    final alignment = WidgetUtils.alignment(props['alignment'] as String?);
+    final padding = WidgetUtils.edgeInsets(props['padding']);
+    final margin = WidgetUtils.edgeInsets(props['margin']);
+    final child = factory.buildFirstChild(context, children, type);
+    // duration<=0 时跳过 implicit animation 控制器，避免每帧空转 ticker。
+    Widget container = durationMs <= 0
+        ? Container(
+            width: width,
+            height: height,
+            constraints: constraints,
+            alignment: alignment,
+            padding: padding,
+            margin: margin,
+            decoration: decoration,
+            child: child,
+          )
+        : AnimatedContainer(
+            duration: Duration(milliseconds: durationMs),
+            curve: WidgetUtils.parseCurve(props['curve'] as String?),
+            width: width,
+            height: height,
+            constraints: constraints,
+            alignment: alignment,
+            padding: padding,
+            margin: margin,
+            decoration: decoration,
+            child: child,
+          );
 
     // 手势支持：onTap / onLongPress
     final dynamic onTapProp = props['onTap'];

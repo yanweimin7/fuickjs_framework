@@ -4,8 +4,8 @@ import 'package:flutter/cupertino.dart';
 import '../container/fuick_app_controller.dart';
 import '../logger.dart';
 import 'bundle_preloader.dart';
-import 'engine.dart';
 import 'jscontext_delegate.dart';
+import 'worker.dart';
 
 /// 预渲染页面描述
 class PrewarmPageConfig {
@@ -37,8 +37,16 @@ class FuickAppContext {
   Future<void>? _initFuture;
 
   Future<void> init() {
-    _initFuture ??= _doInit();
-    return _initFuture!;
+    final inflight = _initFuture;
+    if (inflight != null) return inflight;
+    final future = _doInit();
+    _initFuture = future;
+    // 失败时清空 _initFuture，允许调用方重试；不在 _doInit 内部清，是为了避免
+    // 同一时间窗内并发 init() 重复触发引擎初始化。
+    future.catchError((e) {
+      _initFuture = null;
+    });
+    return future;
   }
 
   /// 预渲染页面（可在 init 完成前调用，会排队等 bundle 加载完后执行）
@@ -62,24 +70,25 @@ class FuickAppContext {
     }
 
     try {
-      final contextId = '${appName}_${DateTime.now().microsecondsSinceEpoch}';
-      await EngineInit.initIsolate();
-      logger.d(
-        '[Performance] initIsolate cost: ${stopwatch.elapsedMilliseconds}ms',
-      );
-      final delegate = JsContextDelegate(contextId);
-      await delegate.init();
-      logger.d(
-        '[Performance] JsContextDelegate.init cost: ${stopwatch.elapsedMilliseconds}ms',
-      );
-      ctx = delegate;
-      appController = FuickAppController(ctx);
-
+      await _initContext(stopwatch);
       isReady.value = true;
       await _loadBundle();
     } catch (e, s) {
       logger.e('FuickAppContext init failed: $e\n$s');
+      isReady.value = false;
+      rethrow;
     }
+  }
+
+  Future<void> _initContext(Stopwatch stopwatch) async {
+    final contextId = '${appName}_${DateTime.now().microsecondsSinceEpoch}';
+    await IsolateWorker.instance.ensureInitialized();
+    logger.d('[Performance] isolate init cost: ${stopwatch.elapsedMilliseconds}ms');
+    final delegate = JsContextDelegate(contextId);
+    await delegate.init();
+    logger.d('[Performance] JsContextDelegate.init cost: ${stopwatch.elapsedMilliseconds}ms');
+    ctx = delegate;
+    appController = FuickAppController(ctx);
   }
 
   Future<void> _loadBundle() async {

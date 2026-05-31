@@ -14,6 +14,55 @@ export interface Paint {
   isAntiAlias?: boolean;
 }
 
+export class Path {
+  private operations: unknown[] = [];
+
+  moveTo(x: number, y: number) {
+    this.operations.push({ type: 'moveTo', x, y });
+  }
+
+  lineTo(x: number, y: number) {
+    this.operations.push({ type: 'lineTo', x, y });
+  }
+
+  quadraticBezierTo(x1: number, y1: number, x2: number, y2: number) {
+    this.operations.push({ type: 'quadraticBezierTo', x1, y1, x2, y2 });
+  }
+
+  cubicTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) {
+    this.operations.push({ type: 'cubicTo', x1, y1, x2, y2, x3, y3 });
+  }
+
+  arcTo(
+    rect: { left: number; top: number; width: number; height: number },
+    startAngle: number,
+    sweepAngle: number,
+    forceMoveTo?: boolean
+  ) {
+    this.operations.push({ type: 'arcTo', rect, startAngle, sweepAngle, forceMoveTo: forceMoveTo ?? true });
+  }
+
+  addRect(rect: { left: number; top: number; width: number; height: number }) {
+    this.operations.push({ type: 'addRect', rect });
+  }
+
+  addOval(rect: { left: number; top: number; width: number; height: number }) {
+    this.operations.push({ type: 'addOval', rect });
+  }
+
+  addRRect(rrect: { left: number; top: number; width: number; height: number; radius: number }) {
+    this.operations.push({ type: 'addRRect', rrect });
+  }
+
+  close() {
+    this.operations.push({ type: 'close' });
+  }
+
+  serialize() {
+    return { operations: this.operations };
+  }
+}
+
 export class CustomPainter {
   id: number;
   private commands: unknown[] = [];
@@ -90,6 +139,10 @@ export class CustomPainter {
     paint: Paint
   ) {
     this.commands.push({ type: 'drawRRect', rrect, paint });
+  }
+
+  drawPath(path: Path, paint: Paint) {
+    this.commands.push({ type: 'drawPath', path: path.serialize(), paint });
   }
 
   serialize() {
