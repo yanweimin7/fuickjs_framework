@@ -67,13 +67,7 @@ class IsolateWorker {
       completer.completeError(e);
     }
 
-    return completer.future.timeout(
-      const Duration(seconds: 30),
-      onTimeout: () {
-        _pendingRequests.remove(id);
-        throw TimeoutException('Request $type timed out after 30 seconds');
-      },
-    );
+    return completer.future;
   }
 
   FutureOr<void> _mainHandler(dynamic data, SendPort isolateSendPort) async {

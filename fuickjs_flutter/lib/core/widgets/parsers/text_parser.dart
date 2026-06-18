@@ -11,33 +11,17 @@ class TextParser extends WidgetParser {
   Widget parse(BuildContext context, Map<String, dynamic> props,
       dynamic children, WidgetFactory factory) {
     String text = (props['text'] ?? '').toString();
-    final dynamic fontSizeProp = props['fontSize'];
-    final String? colorProp = props['color'] as String?;
-    final String? fontWeightProp = props['fontWeight'] as String?;
-    final String? fontStyleProp = props['fontStyle'] as String?;
-    final String? fontFamilyProp = props['fontFamily'] as String?;
     final bool selectionDisabled = props['selectionDisabled'] == true;
     final String? textAlignProp = props['textAlign'] as String?;
     final String? overflowProp = props['overflow'] as String?;
     final dynamic maxLinesProp = props['maxLines'];
-    final String? textDecorationProp = props['textDecoration'] as String?;
     final String? textTransformProp = props['textTransform'] as String?;
-    final dynamic textShadowProp = props['textShadow'];
-    final dynamic letterSpacingProp = props['letterSpacing'];
-    final dynamic lineHeightProp = props['lineHeight'];
     final bool? softWrapProp = props['softWrap'] as bool?;
 
-    final fontSize = WidgetUtils.asDoubleOrNull(fontSizeProp);
-    final color = WidgetUtils.colorFromHex(colorProp);
-    final fontWeight = WidgetUtils.fontWeight(fontWeightProp);
     final selectable = props['selectable'] == true;
-    final fontStyle = fontStyleProp == 'italic' ? FontStyle.italic : FontStyle.normal;
-    final decoration = WidgetUtils.textDecoration(textDecorationProp);
-    final shadows = WidgetUtils.getTextShadow(textShadowProp);
-    final letterSpacing = WidgetUtils.asDoubleOrNull(letterSpacingProp);
-    final lineHeight = WidgetUtils.asDoubleOrNull(lineHeightProp);
-    final lineHeightIsAbsolute = props['_lineHeightIsAbsolute'] == true;
-    final wordSpacing = WidgetUtils.asDoubleOrNull(props['wordSpacing']);
+
+    // TextStyle 仅依赖样式字段，按 props 实例缓存，避免每次 build 重新构造。
+    final style = WidgetUtils.textStyleFromProps(props);
 
     // text-transform：构建时来不及处理的动态文本在运行时转换
     if (textTransformProp != null) {
@@ -53,23 +37,6 @@ class TextParser extends WidgetParser {
           break;
       }
     }
-
-    final style = TextStyle(
-      fontSize: fontSize,
-      color: color,
-      fontWeight: fontWeight,
-      fontStyle: fontStyle,
-      fontFamily: fontFamilyProp,
-      decoration: decoration,
-      shadows: shadows,
-      letterSpacing: letterSpacing,
-      wordSpacing: wordSpacing,
-      // lineHeightIsAbsolute=true: line-height:24px → 需要除以 fontSize 得倍数
-      // lineHeightIsAbsolute=false: line-height:1.5 → 直接作为倍数
-      height: lineHeight != null
-          ? (lineHeightIsAbsolute && fontSize != null ? lineHeight / fontSize : lineHeight)
-          : null,
-    );
 
     TextAlign? textAlign;
     switch (textAlignProp) {

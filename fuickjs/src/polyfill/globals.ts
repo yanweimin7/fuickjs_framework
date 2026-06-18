@@ -12,6 +12,7 @@ import { WebSocket, base64ToArrayBuffer } from '../ex/websocket';
 import { Headers } from '../ex/headers';
 import { Blob } from '../ex/blob';
 import { ErrorHandler } from '../core/ErrorHandler';
+import { navigator, initNavigator } from './navigator';
 
 const globalAny = globalThis as any;
 
@@ -57,6 +58,16 @@ export function setupGlobals() {
     writable: false,
     configurable: false,
   });
+
+  Object.defineProperty(globalThis, 'navigator', {
+    value: navigator,
+    writable: false,
+    configurable: false,
+  });
+
+  // Kick off async device info fetch — non-blocking, navigator works with
+  // sensible defaults immediately.
+  initNavigator().catch(() => {});
 
   const handleError = (error: unknown, source: 'promise' | 'runtime', detail?: unknown) => {
     ErrorHandler.notify(error, source, detail);

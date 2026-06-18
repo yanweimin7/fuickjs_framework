@@ -3,6 +3,27 @@ import { PageContainer } from './PageContainer';
 
 export const TEXT_TYPE = 'Text';
 
+// 已是绝对/网络/内联资源的 src，无需改写。
+const ABSOLUTE_ASSET_RE = /^(https?:\/\/|file:\/\/|data:|\/)/i;
+
+/**
+ * 将 bundle 内相对图片路径透明解析为 file://<root>/assets/<src>。
+ * - 业务照写相对路径（如 "images/logo.png"），无需任何 API。
+ * - 无动态包（root 缺失）时原样返回，由 Flutter 走 Image.asset 兜底。
+ * 数据源：引擎在 eval 前注入的 globalThis.__FUICK_BUNDLE__ = { name, root }。
+ */
+function resolveBundleAssetPath(src: unknown): unknown {
+  if (typeof src !== 'string' || src.length === 0) return src;
+  if (ABSOLUTE_ASSET_RE.test(src)) return src;
+  const bundle = (globalThis as unknown as { __FUICK_BUNDLE__?: { root?: unknown } }).__FUICK_BUNDLE__;
+  const root = bundle && bundle.root;
+  if (!root || typeof root !== 'string') return src;
+  const rel = src.replace(/^\.?\//, '');
+  return `file://${root}/assets/${rel}`;
+}
+
+const IMAGE_ASSET_PROP_KEYS = ['src', 'url', 'errorSrc', 'errorUrl'];
+
 export class Node {
   id: number;
   type: string;
@@ -27,7 +48,15 @@ export class Node {
     this.applyProps(props);
   }
 
-  applyProps(newProps: Record<string, unknown> | null) {
+  /**
+   * 应用新 props。
+   * @param hasDslChanges 本次更新是否包含影响 DSL 的变更。默认 true（首次挂载/结构变更）。
+   *   当仅有回调函数引用变化时（hostConfig.diffProps 判定 hasDslChanges=false），
+   *   DSL 序列化结果不变——事件在 DSL 中表示为 { nodeId, eventKey, ... } 协议对象，
+   *   不内嵌函数体，调用时按 (nodeId, eventKey) 在回调表中查找。
+   *   因此此时无需失效 DSL 缓存，仅需照常重注册回调。
+   */
+  applyProps(newProps: Record<string, unknown> | null, hasDslChanges = true) {
     const oldRefId = this.props?.refId;
     if (oldRefId && typeof oldRefId === 'string') {
       this.container?.unregisterNode(this);
@@ -51,8 +80,10 @@ export class Node {
 
     this.container?.registerNode(this);
 
-    this._dslCacheDirty = true;
-    this._invalidateParentDslCache();
+    if (hasDslChanges) {
+      this._dslCacheDirty = true;
+      this._invalidateParentDslCache();
+    }
   }
 
   private _isTransparent(): boolean {
@@ -160,6 +191,15 @@ export class Node {
       string,
       unknown
     >;
+
+    // Image 资源相对路径 → 动态包绝对路径（透明，业务无感）。
+    if (type === 'Image') {
+      for (const k of IMAGE_ASSET_PROP_KEYS) {
+        if (props[k] !== undefined) {
+          props[k] = resolveBundleAssetPath(props[k]);
+        }
+      }
+    }
 
     // Use refId from props if provided
     const refId = this.props?.refId;

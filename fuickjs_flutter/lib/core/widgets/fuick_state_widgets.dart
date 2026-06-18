@@ -389,3 +389,72 @@ class _FuickItemDSLBuilderState extends State<FuickItemDSLBuilder> {
     return widget.builder(context, _dsl);
   }
 }
+
+/// 包裹滚动 Widget，只在边缘状态变化时触发 onStartReached / onEndReached，
+/// 避免在阈值范围内重复回调。
+class FuickScrollEdgeNotifier extends StatefulWidget {
+  final Widget child;
+  final void Function(ScrollMetrics metrics)? onScroll;
+  final VoidCallback? onStartReached;
+  final VoidCallback? onEndReached;
+  final double startThreshold;
+  final double endThreshold;
+
+  const FuickScrollEdgeNotifier({
+    super.key,
+    required this.child,
+    this.onScroll,
+    this.onStartReached,
+    this.onEndReached,
+    this.startThreshold = 50.0,
+    this.endThreshold = 50.0,
+  });
+
+  @override
+  State<FuickScrollEdgeNotifier> createState() =>
+      _FuickScrollEdgeNotifierState();
+}
+
+class _FuickScrollEdgeNotifierState extends State<FuickScrollEdgeNotifier> {
+  bool _wasAtStart = false;
+  bool _wasAtEnd = false;
+
+  bool _isAtStart(ScrollMetrics m) => m.pixels <= widget.startThreshold;
+  bool _isAtEnd(ScrollMetrics m) =>
+      m.pixels >= m.maxScrollExtent - widget.endThreshold;
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        final metrics = notification.metrics;
+
+        if (widget.onScroll != null &&
+            notification is ScrollUpdateNotification) {
+          widget.onScroll!(metrics);
+        }
+
+        if (widget.onStartReached != null &&
+            notification is ScrollUpdateNotification) {
+          final atStart = _isAtStart(metrics);
+          if (atStart && !_wasAtStart) {
+            widget.onStartReached!();
+          }
+          _wasAtStart = atStart;
+        }
+
+        if (widget.onEndReached != null &&
+            notification is ScrollUpdateNotification) {
+          final atEnd = _isAtEnd(metrics);
+          if (atEnd && !_wasAtEnd) {
+            widget.onEndReached!();
+          }
+          _wasAtEnd = atEnd;
+        }
+
+        return false;
+      },
+      child: widget.child,
+    );
+  }
+}

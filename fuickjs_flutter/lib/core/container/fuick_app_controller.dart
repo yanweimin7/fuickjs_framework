@@ -24,8 +24,8 @@ class FuickAppController {
   late final FuickNavigationDelegate navigation;
   late final FuickPageDelegate page;
 
-  final RouteObserver<ModalRoute<void>> routeObserver =
-      RouteObserver<ModalRoute<void>>();
+  final RouteObserver<Route<dynamic>> routeObserver =
+      RouteObserver<Route<dynamic>>();
 
   final FuickCommandBus commandBus = FuickCommandBus();
   final serviceBinder = AppServiceBinder();

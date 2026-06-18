@@ -1,4 +1,3 @@
-
 export interface DeviceInfoData {
   os: string;
   osVersion: string;

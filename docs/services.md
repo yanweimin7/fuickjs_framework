@@ -53,6 +53,14 @@
 **DeviceInfo（设备信息）**
 - `getDeviceInfo(): Promise<DeviceInfoData>`: OS、版本、屏幕宽高、像素比等
 
+**LifecycleService（App 生命周期）**
+- `getState(): Promise<string>`: 查询当前 App 前后台状态，返回 Flutter `AppLifecycleState` 名称（`resumed` / `paused` / `inactive` / `hidden`）
+- `isInBackground: boolean`: 当前是否在后台（同步 getter）
+- `onChange(callback: (state: 'foreground' | 'background') => void): () => void`: 订阅前后台切换事件，返回取消订阅函数
+- `useAppState()` hook: React 组件中更便捷地使用，返回 `{ isInBackground: boolean }`
+
+> **自动整合**：App 进入后台时，LifecycleService 会自动触发 `useInvisible` 回调；回到前台时触发 `useVisible` 回调。无需额外适配。实现原理：Flutter `WidgetsBindingObserver` 检测 `AppLifecycleState` 变化 → `NativeEventService` 发送事件到 JS → JS `LifecycleService` 调用 `PageContainer.notifyVisible/Invisible`。
+
 **LocalStorage（本地存储）**
 - `getItem(key) / setItem(key, value) / removeItem(key) / clear()` — 均为异步
 
@@ -147,5 +155,6 @@ FuickJS 在 QuickJS 环境中补齐了 Web 标准 API，通过 Flutter 原生能
 2. **JS 侧**
    - 在 `fuickjs/src/services/` 创建对应 TS 类
    - 用全局 `dartCallNative` / `dartCallNativeAsync` 调用
+   - **调用方式可混用**：Dart 注册同步方法时 TS 可用 `dartCallNativeAsync`；Dart 注册异步方法时 TS 可用 `dartCallNative`（引擎层会返回 Promise）
    - 在 `fuickjs/src/index.ts` 导出
 3. **同步文档**：更新本列表

@@ -31,7 +31,7 @@ export class NavigatorService {
   }
 
   static pushReplace(path: string, params: unknown, pageId?: number | null, rootNavigator?: boolean): Promise<unknown> {
-    return dartCallNative('Navigator.pushReplace', { path, params, pageId, rootNavigator });
+    return dartCallNativeAsync('Navigator.pushReplace', { path, params, pageId, rootNavigator });
   }
 
   static showDialog(
@@ -68,6 +68,14 @@ export class NavigatorService {
 
   static pop(pageId?: number | null, rootNavigator?: boolean, result?: unknown) {
     dartCallNative('Navigator.pop', { pageId, rootNavigator, result });
+  }
+
+  static popTo(name: string, pageId?: number | null) {
+    dartCallNative('Navigator.popTo', { name, pageId });
+  }
+
+  static popAll(pageId?: number | null) {
+    dartCallNative('Navigator.popAll', { pageId });
   }
 
   static prewarm(path: string, params: unknown, pageId?: number | null, prewarmMs = 50): void {

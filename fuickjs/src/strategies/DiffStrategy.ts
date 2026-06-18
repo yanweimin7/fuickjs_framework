@@ -2,6 +2,7 @@ import { Node } from '../core/node';
 import { PageContainer } from '../core/PageContainer';
 import { UIService } from '../services/UIService';
 import { perfLog } from '../utils/log';
+import { markDslReady, markSendEnd } from '../utils/perf-timing';
 
 export class DiffStrategy {
   private container: PageContainer;
@@ -47,12 +48,14 @@ export class DiffStrategy {
       const dslStart = Date.now();
       const dsl = this.container.root?.toDsl();
       const dslEnd = Date.now();
+      markDslReady(pageId);
       if (dsl && (dsl as { type: unknown }).type) {
         const sendStart = Date.now();
         UIService.renderUI(Number(pageId), dsl);
         const sendEnd = Date.now();
+        markSendEnd(pageId);
         this.rendered = true;
-        console.log(
+        perfLog(
           `[Perf] page=${pageId} commit(full) total=${sendEnd - commitStart}ms (toDsl=${dslEnd - dslStart}ms, sendToFlutter=${sendEnd - sendStart}ms)`,
         );
       }
@@ -108,7 +111,7 @@ export class DiffStrategy {
         const changedNodeTypes = Array.from(topLevelNodes)
           .map((n) => n.type)
           .join(', ');
-        console.log(
+        perfLog(
           `[Perf] page=${pageId} commit(patchUI) nodes=${topLevelNodes.size} types=[${changedNodeTypes}] total=${sendEnd - commitStart}ms (toDsl=${dslEnd - dslStart}ms, sendToFlutter=${sendEnd - sendStart}ms)`,
         );
       }

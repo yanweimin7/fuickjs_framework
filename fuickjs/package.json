@@ -12,14 +12,14 @@
   "dependencies": {
     "buffer": "^6.0.3",
     "crypto-js": "^4.2.0",
-    "react": "^18.2.0",
-    "react-reconciler": "^0.29.2"
+    "react": "^19.2.0",
+    "react-reconciler": "^0.33.0"
   },
   "devDependencies": {
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^25.5.0",
-    "@types/react": "^19.2.7",
-    "@types/react-reconciler": "^0.32.3",
+    "@types/react": "^19.2.0",
+    "@types/react-reconciler": "^0.33.0",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "eslint": "^9.39.2",

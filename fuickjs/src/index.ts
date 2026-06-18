@@ -18,6 +18,9 @@ export * from './runtime';
 // 服务
 export * from './services';
 
+// 国际化 (i18n)
+export * from './i18n';
+
 // 内部状态
 export * from './store';
 

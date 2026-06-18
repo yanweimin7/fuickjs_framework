@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fuickjs_flutter/offline/domain/entities/package.dart';
 import 'package:fuickjs_flutter/offline/domain/services/sync_service.dart';
+import 'package:fuickjs_flutter/offline/domain/value_objects/sync_result.dart';
 
 void main() {
   group('SyncService', () {
@@ -14,9 +15,23 @@ void main() {
       return Package(name: name, version: version, shasum: shasum, url: url);
     }
 
+    SyncResult run({
+      List<Package> remote = const [],
+      List<Package> internal = const [],
+      List<Package> active = const [],
+      String appVersion = '99.0.0',
+    }) {
+      return syncService.sync(
+        remote: remote,
+        internal: internal,
+        active: active,
+        appVersion: appVersion,
+      );
+    }
+
     group('sync', () {
       test('should return empty result when no packages', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [],
           internal: [],
           active: [],
@@ -28,7 +43,7 @@ void main() {
       });
 
       test('should add new packages not in active', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [pkg('pkg1', '1.0.0', 'abc123')],
           internal: [],
           active: [],
@@ -41,7 +56,7 @@ void main() {
       });
 
       test('should not add packages already active with same version', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [pkg('pkg1', '1.0.0', 'abc123')],
           internal: [],
           active: [pkg('pkg1', '1.0.0', 'abc123')],
@@ -52,7 +67,7 @@ void main() {
       });
 
       test('should mark packages with different version as updated', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [pkg('pkg1', '2.0.0', 'def456')],
           internal: [],
           active: [pkg('pkg1', '1.0.0', 'abc123')],
@@ -64,7 +79,7 @@ void main() {
       });
 
       test('should remove packages not in remote', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [],
           internal: [],
           active: [pkg('pkg1', '1.0.0', 'abc123')],
@@ -77,7 +92,7 @@ void main() {
       });
 
       test('should handle multiple packages correctly', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [
             pkg('pkg1', '1.0.0', 'aaa'),
             pkg('pkg2', '2.0.0', 'bbb'),
@@ -98,7 +113,7 @@ void main() {
 
       group('internal package priority', () {
         test('should prefer internal package when version and shasum match', () {
-          final result = syncService.sync(
+          final result = run(
             remote: [pkg('pkg1', '1.0.0', 'same123', url: 'https://remote.com/pkg1.zip')],
             internal: [pkg('pkg1', '1.0.0', 'same123', url: 'assets://internal/pkg1.zip')],
             active: [],
@@ -112,7 +127,7 @@ void main() {
         });
 
         test('should use remote when internal shasum differs', () {
-          final result = syncService.sync(
+          final result = run(
             remote: [pkg('pkg1', '1.0.0', 'remote123')],
             internal: [pkg('pkg1', '1.0.0', 'internal123')],
             active: [],
@@ -124,7 +139,7 @@ void main() {
         });
 
         test('should use remote when internal version differs', () {
-          final result = syncService.sync(
+          final result = run(
             remote: [pkg('pkg1', '1.0.0', 'remote123')],
             internal: [pkg('pkg1', '2.0.0', 'internal123')],
             active: [],
@@ -135,7 +150,7 @@ void main() {
         });
 
         test('should ignore internal-only packages (remote list is complete)', () {
-          final result = syncService.sync(
+          final result = run(
             remote: [],
             internal: [pkg('pkg1', '1.0.0', 'internal123')],
             active: [],
@@ -147,7 +162,7 @@ void main() {
 
       group('complex scenarios', () {
         test('should handle mixed remote and internal', () {
-          final result = syncService.sync(
+          final result = run(
             remote: [
               pkg('pkg1', '1.0.0', 'same1'),
               pkg('pkg2', '2.0.0', 'remote2'),
@@ -168,7 +183,7 @@ void main() {
         });
 
         test('should update when internal version available for active remote package', () {
-          final result = syncService.sync(
+          final result = run(
             remote: [pkg('pkg1', '1.0.0', 'same1')],
             internal: [pkg('pkg1', '1.0.0', 'same1')],
             active: [pkg('pkg1', '1.0.0', 'old1')],
@@ -182,7 +197,7 @@ void main() {
 
     group('hasChanges', () {
       test('should return false when no changes', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [pkg('pkg1', '1.0.0', 'abc')],
           internal: [],
           active: [pkg('pkg1', '1.0.0', 'abc')],
@@ -192,7 +207,7 @@ void main() {
       });
 
       test('should return true when there are added packages', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [pkg('pkg1', '1.0.0', 'abc')],
           internal: [],
           active: [],
@@ -202,7 +217,7 @@ void main() {
       });
 
       test('should return true when there are updated packages', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [pkg('pkg1', '2.0.0', 'def')],
           internal: [],
           active: [pkg('pkg1', '1.0.0', 'abc')],
@@ -212,7 +227,7 @@ void main() {
       });
 
       test('should return true when there are removed packages', () {
-        final result = syncService.sync(
+        final result = run(
           remote: [],
           internal: [],
           active: [pkg('pkg1', '1.0.0', 'abc')],
@@ -221,5 +236,30 @@ void main() {
         expect(result.hasChanges, true);
       });
     });
+
+    group('minAppVersion', () {
+      test('should skip package when app version is too low', () {
+        final p = Package(
+          name: 'pkg1',
+          version: '1.0.0',
+          shasum: 'abc',
+          minAppVersion: '5.0.0',
+        );
+        final result = run(remote: [p], appVersion: '3.0.0');
+        expect(result.added, isEmpty);
+      });
+
+      test('should add package when app version satisfies minAppVersion', () {
+        final p = Package(
+          name: 'pkg1',
+          version: '1.0.0',
+          shasum: 'abc',
+          minAppVersion: '3.0.0',
+        );
+        final result = run(remote: [p], appVersion: '3.0.0');
+        expect(result.added.length, 1);
+      });
+    });
+
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../container/fuick_action.dart';
 import '../../container/fuick_app_controller.dart';
 import '../../container/fuick_page_view.dart';
 import '../../utils/extensions.dart';
@@ -36,8 +37,13 @@ class ListViewParser extends WidgetParser {
     final dynamic paddingProp = props['padding'];
     final String? scrollDirectionProp =
         props['scrollDirection'] as String? ?? props['orientation'] as String?;
+    final onScrollEvent = props['onScroll'];
+    final onScrollStartReachedEvent = props['onScrollStartReached'];
+    final onScrollEndReachedEvent = props['onScrollEndReached'];
+    final startThreshold = asDoubleOrNull(props['startThreshold']) ?? 50.0;
+    final endThreshold = asDoubleOrNull(props['endThreshold']) ?? 50.0;
 
-    return WidgetUtils.wrapPadding(
+    Widget listView = WidgetUtils.wrapPadding(
       props,
       FuickListView(
         refId: refId,
@@ -83,6 +89,34 @@ class ListViewParser extends WidgetParser {
         children: hasBuilder ? null : factory.buildChildren(context, children),
       ),
     );
+
+    if (onScrollEvent != null ||
+        onScrollStartReachedEvent != null ||
+        onScrollEndReachedEvent != null) {
+      listView = FuickScrollEdgeNotifier(
+        startThreshold: startThreshold,
+        endThreshold: endThreshold,
+        onScroll: onScrollEvent != null
+            ? (metrics) {
+                FuickAction.event(context, onScrollEvent, value: {
+                  'pixels': metrics.pixels,
+                  'axis':
+                      metrics.axis == Axis.vertical ? 'vertical' : 'horizontal',
+                  'maxScrollExtent': metrics.maxScrollExtent,
+                });
+              }
+            : null,
+        onStartReached: onScrollStartReachedEvent != null
+            ? () => FuickAction.event(context, onScrollStartReachedEvent)
+            : null,
+        onEndReached: onScrollEndReachedEvent != null
+            ? () => FuickAction.event(context, onScrollEndReachedEvent)
+            : null,
+        child: listView,
+      );
+    }
+
+    return listView;
   }
 
   Widget _buildItem(BuildContext context, WidgetFactory factory, dynamic dsl) {

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fjs_engine/core/jsc_runtime.dart';
 import 'package:fjs_engine/core/quickjs_ffi.dart';
 import 'package:fjs_engine/core/runtime.dart';
@@ -46,4 +48,9 @@ class EngineInit {
   static void setUseBinaryProtocol(bool use) {
     _qjs?.setUseBinaryProtocol(use);
   }
+
+  /// 当前引擎是否支持 JS 源码 → 字节码本地编译。
+  /// JSC 无便携字节码格式，仅 QuickJS 支持。
+  static bool get supportsBytecodeCompilation =>
+      !(useJscOnIos && Platform.isIOS);
 }

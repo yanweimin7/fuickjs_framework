@@ -1,6 +1,7 @@
 import * as PageRender from '../core/page_render';
 import * as Timer from '../ex/timer';
 import { setDebug } from '../utils/log';
+import { i18n } from '../i18n/i18n';
 import '../polyfill';
 
 export interface FuickConfig {
@@ -42,6 +43,7 @@ export function bindGlobals() {
       handleTimer: Timer.handleTimer,
       configure,
       getConfig: getRuntimeConfig,
+      i18n,
     },
   });
 }

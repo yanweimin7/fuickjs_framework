@@ -1,9 +1,10 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState, useRef } from 'react';
 import { PageContext } from '../core/PageContext';
 import * as PageRender from '../core/page_render';
 
 import { NavigatorService } from '../services/NavigatorService';
 import { NativeEvent } from '../runtime/NativeEvent';
+import { LifecycleService } from '../services/LifecycleService';
 
 export function usePageId() {
   const { pageId } = useContext(PageContext);
@@ -33,35 +34,48 @@ export function useNavigator() {
 export function useVisible(callback: () => void) {
   const { pageId } = useContext(PageContext);
 
+  // Use a ref to hold the latest callback so that changes do not trigger
+  // re-registration. registerVisibleCallback fires immediately when the
+  // page is already visible; if the callback also triggers a re-render
+  // (e.g. via setState), passing a new anonymous function each render
+  // would cause an infinite loop.
+  const cbRef = useRef(callback);
+  cbRef.current = callback;
+
   useEffect(() => {
+    const stableFn = () => cbRef.current();
     const container = PageRender.getContainer(pageId);
     if (container) {
-      container.registerVisibleCallback(callback);
+      container.registerVisibleCallback(stableFn);
     }
     return () => {
       const container = PageRender.getContainer(pageId);
       if (container) {
-        container.unregisterVisibleCallback(callback);
+        container.unregisterVisibleCallback(stableFn);
       }
     };
-  }, [pageId, callback]);
+  }, [pageId]);
 }
 
 export function useInvisible(callback: () => void) {
   const { pageId } = useContext(PageContext);
 
+  const cbRef = useRef(callback);
+  cbRef.current = callback;
+
   useEffect(() => {
+    const stableFn = () => cbRef.current();
     const container = PageRender.getContainer(pageId);
     if (container) {
-      container.registerInvisibleCallback(callback);
+      container.registerInvisibleCallback(stableFn);
     }
     return () => {
       const container = PageRender.getContainer(pageId);
       if (container) {
-        container.unregisterInvisibleCallback(callback);
+        container.unregisterInvisibleCallback(stableFn);
       }
     };
-  }, [pageId, callback]);
+  }, [pageId]);
 }
 
 export function usePageConfig(config: { incrementalMode?: boolean; dslCacheEnabled?: boolean }) {
@@ -99,4 +113,38 @@ export function useRouteTransitionComplete(callback: (result: RouteTransitionRes
       NativeEvent.off('routeTransitionComplete', handler);
     };
   }, [pageId, callback]);
+}
+
+/**
+ * Subscribe to app-level foreground/background state changes.
+ *
+ * Returns `{ isInBackground: boolean }` that updates reactively whenever the
+ * app enters the background or returns to the foreground.
+ *
+ * Unlike [useVisible] / [useInvisible] which fire per-page, this hook is
+ * page-independent and fires on every app state transition.
+ *
+ * @example
+ * ```tsx
+ * const { isInBackground } = useAppState();
+ * useEffect(() => {
+ *   if (isInBackground) {
+ *     // Pause animations, stop polling, etc.
+ *   } else {
+ *     // Resume work.
+ *   }
+ * }, [isInBackground]);
+ * ```
+ */
+export function useAppState(): { isInBackground: boolean } {
+  const [isInBackground, setIsInBackground] = useState(() => LifecycleService.isInBackground);
+
+  useEffect(() => {
+    const unsubscribe = LifecycleService.onChange((state) => {
+      setIsInBackground(state === 'background');
+    });
+    return unsubscribe;
+  }, []);
+
+  return { isInBackground };
 }

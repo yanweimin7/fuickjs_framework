@@ -232,11 +232,27 @@ class FuickNodeManager {
 
         final parent = _nodes[parentId];
         if (parent != null) {
-          parent.children.removeWhere((c) => c.id == childId);
+          final idx = parent.children.indexWhere((c) => c.id == childId);
+          if (idx >= 0) {
+            final removed = parent.children.removeAt(idx);
+            // 递归从 _nodes 注销被删子树，避免节点表只增不删导致的内存泄漏。
+            _disposeSubtree(removed);
+          }
           parent.version++;
           manager.notify(parentId, parent);
         }
       }
+    }
+  }
+
+  /// 递归把子树从 _nodes 中移除。仅当表中记录的就是该节点本身时才移除，
+  /// 防止误删被复用（同 id）的其他节点。
+  void _disposeSubtree(FuickNode node) {
+    if (identical(_nodes[node.id], node)) {
+      _nodes.remove(node.id);
+    }
+    for (final child in node.children) {
+      _disposeSubtree(child);
     }
   }
 }

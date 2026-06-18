@@ -6,6 +6,7 @@ import 'file_system_service.dart';
 import 'native_event_service.dart';
 import 'navigation_service.dart';
 import 'network_service.dart';
+import 'lifecycle_service.dart';
 import 'local_storage_service.dart';
 import 'timer_service.dart';
 import 'toast_service.dart';
@@ -39,6 +40,7 @@ class NativeServiceManager {
     registerService(() => DialogService());
     registerService(() => WebSocketService());
     registerService(() => SoundService());
+    registerService(() => LifecycleService());
   }
 
   void registerService(ServiceBuilder serviceBuilder) {

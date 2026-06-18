@@ -98,6 +98,8 @@ class TextFieldParser extends WidgetParser {
     }
   }
 
+  // iOS 不支持 TextInputAction.none，会触发断言崩溃；
+  // 将 'none' 映射为 unspecified（语义最接近：无特定动作）。
   TextInputAction? _parseTextInputAction(String? value) {
     switch (value) {
       case 'done':
@@ -111,7 +113,7 @@ class TextFieldParser extends WidgetParser {
       case 'send':
         return TextInputAction.send;
       case 'none':
-        return TextInputAction.none;
+        return TextInputAction.unspecified;
       case 'unspecified':
         return TextInputAction.unspecified;
       default:
@@ -307,6 +309,16 @@ class _FuickTextFieldState extends State<FuickTextField>
       ),
       onChanged: widget.onChanged,
       onSubmitted: widget.onSubmitted,
+      // iOS 16+ 在 Overlay/Dialog 中使用原生系统上下文菜单时，
+      // TextInputConnection 可能因 Overlay rebuild 断开，
+      // 导致 'TextInput._instance._currentConnection != null' 断言崩溃。
+      // 使用 AdaptiveTextSelectionToolbar.buttonItems 替代原生菜单，避免此问题。
+      contextMenuBuilder: (context, editableTextState) {
+        return AdaptiveTextSelectionToolbar.buttonItems(
+          anchors: editableTextState.contextMenuAnchors,
+          buttonItems: editableTextState.contextMenuButtonItems,
+        );
+      },
     );
   }
 }

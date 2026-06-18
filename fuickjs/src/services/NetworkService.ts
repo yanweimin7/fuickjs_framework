@@ -1,4 +1,3 @@
-
 export interface NetworkResponse {
   status: number;
   headers: Record<string, string>;
@@ -39,7 +38,11 @@ export class NetworkService {
     formData?: Record<string, string>,
   ): Promise<{ statusCode: number; data: string }> {
     return (await dartCallNativeAsync('Network.uploadFile', {
-      url, filePath, name, header, formData,
+      url,
+      filePath,
+      name,
+      header,
+      formData,
     })) as { statusCode: number; data: string };
   }
 
@@ -49,7 +52,9 @@ export class NetworkService {
     header?: Record<string, string>,
   ): Promise<{ statusCode: number; tempFilePath: string }> {
     return (await dartCallNativeAsync('Network.downloadFile', {
-      url, filePath, header,
+      url,
+      filePath,
+      header,
     })) as { statusCode: number; tempFilePath: string };
   }
 }

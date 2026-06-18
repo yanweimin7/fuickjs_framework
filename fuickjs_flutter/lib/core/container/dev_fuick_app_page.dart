@@ -1,8 +1,9 @@
-import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../logger.dart';
@@ -16,53 +17,28 @@ class DevFuickAppPage extends StatefulWidget {
   final bool useIsolate;
   final bool useAotCode;
   final String debugServerUrl;
-  final RouteObserver<ModalRoute<void>>? routeObserver;
 
   const DevFuickAppPage({
     super.key,
     this.useIsolate = true,
     this.useAotCode = true,
     this.debugServerUrl = 'ws://127.0.0.1:8080',
-    this.routeObserver,
   });
 
   @override
   State<DevFuickAppPage> createState() => _DevFuickAppPageState();
 }
 
-class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
+class _DevFuickAppPageState extends State<DevFuickAppPage> {
   WebSocketChannel? _wsChannel;
-  bool _isShowingPreview = false;
+  bool _disposed = false;
   String? _lastDebugCode;
+  Map<String, dynamic>? _lastSourceMap;
+  String _lastAppName = 'bundle';
+  String? _cachedBundleRoot;
+  String? _assetsHash;
 
-  // 这里需要访问全局的 routeObserver。由于这是一个 package，
-  // 我们建议在应用层（main.dart）定义的 observer 通过某种方式传递，
-  // 或者在此处定义一个约定好的静态变量。
-  // 为了演示，我们假设它存在于 context 链中或者通过某种方式可访问。
-  // 实际上，更通用的做法是在 DevFuickAppPage 增加一个 RouteObserver 参数。
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final route = ModalRoute.of(context);
-    if (route is PageRoute) {
-      widget.routeObserver?.subscribe(this, route);
-    }
-  }
-
-  @override
-  void didPushNext() {
-    // 当有新页面覆盖当前页面时触发
-    _isShowingPreview = true;
-    logger.d('[Dev] RouteAware: didPushNext (preview opened)');
-  }
-
-  @override
-  void didPopNext() {
-    // 当覆盖层页面关闭，回到当前页面时触发
-    _isShowingPreview = false;
-    logger.d('[Dev] RouteAware: didPopNext (returned to debug console)');
-  }
+  String _makeAppName(String base) => '_dev_$base';
 
   @override
   void initState() {
@@ -71,6 +47,7 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
   }
 
   void _connectDebugServer() {
+    if (_disposed) return;
     try {
       _wsChannel = WebSocketChannel.connect(Uri.parse(widget.debugServerUrl));
       _wsChannel?.stream.listen(
@@ -79,7 +56,12 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
           if (data['type'] == 'reload') {
             logger.i('[Dev] Received reload signal and business payload');
             final payload = data['payload'];
-            _handleReload(businessCode: payload?['business']);
+            _handleReload(
+              businessCode: payload?['business'],
+              appName: payload?['appName'] as String? ?? 'bundle',
+              sourceMap: payload?['sourceMap'] as Map<String, dynamic>?,
+              assets: payload?['assets'] as Map<String, dynamic>?,
+            );
           }
         },
         onError: (error) {
@@ -95,7 +77,12 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
     }
   }
 
-  Future<void> _handleReload({String? businessCode}) async {
+  Future<void> _handleReload({
+    String? businessCode,
+    String appName = 'bundle',
+    Map<String, dynamic>? sourceMap,
+    Map<String, dynamic>? assets,
+  }) async {
     if (businessCode == null || businessCode.isEmpty) {
       logger.w('[Dev] No business code received, skip reload');
       return;
@@ -103,34 +90,68 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
 
     try {
       _lastDebugCode = businessCode;
-      logger.i('[Dev] Received bundle code (length: ${businessCode.length})');
+      _lastSourceMap = sourceMap;
+      _lastAppName = appName;
+      final debugAppName = _makeAppName(appName);
 
-      if (!mounted) return;
-
-      // 1. 如果当前已经打开了预览页面，先将其关闭
-      if (_isShowingPreview) {
-        Navigator.of(
-          context,
-        ).popUntil((e) => (e.settings.name) == debugRouteName);
-        // 给一点点时间让 pop 动画执行或状态重置
-        await Future.delayed(const Duration(milliseconds: 500));
+      if (assets != null) {
+        _cachedBundleRoot = await _saveAssets(assets, appName);
       }
 
       if (!mounted) return;
 
-      // 2. 自动打开一个新页面加载 FuickAppView
+      // pop 所有预览页（_dev_preview），不会误伤 /dev
+      Navigator.of(context).popUntil(
+        (route) => route.settings.name != '_dev_preview',
+      );
+      // CupertinoPageRoute pop 动画 400ms + dispose 数帧，
+      // 等 1s 确保旧 FuickAppView.dispose() → releaseContext() 完成后再 push。
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      if (!mounted) return;
+
       Navigator.of(context).push(
         CupertinoPageRoute(
+          settings: const RouteSettings(name: '_dev_preview'),
           builder: (context) => FuickAppView(
-            appName: 'dev_bundle',
+            appName: debugAppName,
             debugBusinessCode: _lastDebugCode,
+            sourceMap: _lastSourceMap,
+            cachedBundleRoot: _cachedBundleRoot,
           ),
         ),
       );
-      logger.d('[Dev] Opened new debug page with direct eval');
+      logger.d('[Dev] Opened new debug preview');
     } catch (e) {
       logger.e('[Dev] Failed to handle reload: $e');
     }
+  }
+
+  /// 将 assets base64 文件写入临时缓存目录，内容不变时跳过。
+  Future<String?> _saveAssets(Map<String, dynamic> assets, String appName) async {
+    final files = assets['files'] as Map<String, dynamic>?;
+    final hash = assets['hash'] as String?;
+    if (files == null || hash == null) return _cachedBundleRoot;
+    if (hash == _assetsHash && _cachedBundleRoot != null) {
+      return _cachedBundleRoot; // 没变化，复用
+    }
+
+    final dir = Directory(p.join(
+      Directory.systemTemp.path,
+      'fuick_debug_${appName}_$hash',
+    ));
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+      for (final entry in files.entries) {
+        // 与 zip 包结构对齐：<root>/assets/<rel>
+        final file = File(p.join(dir.path, 'assets', entry.key));
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(base64Decode(entry.value as String));
+      }
+    }
+    _assetsHash = hash;
+    logger.d('[Dev] Assets cached to ${dir.path} (${files.length} files)');
+    return dir.path;
   }
 
   @override
@@ -154,7 +175,9 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
             ),
             if (_lastDebugCode != null) ...[
               const SizedBox(height: 24),
-              const Text('状态: 已接收到最新代码'),
+              Text('Bundle: $_lastAppName'
+                  '${_lastSourceMap != null ? " (with sourcemap)" : ""}'),
+              const SizedBox(height: 4),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
@@ -172,7 +195,7 @@ class _DevFuickAppPageState extends State<DevFuickAppPage> with RouteAware {
 
   @override
   void dispose() {
-    widget.routeObserver?.unsubscribe(this);
+    _disposed = true;
     _wsChannel?.sink.close();
     super.dispose();
   }

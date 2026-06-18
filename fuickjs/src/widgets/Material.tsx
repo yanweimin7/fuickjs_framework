@@ -14,12 +14,14 @@ export interface MaterialProps extends WidgetProps {
     fontWeight?: 'normal' | 'bold';
     fontStyle?: 'normal' | 'italic';
   };
-  borderRadius?: number | {
-    topLeft?: number;
-    topRight?: number;
-    bottomLeft?: number;
-    bottomRight?: number;
-  };
+  borderRadius?:
+    | number
+    | {
+        topLeft?: number;
+        topRight?: number;
+        bottomLeft?: number;
+        bottomRight?: number;
+      };
   borderOnForeground?: boolean;
   clipBehavior?: 'none' | 'hardEdge' | 'antiAlias' | 'antiAliasWithSaveLayer';
   animationDuration?: number;

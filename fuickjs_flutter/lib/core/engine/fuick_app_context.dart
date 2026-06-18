@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../offline/offline.dart';
 import '../container/fuick_app_controller.dart';
 import '../logger.dart';
+import 'bundle_compiler.dart';
 import 'bundle_preloader.dart';
 import 'jscontext_delegate.dart';
 import 'worker.dart';
@@ -20,6 +24,8 @@ class FuickAppContext {
 
   final bool useAotCode;
   final String? debugBusinessCode;
+  final Map<String, dynamic>? sourceMap;
+  final String? cachedBundleRoot;
 
   /// init 完成后需要预渲染的页面列表
   List<PrewarmPageConfig>? _pendingPrewarmPages;
@@ -28,10 +34,15 @@ class FuickAppContext {
   late FuickAppController appController;
   final ValueNotifier<bool> isReady = ValueNotifier<bool>(false);
 
+  /// isolate 侧 contextId，用于向 isolate 发送 sourcemap 等数据。
+  String? _contextId;
+
   FuickAppContext({
     required this.appName,
     this.useAotCode = false,
     this.debugBusinessCode,
+    this.sourceMap,
+    this.cachedBundleRoot,
   });
 
   Future<void>? _initFuture;
@@ -61,17 +72,27 @@ class FuickAppContext {
 
   bool _bundleLoaded = false;
 
+  /// 当前加载的 bundle 包根目录（动态包；null 表示走内置 assets/js）。
+  String? _activeBundleRoot;
+  String? get activeBundleRoot => _activeBundleRoot;
+
   Future<void> _doInit() async {
     final stopwatch = Stopwatch()..start();
 
-    // Start bundle IO loading in parallel with engine initialization
-    if (debugBusinessCode == null) {
-      BundlePreloader().prewarm(appName, useAot: useAotCode);
-    }
+    final rootFuture = _resolveBundleRoot();
+    rootFuture.then((root) {
+      _activeBundleRoot = root ?? cachedBundleRoot;
+      if (root != null) {
+        BundlePreloader()
+            .prewarm(appName, useAot: useAotCode, packageRoot: root);
+      }
+    });
 
     try {
       await _initContext(stopwatch);
       isReady.value = true;
+      final root = await rootFuture;
+      _activeBundleRoot = root ?? cachedBundleRoot;
       await _loadBundle();
     } catch (e, s) {
       logger.e('FuickAppContext init failed: $e\n$s');
@@ -80,27 +101,62 @@ class FuickAppContext {
     }
   }
 
+  /// 解析 bundle 包根目录：触发"下次打开"提升与内置懒解压。
+  Future<String?> _resolveBundleRoot() async {
+    try {
+      if (Offline.initialized) {
+        return await Offline.promoteAndGetRoot(appName);
+      }
+    } catch (e) {
+      logger.e('resolve bundle root failed: $e');
+    }
+    return null;
+  }
+
+  /// 注入 globalThis.__FUICK_BUNDLE__（eval 业务代码之前）。
+  Future<void> _injectBundleGlobals(String? root) async {
+    final info = jsonEncode({'name': appName, 'root': root});
+    await ctx.eval('globalThis.__FUICK_BUNDLE__ = $info;', returnValue: false);
+  }
+
   Future<void> _initContext(Stopwatch stopwatch) async {
-    final contextId = '${appName}_${DateTime.now().microsecondsSinceEpoch}';
+    _contextId = '${appName}_${DateTime.now().microsecondsSinceEpoch}';
     await IsolateWorker.instance.ensureInitialized();
-    logger.d('[Performance] isolate init cost: ${stopwatch.elapsedMilliseconds}ms');
-    final delegate = JsContextDelegate(contextId);
+    logger.d(
+        '[Performance] isolate init cost: ${stopwatch.elapsedMilliseconds}ms');
+    final delegate = JsContextDelegate(_contextId!);
     await delegate.init();
-    logger.d('[Performance] JsContextDelegate.init cost: ${stopwatch.elapsedMilliseconds}ms');
+    logger.d(
+        '[Performance] JsContextDelegate.init cost: ${stopwatch.elapsedMilliseconds}ms');
     ctx = delegate;
     appController = FuickAppController(ctx);
+  }
+
+  /// 将 sourcemap 发送到 isolate 侧，供 ConsoleService 做堆栈解析。
+  Future<void> _forwardSourceMap() async {
+    if (sourceMap == null || _contextId == null) return;
+    try {
+      await IsolateWorker.instance
+          .sendRequest(_contextId!, 'setSourceMap', sourceMap);
+      logger.d('[Debug] Sourcemap forwarded to isolate');
+    } catch (e) {
+      logger.e('[Debug] Failed to forward sourcemap: $e');
+    }
   }
 
   Future<void> _loadBundle() async {
     final stopwatch = Stopwatch()..start();
     try {
       if (debugBusinessCode != null) {
+        await _injectBundleGlobals(_activeBundleRoot);
+        // 有 sourcemap 时先发到 isolate，eval 后的 console.error 就能直接解析
+        await _forwardSourceMap();
         await ctx.eval(debugBusinessCode!, returnValue: false);
         logger.d(
           '[Debug] Successfully loaded business bundle from debug payload',
         );
       } else {
-        await _loadSingleBundle(appName);
+        await _loadSingleBundle(appName, _activeBundleRoot);
       }
       logger.d(
         '[Performance] load bundle cost: ${stopwatch.elapsedMilliseconds}ms',
@@ -122,19 +178,23 @@ class FuickAppContext {
     }
   }
 
-  Future<void> _loadSingleBundle(String bundleName) async {
-    try {
-      // consume() 等待 IO 完成后立即释放 BundlePreloader 内的引用
-      final content =
-          await BundlePreloader().consume(bundleName, useAot: useAotCode);
-      if (content.bytecode != null) {
-        await ctx.evalBinary(content.bytecode!, returnValue: false);
-      } else if (content.source != null) {
-        await ctx.eval(content.source!, returnValue: false);
-      }
-    } catch (e) {
-      logger.e('加载 bundle $bundleName 失败: $e');
-      rethrow;
+  Future<void> _loadSingleBundle(String bundleName, String? root) async {
+    await _injectBundleGlobals(root);
+    // consume() 等待 IO 完成后立即释放 BundlePreloader 内的引用
+    final content = await BundlePreloader()
+        .consume(bundleName, useAot: useAotCode, packageRoot: root);
+    if (content.bytecode != null) {
+    logger.d('[Performance] load bundle bytes for $bundleName');
+      await ctx.evalBinary(content.bytecode!, returnValue: false);
+    } else if (content.source != null) {
+      logger.d('[Performance] load bundle js for $bundleName');
+      await ctx.eval(content.source!, returnValue: false);
+      // 后台编译 JS → 字节码，下次启动直接加载 qjc（fire-and-forget）
+      BundleCompiler.compileIfNeeded(
+        ctx: ctx,
+        source: content.source!,
+        packageDir: root,
+      );
     }
   }
 

@@ -76,12 +76,7 @@ export function NavigationLink({
   const padding = hitSlop > 0 ? { all: hitSlop } : undefined;
 
   return (
-    <GestureDetector
-      onTapDown={handleTapDown}
-      onTapCancel={handleTapCancel}
-      onTap={handleTap}
-      padding={padding}
-    >
+    <GestureDetector onTapDown={handleTapDown} onTapCancel={handleTapCancel} onTap={handleTap} padding={padding}>
       {children}
     </GestureDetector>
   );

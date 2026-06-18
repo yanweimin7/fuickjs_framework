@@ -51,19 +51,16 @@ export function dispatchEvent(eventObj: unknown, payload: unknown) {
       );
     }
   } catch (e) {
-    console.error(`[Renderer] Error in dispatchEvent:`, e);
     ErrorHandler.notify(e, 'event', { eventObj, payload });
   }
 }
 
 /**
  * React Reconciler "render in progress" 错误检测。
- * React 18 flushSync 内嵌套更新时会抛出错误码 327 或类似提示。
+ * flushSync 内嵌套更新时会抛出错误码 327 或类似提示。
  * 使用独立函数集中维护检测逻辑，避免散落的魔法字符串。
  */
 function isRenderInProgressError(msg: string): boolean {
-  // React 18 错误码 327: "flushSync was called from inside a lifecycle method"
-  // React 内部 "already working" 提示
   return msg.includes('327') || msg.includes('already being rendered') || msg.includes('working');
 }
 
@@ -88,8 +85,21 @@ export function createRenderer(): Renderer {
     }
 
     // container.setIncrementalMode(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const root = (reconciler as any).createContainer(container, 1, null, false, null, '', handleRecoverableError, null);
+
+    // React 19: createContainer 新增 onUncaughtError/onCaughtError/onDefaultTransitionIndicator，
+    // onRecoverableError 从第 7 位移至第 9 位。
+    const root = (reconciler as any).createContainer(
+      container,
+      1,
+      null,
+      false,
+      null,
+      '',
+      null,
+      null,
+      handleRecoverableError,
+      () => {},
+    );
     roots[pageId] = root;
     return root;
   }
@@ -115,7 +125,8 @@ export function createRenderer(): Renderer {
         const updateStart = Date.now();
         try {
           if (isFirstRender) {
-            reconciler.flushSync(() => {
+            // React 19: reconciler.flushSync → reconciler.flushSyncFromReconciler
+            (reconciler as any).flushSyncFromReconciler(() => {
               reconciler.updateContainer(element, root, null, null);
             });
             renderedPages.add(pageId);
@@ -123,10 +134,7 @@ export function createRenderer(): Renderer {
             reconciler.updateContainer(element, root, null, null);
           }
           const updateEnd = Date.now();
-          console.log(
-            `[Perf] page=${pageId} reconciler.updateContainer=${updateEnd - updateStart}ms (firstRender=${isFirstRender})`,
-          );
-          perfLog(`[Renderer] update() succeeded for pageId=${pageId}, retries=${retryCount}`);
+
           retryCount = 0;
         } catch (e: unknown) {
           const msg = (e as Error).message || String(e);

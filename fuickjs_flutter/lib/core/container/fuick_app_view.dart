@@ -13,6 +13,8 @@ import 'fuick_page_view.dart';
 class FuickAppView extends StatefulWidget {
   final String appName;
   final String? debugBusinessCode;
+  final Map<String, dynamic>? sourceMap;
+  final String? cachedBundleRoot;
   final String? initialRoute;
   final Map<String, dynamic>? initialParams;
   final FuickPageTransition pageTransition;
@@ -23,6 +25,8 @@ class FuickAppView extends StatefulWidget {
     super.key,
     required this.appName,
     this.debugBusinessCode,
+    this.sourceMap,
+    this.cachedBundleRoot,
     this.initialRoute,
     this.initialParams,
     this.pageTransition = FuickPageTransition.cupertino,
@@ -82,6 +86,8 @@ class _FuickAppViewState extends State<FuickAppView> {
       appContext = FuickAppContext(
         appName: widget.appName,
         debugBusinessCode: widget.debugBusinessCode,
+        sourceMap: widget.sourceMap,
+        cachedBundleRoot: widget.cachedBundleRoot,
         useAotCode: widget.useAotCode,
       );
       FuickAppContextManager().registerContext(widget.appName, appContext!);
@@ -155,7 +161,7 @@ class _FuickAppViewState extends State<FuickAppView> {
           child: child!),
       child: Navigator(
         key: _navKey,
-        observers: [_observer],
+        observers: [_observer, appContext!.appController.routeObserver],
         onGenerateInitialRoutes: (NavigatorState nav, String initialRoute) {
           return [
             PageRouteBuilder(

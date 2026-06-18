@@ -1,6 +1,8 @@
 const globalAny = globalThis as any;
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+// 默认不设超时：部分操作（如 Navigator.push 等页面关闭才返回）耗时不可预期。
+// 调用方可显式传第三个参数 timeoutMs 设自定义超时。
+const DEFAULT_TIMEOUT_MS = 0;
 
 const originalDartCallNativeAsync = globalAny.dartCallNativeAsync;
 

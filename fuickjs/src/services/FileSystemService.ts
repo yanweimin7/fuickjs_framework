@@ -1,4 +1,3 @@
-
 export interface Stats {
   isFile: () => boolean;
   isDirectory: () => boolean;
@@ -36,20 +35,13 @@ export interface FileSystem {
 }
 
 export const fs: FileSystem = {
-  readFile: async (
-    path: string,
-    options?: { encoding?: 'utf8' | 'base64' },
-  ): Promise<string> => {
+  readFile: async (path: string, options?: { encoding?: 'utf8' | 'base64' }): Promise<string> => {
     return (await dartCallNativeAsync('FileSystem.readFile', {
       path,
       encoding: options?.encoding,
     })) as string;
   },
-  writeFile: async (
-    path: string,
-    data: string,
-    options?: { encoding?: 'utf8' | 'base64' },
-  ): Promise<void> => {
+  writeFile: async (path: string, data: string, options?: { encoding?: 'utf8' | 'base64' }): Promise<void> => {
     await dartCallNativeAsync('FileSystem.writeFile', {
       path,
       data,
@@ -59,19 +51,13 @@ export const fs: FileSystem = {
   unlink: async (path: string): Promise<void> => {
     await dartCallNativeAsync('FileSystem.unlink', { path });
   },
-  mkdir: async (
-    path: string,
-    options?: { recursive?: boolean },
-  ): Promise<void> => {
+  mkdir: async (path: string, options?: { recursive?: boolean }): Promise<void> => {
     await dartCallNativeAsync('FileSystem.mkdir', {
       path,
       recursive: options?.recursive,
     });
   },
-  rmdir: async (
-    path: string,
-    options?: { recursive?: boolean },
-  ): Promise<void> => {
+  rmdir: async (path: string, options?: { recursive?: boolean }): Promise<void> => {
     await dartCallNativeAsync('FileSystem.rmdir', {
       path,
       recursive: options?.recursive,
@@ -105,10 +91,7 @@ export const fs: FileSystem = {
     await dartCallNativeAsync('FileSystem.copyFile', { src, dest });
   },
   getDirectories: async (): Promise<Record<string, string>> => {
-    return (await dartCallNativeAsync('FileSystem.getDirectories', {})) as Record<
-      string,
-      string
-    >;
+    return (await dartCallNativeAsync('FileSystem.getDirectories', {})) as Record<string, string>;
   },
   readFileSync: (path: string, options?: { encoding?: 'utf8' | 'base64' }): string => {
     return dartCallNative('FileSystem.readFileSync', { path, encoding: options?.encoding }) as string;

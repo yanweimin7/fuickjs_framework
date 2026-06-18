@@ -3,9 +3,19 @@ import { createRenderer, Renderer } from './renderer';
 import * as Router from '../router/router';
 import { PageContext } from './PageContext';
 import { ErrorBoundary } from './ErrorBoundary';
+import { LifecycleService } from '../services/LifecycleService';
+import { markStart, report } from '../utils/perf-timing';
 
 let renderer: Renderer | null = null;
 let globalErrorFallback: ((error: Error) => React.ReactNode) | null = null;
+
+// Wire LifecycleService to the renderer's notifyLifecycle so that app-level
+// foreground/background events are translated into page-level visible/invisible
+// notifications — useVisible / useInvisible hooks get the benefit for free.
+LifecycleService.setNotifier((pageId, type) => {
+  const r = ensureRenderer();
+  r.notifyLifecycle(pageId, type);
+});
 
 // 同 pageId 在途渲染状态：rendering=true 表示当前微任务正在 reconciler.update。
 // 若期间有新 render() 进入，仅记录 pending 参数，等当前 update 完成后再合并执行。
@@ -23,6 +33,7 @@ export function ensureRenderer() {
 }
 
 function doRender(pageId: number, path: string, params: unknown) {
+  markStart(pageId);
   const t0 = Date.now();
   const r = ensureRenderer();
 
@@ -93,6 +104,8 @@ function doRender(pageId: number, path: string, params: unknown) {
       ` wrapContext=${t4 - t3}ms |` +
       ` reconciler.update=${t5 - t4}ms`,
   );
+  // 合并打印三阶段耗时：JS→DSL / DSL传输 / 总计
+  report(pageId, path);
 }
 
 export function render(pageId: number, path: string, params: unknown) {
@@ -125,6 +138,7 @@ export function destroy(pageId: number) {
   const r = ensureRenderer();
   // 清掉在途渲染记录，防止 destroy 后还触发 pending 重渲染。
   delete renderState[pageId];
+  LifecycleService._onPageLifecycle(pageId, 'invisible');
   r.destroy(pageId);
 }
 
@@ -144,6 +158,7 @@ export function elementToDsl(pageId: number, element: React.ReactNode) {
 }
 
 export function notifyLifecycle(pageId: number, type: 'visible' | 'invisible') {
+  LifecycleService._onPageLifecycle(pageId, type);
   const r = ensureRenderer();
   r.notifyLifecycle(pageId, type);
 }

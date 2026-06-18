@@ -233,5 +233,8 @@ FuickAppView(
 
 1. **IncrementalStrategy**：高频更新场景下只发送最小增量补丁
 2. **DSL 缓存**：Node 树有 dirty 标记，只重新序列化变更节点
-3. **LazyView builder 模式**：heavy 组件延迟到 ready=true 时才创建
-4. **回调引用稳定**：函数引用变化只更新 JS 侧回调映射，不触发 Flutter UI 重建
+3. **DSL 解码快速路径**：`renderUI` / `patchUI` / `patchOps` 跳过扩展类型二次转换，减少 Dart 侧整树遍历
+4. **字符串零拷贝解码**：二进制协议解码字符串时直接读取原始缓冲区片段，避免额外 `Uint8List` 分配
+5. **二进制协议 v2（varint + 字符串表）**：整数用 zigzag/LEB128 变长编码（小整数 1 字节），重复的键名/字符串走流式字符串表回引。相比 v1 定长编码体积约降到 28%，相比 JSON 体积约 40%；编解码往返耗时比 JSON 快 2.5~3.3×、比 v1 快 1.14~1.47×（节点越多优势越大，5 轮实测波动 <5%）。默认开启，可用 `QuickJsFFI.setBinaryCodecV2(false)` 回退到 v1。详见 [binary-protocol-v2.md](./binary-protocol-v2.md)
+6. **LazyView builder 模式**：heavy 组件延迟到 ready=true 时才创建
+7. **回调引用稳定**：函数引用变化只更新 JS 侧回调映射，不触发 Flutter UI 重建

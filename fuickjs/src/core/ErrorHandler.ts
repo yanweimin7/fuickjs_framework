@@ -10,6 +10,13 @@ function notify(error: unknown, source: ErrorSource, detail?: unknown) {
   if (isNotifying) {
     return;
   }
+  // 兜底：没人注册 handler 时默认走 console.error，确保任何未捕获异常
+  // 都会经过 ConsoleService → Flutter 日志（带 sourcemap 解析）。
+  const hasHandler = currentHandler != null || globalListeners.length > 0;
+  if (!hasHandler) {
+    console.error(error);
+    return;
+  }
   try {
     isNotifying = true;
     if (currentHandler) {

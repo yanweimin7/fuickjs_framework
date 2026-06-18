@@ -2,291 +2,214 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fuickjs_flutter/offline/domain/entities/package.dart';
 import 'package:fuickjs_flutter/offline/domain/repositories/package_repository.dart';
 import 'package:fuickjs_flutter/offline/domain/services/package_service.dart';
+import 'package:fuickjs_flutter/offline/domain/value_objects/package_registry.dart';
 
 class MockPackageRepository implements PackageRepository {
-  List<Package> _activePackages = [];
+  PackageRegistry _registry = const PackageRegistry();
   final Map<String, bool> _validityMap = {};
-  bool saveCalled = false;
-  List<Package>? savedPackages;
+  final List<String> deleted = [];
 
-  void setActivePackages(List<Package> packages) {
-    _activePackages = List.from(packages);
-  }
-
-  void setPackageValidity(Package package, bool valid) {
-    _validityMap[package.versionShasumName] = valid;
-  }
+  void seedRegistry(PackageRegistry r) => _registry = r;
+  void setValidity(Package p, bool valid) =>
+      _validityMap[p.versionShasumName] = valid;
 
   @override
   Future<void> init() async {}
 
   @override
-  Future<List<Package>> loadActivePackages() async {
-    return List.from(_activePackages);
+  Future<PackageRegistry> loadRegistry() async => _registry;
+
+  @override
+  Future<void> saveRegistry(PackageRegistry registry) async {
+    _registry = registry;
   }
 
   @override
-  Future<void> saveActivePackages(List<Package> packages) async {
-    saveCalled = true;
-    savedPackages = packages;
-    _activePackages = List.from(packages);
-  }
+  String getPackageDir(Package package) =>
+      '/packages/${package.name}/${package.versionShasumName}';
 
   @override
-  String getPackageDir(Package package) => '/packages/${package.name}';
+  String getStagingDir(Package package) =>
+      '/staging/${package.name}/${package.versionShasumName}';
 
   @override
   String getDownloadDir() => '/download';
 
   @override
   String getPackageFlagFile(Package package) =>
-      '/packages/${package.name}/${package.versionShasumName}/.offline_valid.flag';
+      '${getPackageDir(package)}/.offline_valid.flag';
 
   @override
-  Future<bool> validatePackage(Package package) async {
-    return _validityMap[package.versionShasumName] ?? true;
+  String get packagesRootDir => '/packages';
+
+  @override
+  String get offlineRootDir => '/offline';
+
+  @override
+  String builtinBundleZipAsset(String name) => 'assets/js/$name.zip';
+
+  @override
+  Future<bool> validatePackage(Package package) async =>
+      _validityMap[package.versionShasumName] ?? true;
+
+  @override
+  Future<void> deletePackage(Package package) async {
+    deleted.add(package.versionShasumName);
   }
 
   @override
-  Future<void> deletePackage(Package package) async {}
+  Future<void> deleteStaging(Package package) async {}
+
+  @override
+  Future<void> promoteStaging(Package package) async {}
 }
 
 void main() {
-  group('PackageService', () {
-    late MockPackageRepository repository;
-    late PackageService packageService;
+  group('PackageService state machine', () {
+    late MockPackageRepository repo;
+    late PackageService service;
 
     setUp(() {
-      repository = MockPackageRepository();
-      packageService = PackageService(repository);
+      repo = MockPackageRepository();
+      service = PackageService(repo, retainVersions: 2);
     });
 
-    Package pkg(String name, String version, String shasum) =>
-        Package(name: name, version: version, shasum: shasum);
+    Package pkg(String name, String version, String hash, {String? url}) =>
+        Package(name: name, version: version, sha256: hash, url: url);
 
-    group('init', () {
-      test('should load active packages from repository', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-          pkg('pkg2', '2.0.0', 'bbb'),
-        ]);
+    test('applyReady sets single staged slot (replace semantics)', () async {
+      await service.init();
+      await service.applyReady([pkg('app', '1.0.0', 'h1')]);
+      expect(service.stagedPackages.length, 1);
 
-        await packageService.init();
-
-        expect(packageService.activePackages.length, 2);
-      });
-
-      test('should filter out invalid packages and save', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        repository.setPackageValidity(pkg('pkg1', '1.0.0', 'aaa'), false);
-
-        await packageService.init();
-
-        expect(packageService.activePackages, isEmpty);
-        expect(repository.saveCalled, true);
-      });
-
-      test('should not save when all packages are valid', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        repository.setPackageValidity(pkg('pkg1', '1.0.0', 'aaa'), true);
-
-        await packageService.init();
-
-        expect(repository.saveCalled, false);
-      });
-
-      test('should not init twice', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-
-        await packageService.init();
-        await packageService.init();
-      });
+      // 下载新版本替换旧 staged（旧从未 active → 删除）。
+      await service.applyReady([pkg('app', '1.1.0', 'h2')]);
+      expect(service.stagedPackages.length, 1);
+      expect(service.getStagedPackage('app')!.version, '1.1.0');
+      expect(repo.deleted, contains('app-1.0.0-h1'));
     });
 
-    group('setRemotePackages', () {
-      test('should store remote packages', () async {
-        packageService.setRemotePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-          pkg('pkg2', '2.0.0', 'bbb'),
-        ]);
+    test('promoteStaged: staged -> active, old active -> history', () async {
+      repo.seedRegistry(PackageRegistry(
+        active: [pkg('app', '1.0.0', 'h1').copyWith(state: PackageState.active)],
+      ));
+      await service.init();
+      await service.applyReady([pkg('app', '2.0.0', 'h2')]);
 
-        expect(packageService.remotePackages.length, 2);
-      });
+      final newActive = await service.promoteStaged('app');
+      expect(newActive!.version, '2.0.0');
+      expect(service.getActivePackage('app')!.version, '2.0.0');
+      expect(service.stagedPackages, isEmpty);
+      expect(service.registry.history.any((p) => p.version == '1.0.0'), true);
     });
 
-    group('setInternalPackages', () {
-      test('should store internal packages', () async {
-        packageService.setInternalPackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-
-        expect(packageService.internalPackages.length, 1);
-      });
+    test('history retains at most N versions', () async {
+      await service.init();
+      // 连续提升 4 个版本，retainVersions=2。
+      for (final v in ['1.0.0', '2.0.0', '3.0.0', '4.0.0']) {
+        await service.applyReady([pkg('app', v, 'h$v')]);
+        await service.promoteStaged('app');
+      }
+      final history = service.registry.history.where((p) => p.name == 'app');
+      expect(history.length, lessThanOrEqualTo(2));
+      expect(service.getActivePackage('app')!.version, '4.0.0');
     });
 
-    group('isInternal', () {
-      test('should return true for internal package', () async {
-        packageService.setInternalPackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
+    test('reuseLocalAsStaged uses history without download', () async {
+      repo.seedRegistry(PackageRegistry(
+        active: [pkg('app', '2.0.0', 'h2').copyWith(state: PackageState.active)],
+        history: [
+          pkg('app', '1.0.0', 'h1').copyWith(state: PackageState.history),
+        ],
+      ));
+      repo.setValidity(pkg('app', '1.0.0', 'h1'), true);
+      await service.init();
 
-        expect(packageService.isInternal(pkg('pkg1', '1.0.0', 'aaa')), true);
-      });
+      final remote = pkg('app', '1.0.0', 'h1', url: 'https://cdn/app-1.0.0.zip');
+      // 返回候选包但不落盘；由调用方统一 applyReady。
+      final reused = await service.reuseLocalAsStaged(remote);
+      expect(reused, isNotNull);
+      expect(reused!.version, '1.0.0');
+      // history 中同版本已被移除（in-memory），避免 promote 后重复。
+      expect(
+        service.registry.history.any((p) => p.version == '1.0.0'),
+        false,
+      );
 
-      test('should return false for non-internal package', () async {
-        packageService.setInternalPackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-
-        expect(packageService.isInternal(pkg('pkg2', '2.0.0', 'bbb')), false);
-      });
-
-      test('should return false for different version', () async {
-        packageService.setInternalPackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-
-        expect(packageService.isInternal(pkg('pkg1', '2.0.0', 'bbb')), false);
-      });
+      await service.applyReady([reused]);
+      expect(service.getStagedPackage('app')!.version, '1.0.0');
     });
 
-    group('activatePackages', () {
-      test('should add new packages', () async {
-        await packageService.init();
+    test('promoteStaged discards stale staged when not latest remote',
+        () async {
+      repo.seedRegistry(PackageRegistry(
+        active: [pkg('app', '1.0.0', 'h1').copyWith(state: PackageState.active)],
+      ));
+      await service.init();
+      // 误发的 v2 已 staged。
+      await service.applyReady([pkg('app', '2.0.0', 'h2')]);
+      // 线上最新已撤回为 v1（≠ staged v2）。
+      service.setRemotePackages([pkg('app', '1.0.0', 'h1')]);
 
-        await packageService.activatePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-
-        expect(packageService.activePackages.length, 1);
-        expect(packageService.activePackages.first.name, 'pkg1');
-        expect(repository.saveCalled, true);
-      });
-
-      test('should replace existing package with same name', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        await packageService.init();
-
-        await packageService.activatePackages([
-          pkg('pkg1', '2.0.0', 'bbb'),
-        ]);
-
-        expect(packageService.activePackages.length, 1);
-        expect(packageService.activePackages.first.version, '2.0.0');
-      });
-
-      test('should not do anything for empty list', () async {
-        await packageService.init();
-        repository.saveCalled = false;
-
-        await packageService.activatePackages([]);
-
-        expect(repository.saveCalled, false);
-      });
-
-      test('should keep existing packages when adding new ones', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        await packageService.init();
-
-        await packageService.activatePackages([
-          pkg('pkg2', '2.0.0', 'bbb'),
-        ]);
-
-        expect(packageService.activePackages.length, 2);
-      });
+      final result = await service.promoteStaged('app');
+      // staged 被丢弃，沿用当前 active v1。
+      expect(result!.version, '1.0.0');
+      expect(service.stagedPackages, isEmpty);
+      expect(repo.deleted, contains('app-2.0.0-h2'));
+      expect(service.getActivePackage('app')!.version, '1.0.0');
     });
 
-    group('deactivatePackages', () {
-      test('should remove packages', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-          pkg('pkg2', '2.0.0', 'bbb'),
-        ]);
-        await packageService.init();
+    test('promoteStaged promotes staged when equals latest remote', () async {
+      await service.init();
+      await service.applyReady([pkg('app', '2.0.0', 'h2')]);
+      service.setRemotePackages([pkg('app', '2.0.0', 'h2')]);
 
-        await packageService.deactivatePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-
-        expect(packageService.activePackages.length, 1);
-        expect(packageService.activePackages.first.name, 'pkg2');
-      });
-
-      test('should not do anything for empty list', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        await packageService.init();
-        repository.saveCalled = false;
-
-        await packageService.deactivatePackages([]);
-
-        expect(repository.saveCalled, false);
-      });
+      final result = await service.promoteStaged('app');
+      expect(result!.version, '2.0.0');
+      expect(service.getActivePackage('app')!.version, '2.0.0');
     });
 
-    group('isActive', () {
-      test('should return true for active package', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        await packageService.init();
+    test('promoteStaged promotes staged when remote list not ready', () async {
+      await service.init();
+      await service.applyReady([pkg('app', '2.0.0', 'h2')]);
+      // 未 setRemotePackages（离线/首启未同步）→ 不阻断。
 
-        expect(packageService.isActive('pkg1', '1.0.0-aaa'), true);
-      });
-
-      test('should return false for inactive package', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        await packageService.init();
-
-        expect(packageService.isActive('pkg2', '2.0.0-bbb'), false);
-      });
-
-      test('should return false for different version', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        await packageService.init();
-
-        expect(packageService.isActive('pkg1', '2.0.0-bbb'), false);
-      });
+      final result = await service.promoteStaged('app');
+      expect(result!.version, '2.0.0');
     });
 
-    group('getActivePackage', () {
-      test('should return package by name', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        await packageService.init();
+    test('promoteStaged promotes internal staged regardless of remote',
+        () async {
+      await service.init();
+      service.setInternalPackages([pkg('app', '1.0.0', 'h1')]);
+      await service.applyReady([pkg('app', '1.0.0', 'h1')]);
+      // 线上有更新版 v3，但 staged 是内置 v1 → 豁免校验，正常生效。
+      service.setRemotePackages([pkg('app', '3.0.0', 'h3')]);
 
-        final result = packageService.getActivePackage('pkg1');
+      final result = await service.promoteStaged('app');
+      expect(result!.version, '1.0.0');
+      expect(service.getActivePackage('app')!.version, '1.0.0');
+    });
 
-        expect(result, isNotNull);
-        expect(result!.name, 'pkg1');
-      });
+    test('reuseLocalAsStaged returns null when not in retained', () async {
+      await service.init();
+      final remote = pkg('app', '1.0.0', 'h1');
+      expect(await service.reuseLocalAsStaged(remote), isNull);
+    });
 
-      test('should return null for non-existent package', () async {
-        repository.setActivePackages([
-          pkg('pkg1', '1.0.0', 'aaa'),
-        ]);
-        await packageService.init();
+    test('init drops packages whose files are missing', () async {
+      final bad = pkg('app', '1.0.0', 'h1').copyWith(state: PackageState.active);
+      repo.seedRegistry(PackageRegistry(active: [bad]));
+      repo.setValidity(bad, false);
 
-        final result = packageService.getActivePackage('pkg2');
+      await service.init();
+      expect(service.activePackages, isEmpty);
+    });
 
-        expect(result, isNull);
-      });
+    test('isInternal matches by version+hash', () async {
+      service.setInternalPackages([pkg('app', '1.0.0', 'h1')]);
+      expect(service.isInternal(pkg('app', '1.0.0', 'h1')), true);
+      expect(service.isInternal(pkg('app', '2.0.0', 'h2')), false);
     });
   });
 }

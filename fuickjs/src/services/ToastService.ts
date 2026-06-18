@@ -1,4 +1,3 @@
-
 export class ToastService {
   static show(message: string, duration?: number): Promise<boolean> {
     return dartCallNativeAsync('Toast.show', { message, duration });

@@ -52,8 +52,10 @@ class JsContextDelegate implements IQuickJsContext {
       _worker.sendRequest(contextId, 'evalModule', code);
 
   @override
-  Future<dynamic> evalBinary(Uint8List bytecode, {bool returnValue = false}) =>
-      _worker.sendRequest(contextId, 'evalBinary', {'bytecode': bytecode, 'returnValue': returnValue});
+  Future<dynamic> evalBinary(Uint8List bytecode,
+      {bool returnValue = false, bool isModule = false}) =>
+      _worker.sendRequest(contextId, 'evalBinary',
+          {'bytecode': bytecode, 'returnValue': returnValue, 'isModule': isModule});
 
   @override
   Future<Uint8List> compile(String code,

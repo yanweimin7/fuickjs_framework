@@ -21,13 +21,13 @@ export interface EdgeInsets {
 export interface BoxDecoration {
   color?: string;
   borderRadius?:
-  | number
-  | {
-    topLeft?: number;
-    topRight?: number;
-    bottomLeft?: number;
-    bottomRight?: number;
-  };
+    | number
+    | {
+        topLeft?: number;
+        topRight?: number;
+        bottomLeft?: number;
+        bottomRight?: number;
+      };
   border?: {
     color?: string;
     width?: number;

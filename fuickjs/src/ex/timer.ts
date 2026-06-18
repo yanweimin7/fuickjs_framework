@@ -13,7 +13,6 @@ export function setTimeout(fn: (...args: any[]) => unknown, ms?: number): number
       try {
         fn();
       } catch (e) {
-        console.error(`[Timer] Error in microtask timeout callback:`, e);
         ErrorHandler.notify(e, 'timer', { id });
       } finally {
         timerMap.delete(id);
@@ -33,7 +32,6 @@ export function setTimeout(fn: (...args: any[]) => unknown, ms?: number): number
     try {
       fn();
     } catch (innerE) {
-      console.error(`[Timer] Error in immediate timer callback:`, innerE);
       ErrorHandler.notify(innerE, 'timer', { id });
     }
   }
@@ -90,7 +88,6 @@ export function handleTimer(id: number) {
         console.error(`[Timer] Callback for timer ${id} is not a function:`, entry.fn);
       }
     } catch (e) {
-      console.error(`[Timer] Error in timer ${id} callback:`, e);
       ErrorHandler.notify(e, 'timer', { id });
     }
   } else {

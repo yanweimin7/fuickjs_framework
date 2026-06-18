@@ -1,34 +1,67 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fuickjs_flutter/offline/config/offline_config.dart';
 import 'package:fuickjs_flutter/offline/domain/entities/package.dart';
-import 'package:fuickjs_flutter/offline/domain/services/download_service.dart';
 import 'package:fuickjs_flutter/offline/domain/repositories/package_repository.dart';
+import 'package:fuickjs_flutter/offline/domain/services/bundle_verifier.dart';
+import 'package:fuickjs_flutter/offline/domain/services/download_service.dart';
+import 'package:fuickjs_flutter/offline/domain/value_objects/package_registry.dart';
 
 class MockPackageRepository implements PackageRepository {
   @override
   Future<void> init() async {}
 
   @override
-  Future<List<Package>> loadActivePackages() async => [];
+  Future<PackageRegistry> loadRegistry() async => const PackageRegistry();
 
   @override
-  Future<void> saveActivePackages(List<Package> packages) async {}
+  Future<void> saveRegistry(PackageRegistry registry) async {}
 
   @override
-  String getPackageDir(Package package) => '/tmp/packages/${package.name}';
+  String getPackageDir(Package package) =>
+      '/tmp/fuick-test/packages/${package.name}/${package.versionShasumName}';
 
   @override
-  String getDownloadDir() => '/tmp/download';
+  String getStagingDir(Package package) =>
+      '/tmp/fuick-test/staging/${package.name}/${package.versionShasumName}';
+
+  @override
+  String getDownloadDir() => '/tmp/fuick-test/download';
 
   @override
   String getPackageFlagFile(Package package) =>
-      '/tmp/packages/${package.name}/${package.versionShasumName}/.offline_valid.flag';
+      '${getPackageDir(package)}/.offline_valid.flag';
 
   @override
-  Future<bool> validatePackage(Package package) async => true;
+  String get packagesRootDir => '/tmp/fuick-test/packages';
+
+  @override
+  String get offlineRootDir => '/tmp/fuick-test/offline';
+
+  @override
+  String builtinBundleZipAsset(String name) => 'assets/js/$name.zip';
+
+  // 文件未落盘 → preparePackage 走完整下载/解压流程。
+  @override
+  Future<bool> validatePackage(Package package) async => false;
 
   @override
   Future<void> deletePackage(Package package) async {}
+
+  @override
+  Future<void> deleteStaging(Package package) async {}
+
+  @override
+  Future<void> promoteStaging(Package package) async {}
 }
+
+OfflineConfig testConfig() => OfflineConfig(
+      envGetter: () => 'test',
+      offlinePackagesGetter: () async => null,
+      offlineConfigGetter: () async => null,
+      logger: (_, __) {},
+      debug: false,
+      appVersionGetter: () => '99.0.0',
+    );
 
 void main() {
   group('DownloadService', () {
@@ -37,71 +70,38 @@ void main() {
 
     setUp(() {
       repository = MockPackageRepository();
-      downloadService = DownloadService(repository);
+      downloadService = DownloadService(
+        repository,
+        config: testConfig(),
+        verifier: BundleVerifier(),
+      );
     });
 
-    Package pkg(String name, String version, String shasum, {String? url}) =>
-        Package(name: name, version: version, shasum: shasum, url: url);
+    Package pkg(String name, String version, String hash, {String? url}) =>
+        Package(name: name, version: version, sha256: hash, url: url);
 
-    group('setInternalChecker', () {
-      test('should set internal checker', () {
-        bool called = false;
-        downloadService.setInternalChecker((pkg) {
-          called = true;
-          return true;
-        });
-
-        final checker = (Package p) => false;
-        downloadService.setInternalChecker(checker);
-
-        expect(called, false);
-      });
+    test('returns null when remote url is empty', () async {
+      downloadService.setInternalChecker((p) => false);
+      final result = await downloadService.preparePackage(
+        pkg('test', '1.0.0', 'aaa'),
+      );
+      expect(result, isNull);
     });
 
-    group('preparePackage', () {
-      test('should return null when url is null or empty', () async {
-        downloadService.setInternalChecker((pkg) => false);
-
-        final result = await downloadService.preparePackage(
-          pkg('test', '1.0.0', 'aaa'),
-        );
-
-        expect(result, isNull);
-      });
-
-      test('should use internal checker to determine package source', () async {
-        downloadService.setInternalChecker((pkg) => true);
-
-        final result = await downloadService.preparePackage(
-          pkg('nonexistent', '1.0.0', 'aaa'),
-        );
-
-        expect(result, isNull);
-      });
-
-      test('should default to remote when no checker set', () async {
-        final result = await downloadService.preparePackage(
-          pkg('test', '1.0.0', 'aaa', url: 'https://example.com/test.zip'),
-        );
-
-        expect(result, isNull);
-      });
+    test('returns null when internal asset is missing', () async {
+      downloadService.setInternalChecker((p) => true);
+      final result = await downloadService.preparePackage(
+        pkg('nonexistent', '1.0.0', 'aaa'),
+      );
+      expect(result, isNull);
     });
 
-    group('getProgress', () {
-      test('should return 0 for unknown url', () {
-        expect(downloadService.getProgress('unknown'), 0);
-      });
-
-      test('should return 0 for url without progress', () {
-        expect(downloadService.getProgress('https://example.com/test.zip'), 0);
-      });
+    test('getProgress returns 0 for unknown url', () {
+      expect(downloadService.getProgress('unknown'), 0);
     });
 
-    group('isDownloading', () {
-      test('should return false for unknown url', () {
-        expect(downloadService.isDownloading('unknown'), false);
-      });
+    test('isDownloading returns false for unknown url', () {
+      expect(downloadService.isDownloading('unknown'), false);
     });
   });
 }

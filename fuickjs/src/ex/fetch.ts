@@ -80,9 +80,7 @@ export async function fetch(url: string, options: FetchOptions = {}): Promise<Fe
       } catch (e) {
         console.warn('[fetch] cancel error:', e);
       }
-      const err = signal.reason instanceof Error
-        ? signal.reason
-        : new Error('AbortError');
+      const err = signal.reason instanceof Error ? signal.reason : new Error('AbortError');
       err.name = err.name || 'AbortError';
       reject(err);
     };
@@ -109,7 +107,9 @@ function createResponse(result: any): FetchResponse {
       ok: false,
       headers: new Headers(),
       text: async () => '',
-      json: async () => { throw new Error('Empty response'); },
+      json: async () => {
+        throw new Error('Empty response');
+      },
       arrayBuffer: async () => new ArrayBuffer(0),
     };
   }

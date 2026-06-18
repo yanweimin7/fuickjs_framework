@@ -48,29 +48,26 @@ class SingleChildScrollViewParser extends WidgetParser {
           if (onScrollEvent != null ||
               onScrollStartReachedEvent != null ||
               onScrollEndReachedEvent != null) {
-            scrollView = NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                final metrics = notification.metrics;
-                if (onScrollEvent != null &&
-                    notification is ScrollUpdateNotification) {
-                  FuickAction.event(context, onScrollEvent, value: {
-                    'pixels': metrics.pixels,
-                    'axis': metrics.axis == Axis.vertical ? 'vertical' : 'horizontal',
-                    'maxScrollExtent': metrics.maxScrollExtent,
-                  });
-                }
-                if (onScrollStartReachedEvent != null &&
-                    notification is ScrollUpdateNotification &&
-                    metrics.pixels <= startThreshold) {
-                  FuickAction.event(context, onScrollStartReachedEvent);
-                }
-                if (onScrollEndReachedEvent != null &&
-                    notification is ScrollUpdateNotification &&
-                    metrics.pixels >= metrics.maxScrollExtent - endThreshold) {
-                  FuickAction.event(context, onScrollEndReachedEvent);
-                }
-                return false;
-              },
+            scrollView = FuickScrollEdgeNotifier(
+              startThreshold: startThreshold,
+              endThreshold: endThreshold,
+              onScroll: onScrollEvent != null
+                  ? (metrics) {
+                      FuickAction.event(context, onScrollEvent, value: {
+                        'pixels': metrics.pixels,
+                        'axis': metrics.axis == Axis.vertical
+                            ? 'vertical'
+                            : 'horizontal',
+                        'maxScrollExtent': metrics.maxScrollExtent,
+                      });
+                    }
+                  : null,
+              onStartReached: onScrollStartReachedEvent != null
+                  ? () => FuickAction.event(context, onScrollStartReachedEvent)
+                  : null,
+              onEndReached: onScrollEndReachedEvent != null
+                  ? () => FuickAction.event(context, onScrollEndReachedEvent)
+                  : null,
               child: scrollView,
             );
           }

@@ -33,14 +33,14 @@ void main() {
       expect(pkg.timestamp, 1234567890);
     });
 
-    test('versionShasumName should return version-shasum', () {
+    test('versionShasumName should return name-version-shasum', () {
       const pkg = Package(
         name: 'test-package',
         version: '1.0.0',
         shasum: 'abc123',
       );
 
-      expect(pkg.versionShasumName, '1.0.0-abc123');
+      expect(pkg.versionShasumName, 'test-package-1.0.0-abc123');
     });
 
     test('isSameVersion should return true for same version', () {
@@ -88,8 +88,7 @@ void main() {
         shasum: 'abc123',
       );
 
-      // isSameVersion compares version-shasum, not name
-      expect(pkg1.isSameVersion(pkg2), true);
+      expect(pkg1.isSameVersion(pkg2), false);
     });
 
     group('fromJson', () {
@@ -113,17 +112,19 @@ void main() {
         expect(pkg.timestamp, 1234567890);
       });
 
-      test('should use defaults for missing fields', () {
-        final json = <String, dynamic>{};
+      test('should throw when required fields missing', () {
+        expect(() => Package.fromJson(<String, dynamic>{}), throwsArgumentError);
+      });
 
-        final pkg = Package.fromJson(json);
-
-        expect(pkg.name, '');
-        expect(pkg.version, '');
-        expect(pkg.shasum, '');
-        expect(pkg.url, isNull);
-        expect(pkg.mustBeUpdated, false);
-        expect(pkg.timestamp, isNull);
+      test('integrity prefers sha256 over shasum', () {
+        final pkg = Package.fromJson({
+          'name': 'p',
+          'version': '1.0.0',
+          'sha256': 'deadbeef',
+          'shasum': 'legacy',
+        });
+        expect(pkg.integrity, 'deadbeef');
+        expect(pkg.versionShasumName, 'p-1.0.0-deadbeef');
       });
     });
 

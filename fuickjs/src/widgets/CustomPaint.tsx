@@ -37,7 +37,7 @@ export class Path {
     rect: { left: number; top: number; width: number; height: number },
     startAngle: number,
     sweepAngle: number,
-    forceMoveTo?: boolean
+    forceMoveTo?: boolean,
   ) {
     this.operations.push({ type: 'arcTo', rect, startAngle, sweepAngle, forceMoveTo: forceMoveTo ?? true });
   }
@@ -129,15 +129,12 @@ export class CustomPainter {
     startAngle: number,
     sweepAngle: number,
     useCenter: boolean,
-    paint: Paint
+    paint: Paint,
   ) {
     this.commands.push({ type: 'drawArc', rect, startAngle, sweepAngle, useCenter, paint });
   }
 
-  drawRRect(
-    rrect: { left: number; top: number; width: number; height: number; radius: number },
-    paint: Paint
-  ) {
+  drawRRect(rrect: { left: number; top: number; width: number; height: number; radius: number }, paint: Paint) {
     this.commands.push({ type: 'drawRRect', rrect, paint });
   }
 

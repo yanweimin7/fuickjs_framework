@@ -12,6 +12,16 @@ export interface GridViewProps extends WidgetProps {
   shrinkWrap?: boolean;
   physics?: 'never' | 'bouncing' | 'clamping' | 'always';
   cacheKey?: unknown;
+  /** 滚动位置变化回调（高频，每次滚动像素变化都触发） */
+  onScroll?: (e: { pixels: number; axis: 'vertical' | 'horizontal'; maxScrollExtent: number }) => void;
+  /** 滚动到顶部阈值内触发 */
+  onScrollStartReached?: () => void;
+  /** 滚动到底部阈值内触发 */
+  onScrollEndReached?: () => void;
+  /** 顶部阈值，默认 50 */
+  startThreshold?: number;
+  /** 底部阈值，默认 50 */
+  endThreshold?: number;
 }
 
 export class GridView extends ScrollableBaseWidget<GridViewProps> {

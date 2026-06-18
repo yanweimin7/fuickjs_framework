@@ -1,6 +1,7 @@
 export { ToastService } from './ToastService';
 export { DialogService } from './DialogService';
 export { PickerService } from './PickerService';
+export { LifecycleService } from './LifecycleService';
 export { LocalStorageService } from './LocalStorageService';
 export { DeviceInfoService, type DeviceInfoData } from './DeviceInfoService';
 export * from './ClipboardService';

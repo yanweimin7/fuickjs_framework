@@ -98,7 +98,11 @@ class IsolateHandler {
           }
 
           dynamic result;
-          if (type == 'eval') {
+          if (type == 'setSourceMap') {
+            final map = payload as Map<String, dynamic>?;
+            ConsoleService.setSourceMap(map);
+            result = null;
+          } else if (type == 'eval') {
             final code = payload['code'] as String;
             final returnValue = payload['returnValue'] as bool? ?? true;
             result = await ctx!.eval(code, returnValue: returnValue);
@@ -107,7 +111,9 @@ class IsolateHandler {
           } else if (type == 'evalBinary') {
             final bytecode = payload['bytecode'] as Uint8List;
             final returnValue = payload['returnValue'] as bool? ?? false;
-            result = await ctx!.evalBinary(bytecode, returnValue: returnValue);
+            final isModule = payload['isModule'] as bool? ?? false;
+            result = await ctx!.evalBinary(bytecode,
+                returnValue: returnValue, isModule: isModule);
           } else if (type == 'compile') {
             final code = payload['code'] as String;
             final isModule = payload['isModule'] as bool? ?? false;

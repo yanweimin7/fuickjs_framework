@@ -11,6 +11,16 @@ export interface ListViewProps extends WidgetProps {
   cacheKey?: unknown;
   /** 是否为有状态列表（走 reconciler sub-root，支持 useState/useEffect）。默认 false。设为 true 则走 reconciler，拥有完整生命周期。 */
   stateful?: boolean;
+  /** 滚动位置变化回调（高频，每次滚动像素变化都触发） */
+  onScroll?: (e: { pixels: number; axis: 'vertical' | 'horizontal'; maxScrollExtent: number }) => void;
+  /** 滚动到顶部阈值内触发 */
+  onScrollStartReached?: () => void;
+  /** 滚动到底部阈值内触发 */
+  onScrollEndReached?: () => void;
+  /** 顶部阈值，默认 50 */
+  startThreshold?: number;
+  /** 底部阈值，默认 50 */
+  endThreshold?: number;
 }
 
 export class ListView extends ScrollableBaseWidget<ListViewProps> {

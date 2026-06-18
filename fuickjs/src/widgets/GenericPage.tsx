@@ -23,9 +23,9 @@ export function GenericPage(props: GenericPageProps) {
 
   if (!component) {
     return (
-        <Container alignment="center">
-            <Text text="Content not found" />
-        </Container>
+      <Container alignment="center">
+        <Text text="Content not found" />
+      </Container>
     );
   }
 

@@ -8,10 +8,14 @@ export interface OverlayProps extends BaseProps {
 
 export class Overlay extends React.Component<OverlayProps> {
   render(): ReactNode {
-    return React.createElement('Overlay', {
-      visible: this.props.visible,
-      overlayKey: this.props.overlayKey,
-      isBoundary: true,
-    }, this.props.children);
+    return React.createElement(
+      'Overlay',
+      {
+        visible: this.props.visible,
+        overlayKey: this.props.overlayKey,
+        isBoundary: true,
+      },
+      this.props.children,
+    );
   }
 }

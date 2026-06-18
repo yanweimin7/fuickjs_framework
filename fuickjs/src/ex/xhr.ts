@@ -49,14 +49,18 @@ export class XMLHttpRequest extends EventTarget {
 
   setRequestHeader(header: string, value: string): void {
     if (this.readyState !== XMLHttpRequest.OPENED) {
-      throw new Error('DOMException: Failed to execute "setRequestHeader" on "XMLHttpRequest": The object\'s state must be OPENED.');
+      throw new Error(
+        'DOMException: Failed to execute "setRequestHeader" on "XMLHttpRequest": The object\'s state must be OPENED.',
+      );
     }
     this._requestHeaders[header] = value;
   }
 
   send(body?: any): void {
     if (this.readyState !== XMLHttpRequest.OPENED) {
-      throw new Error('DOMException: Failed to execute "send" on "XMLHttpRequest": The object\'s state must be OPENED.');
+      throw new Error(
+        'DOMException: Failed to execute "send" on "XMLHttpRequest": The object\'s state must be OPENED.',
+      );
     }
 
     this._requestId = Math.random().toString(36).substring(2);
@@ -71,20 +75,20 @@ export class XMLHttpRequest extends EventTarget {
           this._method,
           this._requestHeaders,
           typeof body === 'string' ? body : JSON.stringify(body),
-          this._requestId!
+          this._requestId!,
         );
 
         if (this._aborted) return;
 
         this.status = result.status;
         this.statusText = result.status >= 200 && result.status < 300 ? 'OK' : 'Error';
-        
+
         // Handle headers
         this._changeReadyState(XMLHttpRequest.HEADERS_RECEIVED);
-        
+
         // Handle loading (simplified since we get the whole body at once)
         this._changeReadyState(XMLHttpRequest.LOADING);
-        
+
         this.responseText = result.body;
         this._parseResponse();
 
@@ -101,7 +105,7 @@ export class XMLHttpRequest extends EventTarget {
     if (this._async) {
       doRequest();
     } else {
-      // FuickJS bridge is async by nature, so sync XHR is not truly possible 
+      // FuickJS bridge is async by nature, so sync XHR is not truly possible
       // without blocking the JS thread which we don't want to do.
       console.warn('[XMLHttpRequest] Synchronous request is not supported in this environment, falling back to async.');
       doRequest();

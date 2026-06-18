@@ -17,9 +17,13 @@
 
 - [技术介绍（原理、架构、功能、使用示例）](./introduction.md)
 - [UI 组件 (Widgets)](./widgets.md)
+- [FlutterProps 命名属性机制](./flutter-props.md)
 - [原生服务 & 浏览器 API](./services.md)
+- [多语言 (i18n)](./i18n.md)
 - [Community 扩展包](./community.md)
 - [fuickjs_dart — Dart 动态渲染方案](./fuickjs_dart.md)
+- [Bundle 动态下发（签名验签/回滚/图片透明加载）](./bundle-delivery.md)
+- [二进制协议 v2（varint + 字符串表）](./binary-protocol-v2.md)
 - [框架审计报告](./audit-report.md)
 
 ## 开发规范
@@ -112,6 +116,8 @@ Router.register('/detail', (params) => <DetailPage id={params.id} />);
 | `useVisible(cb)` | 页面进入前台时触发 |
 | `useInvisible(cb)` | 页面进入后台时触发 |
 | `usePageConfig(config)` | 配置页面级渲染参数（`incrementalMode` / `dslCacheEnabled`） |
+| `useTranslation()` | 多语言翻译，返回 `{ t, locale, setLocale, locales }`，语言切换自动重渲染（详见 [i18n](./i18n.md)） |
+| `useLocale()` | 返回 `[locale, setLocale]` |
 
 ```typescript
 import { useNavigator, useVisible, usePageConfig } from 'fuickjs';
@@ -126,6 +132,24 @@ export function MyPage() {
   });
 
   return <Button text="跳转" onTap={() => nav.push('/next')} />;
+}
+```
+
+---
+
+### 4.1 多语言 (i18n)
+
+文案在生成 DSL 前由 JS 层 `t(key)` 解析为目标语言，Flutter Parser 无需感知语言。支持插值、复数、回退链、持久化与 `NativeEvent` 广播。详见 [多语言 (i18n)](./i18n.md)。
+
+```tsx
+import { i18n, useTranslation } from 'fuickjs';
+
+i18n.configure({ fallbackLocale: 'en', resources: { en: {...}, 'zh-CN': {...} } });
+await i18n.init(); // 持久化偏好 → 系统语言 → fallback
+
+function Home() {
+  const { t, setLocale } = useTranslation();
+  return <Text text={t('home.greeting', { name: 'Tom' })} onTap={() => setLocale('zh-CN')} />;
 }
 ```
 

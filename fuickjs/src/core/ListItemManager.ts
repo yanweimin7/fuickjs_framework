@@ -57,7 +57,9 @@ export class ListItemManager {
     if (!entry) {
       // 创建新的 sub-root
       const container = new ItemContainer(pageId, mainContainer);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+      // React 19: createContainer 新增 onUncaughtError/onCaughtError/onDefaultTransitionIndicator，
+      // onRecoverableError 从第 7 位移至第 9 位。
       const root = (this.reconciler as any).createContainer(
         container,
         1, // tag: ConcurrentRoot
@@ -65,8 +67,10 @@ export class ListItemManager {
         false,
         null,
         '',
-        this.handleRecoverableError,
-        null,
+        null, // onUncaughtError
+        null, // onCaughtError
+        this.handleRecoverableError, // onRecoverableError
+        () => {}, // onDefaultTransitionIndicator
       );
       entry = { container, root };
       this.items.set(key, entry);
@@ -75,7 +79,8 @@ export class ListItemManager {
 
     try {
       // flushSync 保证同步渲染，渲染完成后 Node 树已提交
-      this.reconciler.flushSync(() => {
+      // React 19: reconciler.flushSync → reconciler.flushSyncFromReconciler
+      this.reconciler.flushSyncFromReconciler(() => {
         this.reconciler.updateContainer(element, entry!.root, null, null);
       });
 

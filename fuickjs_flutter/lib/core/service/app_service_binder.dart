@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:fjs_engine/core/jscontext_interface.dart';
-import 'package:flutter/cupertino.dart';
 
 import '../container/fuick_app_controller.dart';
 import '../logger.dart';
@@ -44,21 +43,22 @@ class AppServiceBinder {
     }
 
     ctx.onCallNative = (method, args) {
-      if (_handlers.containsKey(method)) {
+      final syncH = _handlers[method];
+      if (syncH != null) {
         try {
-          return _handlers[method]!(args);
+          return syncH(args);
         } catch (e, s) {
           logger.e("failed to callNative $method $e , $s");
         }
-      } else if (_asyncHandlers.containsKey(method)) {
-        logger.w(
-          '[Service] Warning: Method "$method" is registered as async but called synchronously. '
-          'Consider using dartCallNativeAsync or registerMethod instead.',
-        );
+      }
+      // TS 同步调用命中 Dart 异步方法 → 返回 Future，由引擎映射为 JS Promise。
+      final asyncH = _asyncHandlers[method];
+      if (asyncH != null) {
         try {
-          return _asyncHandlers[method]!(args);
+          return asyncH(args);
         } catch (e, s) {
-          logger.e("failed to callNative(async fallback) $method $e , $s");
+          logger.e("failed to callNative(async) $method $e , $s");
+          rethrow;
         }
       }
       return fallbackSync?.call(method, args);
@@ -67,14 +67,19 @@ class AppServiceBinder {
     ctx.onCallNativeAsync = (method, args) async {
       final asyncH = _asyncHandlers[method];
       if (asyncH != null) {
-        try { return await asyncH(args); } catch (e, s) {
+        try {
+          return await asyncH(args);
+        } catch (e, s) {
           logger.e("failed to callNativeAsync $method $e , $s");
           rethrow;
         }
       }
+      // TS 异步调用命中 Dart 同步方法（含 sync 返回 Future 的情况）。
       final syncH = _handlers[method];
       if (syncH != null) {
-        try { return syncH(args); } catch (e, s) {
+        try {
+          return await Future.sync(() => syncH(args));
+        } catch (e, s) {
           logger.e("failed to callNativeAsync(sync) $method $e , $s");
           rethrow;
         }

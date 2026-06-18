@@ -161,7 +161,11 @@ export function table(data: unknown, columns?: string[]) {
     if (v === undefined) return '';
     if (v === null) return 'null';
     if (typeof v === 'object') {
-      try { return JSON.stringify(v); } catch { return String(v); }
+      try {
+        return JSON.stringify(v);
+      } catch {
+        return String(v);
+      }
     }
     return String(v);
   };
@@ -180,9 +184,7 @@ export function table(data: unknown, columns?: string[]) {
     return row;
   });
 
-  const widths = headers.map((h, i) =>
-    Math.max(h.length, ...tableRows.map((r) => r[i].length)),
-  );
+  const widths = headers.map((h, i) => Math.max(h.length, ...tableRows.map((r) => r[i].length)));
   const pad = (s: string, w: number) => s + ' '.repeat(Math.max(0, w - s.length));
   const sep = '+' + widths.map((w) => '-'.repeat(w + 2)).join('+') + '+';
   const fmtRow = (r: string[]) => '| ' + r.map((c, i) => pad(c, widths[i])).join(' | ') + ' |';

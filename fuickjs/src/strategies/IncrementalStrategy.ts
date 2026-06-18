@@ -2,6 +2,7 @@ import { Node } from '../core/node';
 import { PageContainer } from '../core/PageContainer';
 import { UIService } from '../services/UIService';
 import { MutationOp } from './types';
+import { perfLog } from '../utils/log';
 
 export class IncrementalStrategy {
   private container: PageContainer;
@@ -149,7 +150,7 @@ export class IncrementalStrategy {
     const sendStart = Date.now();
     UIService.patchOps(Number(pageId), flattenedOps);
     const sendEnd = Date.now();
-    console.log(
+    perfLog(
       `[Perf] page=${pageId} commit(patchOps) total=${sendEnd - commitStart}ms (sendToFlutter=${sendEnd - sendStart}ms, ops=${flattenedOps.length})`,
     );
     this.mutationQueue = [];
@@ -222,22 +223,22 @@ Flutter 端的 FuickNode 只有在被标记为 isBoundary 时才会有对应的 
     const propsKey = flutterPropsNode.props?.propsKey as string;
     if (!propsKey) return;
 
-    // Logic from PageContainer.ts
+    // 单次遍历，缓存每个匹配 FlutterProps 的 childrenDsl，避免后续重复 toDsl 序列化。
+    const groupedDsls: unknown[][] = [];
     const allValues: unknown[] = [];
     let hasMultiple = false;
 
     for (const child of host.children) {
-      if (child.type === 'FlutterProps' || child.type === 'flutter-props') {
-        const key = child.props?.propsKey as string;
-        if (key === propsKey) {
-          const childrenDsl = child.children.map((c) => c.toDsl()).filter((c) => c !== null);
-          if (childrenDsl.length > 0) {
-            allValues.push(...childrenDsl);
-          }
-          if (child !== flutterPropsNode && child.props?.propsKey === propsKey) {
-            hasMultiple = true;
-          }
-        }
+      if (child.type !== 'FlutterProps' && child.type !== 'flutter-props') continue;
+      if ((child.props?.propsKey as string) !== propsKey) continue;
+
+      const childrenDsl = child.children.map((c) => c.toDsl()).filter((c) => c !== null);
+      if (childrenDsl.length > 0) {
+        groupedDsls.push(childrenDsl);
+        allValues.push(...childrenDsl);
+      }
+      if (child !== flutterPropsNode) {
+        hasMultiple = true;
       }
     }
 
@@ -245,21 +246,9 @@ Flutter 端的 FuickNode 只有在被标记为 isBoundary 时才会有对应的 
     if (allValues.length === 0) {
       finalValue = null;
     } else if (allValues.length === 1 && !hasMultiple) {
-      const accumulatedValues: unknown[] = [];
-
-      for (const child of host.children) {
-        if ((child.type === 'FlutterProps' || child.type === 'flutter-props') && child.props?.propsKey === propsKey) {
-          const childrenDsl = child.children.map((c) => c.toDsl()).filter((c) => c !== null);
-          if (childrenDsl.length > 0) {
-            const val = childrenDsl.length === 1 ? childrenDsl[0] : childrenDsl;
-            accumulatedValues.push(val);
-          }
-        }
-      }
-
-      if (accumulatedValues.length === 0) {
-        finalValue = null;
-      } else if (accumulatedValues.length === 1) {
+      // 单 FlutterProps 单 child：保持 1 元素打平为对象的旧语义。
+      const accumulatedValues = groupedDsls.map((dsls) => (dsls.length === 1 ? dsls[0] : dsls));
+      if (accumulatedValues.length === 1) {
         finalValue = accumulatedValues[0];
       } else {
         finalValue = accumulatedValues;

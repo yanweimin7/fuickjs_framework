@@ -1,101 +1,106 @@
 import 'dart:io';
 
-import 'package:path/path.dart' as path;
+import 'package:path/path.dart' as p;
 
-import '../../offline.dart';
 import '../../util/logger.dart';
 import '../entities/package.dart';
 import '../repositories/package_repository.dart';
+import '../value_objects/package_registry.dart';
 
 class CleanService {
   final PackageRepository _repository;
 
   CleanService(this._repository);
 
-  Future<void> cleanExpired(List<Package> activePackages) async {
-    await cleanInactivePackages(activePackages);
-    await cleanOtherEnvDirs();
+  /// 启动兜底 GC：收敛到 registry 引用集（active ∪ staged ∪ history）。
+  Future<void> cleanExpired(PackageRegistry registry, String env) async {
+    await cleanUnreferenced(registry);
+    await cleanOtherEnvDirs(env);
     await cleanOldDownloads();
   }
 
-  Future<void> cleanInactivePackages(List<Package> activePackages) async {
-    final packagesDir = Directory(_repository.getPackageDir(
-      const Package(name: '', version: '', shasum: ''),
-    )).parent;
+  /// 删除 packages/ 下不在 registry 引用集内的所有目录。
+  Future<void> cleanUnreferenced(PackageRegistry registry) async {
+    final packagesDir = Directory(_repository.packagesRootDir);
+    if (!await packagesDir.exists()) return;
 
-    if (!(await packagesDir.exists())) return;
+    final retainedDirs = registry.retained
+        .map((pkg) => p.normalize(_repository.getPackageDir(pkg)))
+        .toSet();
 
-    final toClean = <Directory>[];
-
-    await for (final pkgDir in packagesDir.list()) {
-      if (pkgDir is! Directory) continue;
-
-      final packageName = path.basename(pkgDir.path);
-
-      await for (final versionDir in pkgDir.list()) {
+    await for (final pkgNameDir in packagesDir.list()) {
+      if (pkgNameDir is! Directory) continue;
+      await for (final versionDir in pkgNameDir.list()) {
         if (versionDir is! Directory) continue;
-
-        final versionName = path.basename(versionDir.path);
-
-        final isActive = activePackages.any(
-            (p) => p.name == packageName && p.versionShasumName == versionName);
-
-        if (!isActive) {
-          toClean.add(versionDir);
+        final normalized = p.normalize(versionDir.path);
+        if (!retainedDirs.contains(normalized)) {
+          await _deleteDir(versionDir);
         }
-      }
-    }
-
-    for (final dir in toClean) {
-      try {
-        await dir.delete(recursive: true);
-        logger(() => 'Cleaned: ${dir.path}');
-      } catch (e) {
-        logger(() => 'Failed to clean ${dir.path}: $e');
       }
     }
   }
 
-  Future<void> cleanOtherEnvDirs() async {
-    final env = Offline.config.envGetter();
-    final rootDir = Directory(
-        '${Directory(_repository.getPackageDir(const Package(name: '', version: '', shasum: ''))).parent.parent.parent.path}/offline');
+  /// 低磁盘驱逐：按优先级释放空间。
+  /// 顺序：旧 download → history LRU（最旧优先，可删到 0）。
+  /// 返回被删除的 history 包，供上层从 registry 中移除。
+  Future<List<Package>> evictForSpace(
+    PackageRegistry registry, {
+    required bool Function() hasEnoughSpace,
+  }) async {
+    if (hasEnoughSpace()) return const [];
 
-    if (!(await rootDir.exists())) return;
+    await cleanOldDownloads(maxAgeDays: 0);
+    if (hasEnoughSpace()) return const [];
+
+    // history 按进入顺序（registry 内 index 0 为最新）从最旧开始删。
+    final evicted = <Package>[];
+    final history = List<Package>.from(registry.history).reversed.toList();
+    for (final pkg in history) {
+      await _repository.deletePackage(pkg);
+      evicted.add(pkg);
+      if (hasEnoughSpace()) break;
+    }
+    if (evicted.isNotEmpty) {
+      logger(() => 'Evicted ${evicted.length} history packages for space');
+    }
+    return evicted;
+  }
+
+  Future<void> cleanOtherEnvDirs(String env) async {
+    final rootDir = Directory(_repository.offlineRootDir);
+    if (!await rootDir.exists()) return;
 
     await for (final envDir in rootDir.list()) {
-      if (envDir is Directory && path.basename(envDir.path) != env) {
-        try {
-          await envDir.delete(recursive: true);
-          logger(() => 'Cleaned env dir: ${envDir.path}');
-        } catch (e) {
-          logger(() => 'Failed to clean env dir ${envDir.path}: $e');
-        }
+      if (envDir is Directory && p.basename(envDir.path) != env) {
+        await _deleteDir(envDir);
       }
     }
   }
 
-  Future<void> cleanOldDownloads() async {
+  Future<void> cleanOldDownloads({int maxAgeDays = 10}) async {
     final downloadDir = Directory(_repository.getDownloadDir());
-    if (!(await downloadDir.exists())) return;
+    if (!await downloadDir.exists()) return;
 
     await for (final file in downloadDir.list()) {
-      final stat = file.statSync();
-      final age = DateTime.now().difference(stat.modified);
-
-      if (age.inDays > 10) {
-        try {
-          await file.delete();
+      try {
+        final stat = file.statSync();
+        final age = DateTime.now().difference(stat.modified);
+        if (age.inDays >= maxAgeDays) {
+          await file.delete(recursive: true);
           logger(() => 'Cleaned old download: ${file.path}');
-        } catch (e) {
-          logger(() => 'Failed to clean download ${file.path}: $e');
         }
+      } catch (e) {
+        logger(() => 'Failed to clean download ${file.path}: $e');
       }
     }
   }
 
-  Future<void> deletePackage(Package package) async {
-    await _repository.deletePackage(package);
-    logger(() => 'Deleted package: ${package.name}');
+  Future<void> _deleteDir(FileSystemEntity dir) async {
+    try {
+      await dir.delete(recursive: true);
+      logger(() => 'Cleaned: ${dir.path}');
+    } catch (e) {
+      logger(() => 'Failed to clean ${dir.path}: $e');
+    }
   }
 }

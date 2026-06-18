@@ -169,9 +169,11 @@ function isDslEqual(valA: unknown, valB: unknown): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const createHostConfig = (): any => {
+  let currentUpdatePriority = 16; // DefaultEventPriority
   return {
     now: Date.now,
     supportsMutation: true,
+    supportsPersistence: false,
     supportsMicrotasks: true,
     scheduleMicrotask: (callback: () => void) => {
       if (typeof queueMicrotask === 'function') {
@@ -192,12 +194,46 @@ export const createHostConfig = (): any => {
     },
     noTimeout: -1,
     isPrimaryRenderer: true,
-    getCurrentEventPriority: () => 16, // DefaultEventPriority
+    // React 19: priority API renamed from getCurrentEventPriority
+    getCurrentUpdatePriority: () => currentUpdatePriority,
+    setCurrentUpdatePriority: (priority: number) => {
+      currentUpdatePriority = priority;
+    },
+    resolveUpdatePriority: () => currentUpdatePriority,
     getInstanceFromNode: () => null,
     beforeActiveInstanceBlur: () => {},
     afterActiveInstanceBlur: () => {},
     prepareScopeUpdate: () => {},
     getInstanceFromScope: () => null,
+    // React 19: portal mount hook
+    preparePortalMount: () => {},
+    // React 19: Transition support (no-op for custom renderer)
+    NotPendingTransition: null,
+    HostTransitionContext: {
+      $$typeof: Symbol.for('react.context'),
+      _currentValue: null,
+      _currentValue2: null,
+      _threadCount: 0,
+      Consumer: null as unknown,
+      Provider: null as unknown,
+    },
+    // React 19: Form action (no-op)
+    resetFormInstance: () => {},
+    // React 19: post-paint callback (no-op)
+    requestPostPaintCallback: () => {},
+    // React 19: eager transition hint (no-op)
+    shouldAttemptEagerTransition: () => false,
+    // React 19: scheduler tracing (no-op)
+    trackSchedulerEvent: () => {},
+    // React 19: event info (no-op)
+    resolveEventType: () => null,
+    resolveEventTimeStamp: () => -1,
+    // React 19: Suspense commit hooks (no-op — this renderer doesn't suspend)
+    maySuspendCommit: () => false,
+    preloadInstance: () => true,
+    startSuspendingCommit: () => {},
+    suspendInstance: () => {},
+    waitForCommitToBeReady: () => null,
     getPublicInstance: (inst: Node) => inst,
     getRootHostContext: (_root: PageContainer) => null,
     getChildHostContext: (_parentHostContext: unknown, _type: string, _root: PageContainer) => null,
@@ -269,48 +305,35 @@ export const createHostConfig = (): any => {
     clearContainer: (container: PageContainer) => {
       container.root = null;
     },
-    prepareUpdate: (
-      _instance: Node,
+    // React 19: prepareUpdate's return value (updatePayload) is no longer passed to
+    // commitUpdate, so there is no benefit to diffing here. Always return a truthy
+    // sentinel so React schedules commitUpdate, and do the real diff there once.
+    prepareUpdate: () => true,
+    commitUpdate: (
+      instance: Node,
       _type: string,
       oldProps: Record<string, unknown>,
       newProps: Record<string, unknown>,
-      _root: unknown,
-      _hostContext: unknown,
-    ) => {
-      return diffProps(oldProps, newProps);
-    },
-    updateFiberProps: (instance: Node, _type: string, newProps: Record<string, unknown>) => {
-      instance.applyProps(newProps);
-    },
-    commitUpdate: (
-      instance: Node,
-      updatePayload: { payload: unknown[]; hasDslChanges: boolean },
-      _type: string,
-      _oldProps: Record<string, unknown>,
-      newProps: Record<string, unknown>,
       _internalInstanceHandle: unknown,
     ) => {
-      // Update props on the Node instance
-      instance.applyProps(newProps);
+      const result = diffProps(oldProps, newProps);
+      if (!result) return;
 
-      // Only mark as changed if there was an actual payload (calculated in prepareUpdate)
-      if (updatePayload && updatePayload.hasDslChanges && instance.container) {
+      const { payload, hasDslChanges } = result;
+      instance.applyProps(newProps, hasDslChanges);
+
+      if (hasDslChanges && instance.container) {
         const container = instance.container;
         if (instance === container.root) {
-          const changedKeys = updatePayload.payload
-            ? updatePayload.payload.filter((_: unknown, i: number) => i % 2 === 0)
-            : [];
+          const changedKeys = payload.filter((_: unknown, i: number) => i % 2 === 0);
           perfLog(
             `[HostConfig] markChanged ROOT node=${instance.id} type=${instance.type} due to DSL changes in props: ${changedKeys.join(',')}`,
           );
         }
 
         if (typeof container.recordUpdate === 'function') {
-          container.recordUpdate(instance, updatePayload.payload);
-        } else if (typeof container.markChanged === 'function') {
-          container.markChanged(instance);
+          container.recordUpdate(instance, payload);
         } else {
-          // Fallback
           container.markChanged(instance);
         }
       }

@@ -6,6 +6,14 @@ import '../utils/extensions.dart';
 class WidgetUtils {
   static final Map<String, Color> _colorCache = {};
 
+  // 按 props Map 实例缓存解析后的不可变样式对象。
+  // FuickNode 仅在内容变更时把 props 替换为新 Map 实例（identity 变化），
+  // 因此用 Expando 按 identity 缓存等价于按 version 失效，且无需改动 parser 签名。
+  // 值为 null 的结果用 _nullSentinel 表示，以区分「已计算且为 null」与「未计算」。
+  static final Object _nullSentinel = Object();
+  static final Expando<Object> _decorationCache = Expando('fuickBoxDecoration');
+  static final Expando<Object> _textStyleCache = Expando('fuickTextStyle');
+
   static final RegExp _rgbaRegex = RegExp(
       r'rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)');
 
@@ -396,6 +404,16 @@ class WidgetUtils {
   }
 
   static BoxDecoration? boxDecorationFromProps(Map<String, dynamic> props) {
+    final cached = _decorationCache[props];
+    if (cached != null) {
+      return identical(cached, _nullSentinel) ? null : cached as BoxDecoration;
+    }
+    final result = _computeBoxDecoration(props);
+    _decorationCache[props] = result ?? _nullSentinel;
+    return result;
+  }
+
+  static BoxDecoration? _computeBoxDecoration(Map<String, dynamic> props) {
     final decorationProp = props['decoration'];
     final Map<String, dynamic>? dec =
         decorationProp is Map ? asMap(decorationProp) : null;
@@ -442,6 +460,39 @@ class WidgetUtils {
       boxShadow: boxShadow,
       image: image,
     );
+  }
+
+  /// 从 props 解析 Text 的 TextStyle，并按 props 实例缓存。
+  /// 注意：仅依赖样式相关字段，与 text 内容、textTransform 无关。
+  static TextStyle textStyleFromProps(Map<String, dynamic> props) {
+    final cached = _textStyleCache[props];
+    if (cached != null) {
+      return identical(cached, _nullSentinel)
+          ? const TextStyle()
+          : cached as TextStyle;
+    }
+    final fontSize = asDoubleOrNull(props['fontSize']);
+    final lineHeight = asDoubleOrNull(props['lineHeight']);
+    final lineHeightIsAbsolute = props['_lineHeightIsAbsolute'] == true;
+    final style = TextStyle(
+      fontSize: fontSize,
+      color: colorFromHex(props['color'] as String?),
+      fontWeight: fontWeight(props['fontWeight'] as String?),
+      fontStyle:
+          props['fontStyle'] == 'italic' ? FontStyle.italic : FontStyle.normal,
+      fontFamily: props['fontFamily'] as String?,
+      decoration: textDecoration(props['textDecoration'] as String?),
+      shadows: getTextShadow(props['textShadow']),
+      letterSpacing: asDoubleOrNull(props['letterSpacing']),
+      wordSpacing: asDoubleOrNull(props['wordSpacing']),
+      height: lineHeight != null
+          ? (lineHeightIsAbsolute && fontSize != null
+              ? lineHeight / fontSize
+              : lineHeight)
+          : null,
+    );
+    _textStyleCache[props] = style;
+    return style;
   }
 
   static List<BoxShadow>? getBoxShadow(dynamic v) {

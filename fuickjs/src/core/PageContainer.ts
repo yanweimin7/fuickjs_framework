@@ -3,6 +3,7 @@ import { Node, TEXT_TYPE } from './node';
 import { IncrementalStrategy } from '../strategies/IncrementalStrategy';
 import { DiffStrategy } from '../strategies/DiffStrategy';
 import { NativeEvent } from '../runtime/NativeEvent';
+import { perfLog } from '../utils/log';
 
 export class PageContainer {
   pageId: number;
@@ -366,7 +367,7 @@ export class PageContainer {
     } finally {
       this.clear();
     }
-    console.log(`[Perf] page=${this.pageId} commit=${Date.now() - commitStart}ms`);
+    perfLog(`[Perf] page=${this.pageId} commit=${Date.now() - commitStart}ms`);
   }
 
   public getItemDSL(refId: string, index: number): unknown {
@@ -390,7 +391,7 @@ export class PageContainer {
     }
   }
 
-  public static readonly MAX_ELEMENT_DEPTH = 512;
+  public static readonly MAX_ELEMENT_DEPTH = 1024;
 
   public elementToDsl(element: React.ReactNode, depth: number = 0, visited?: WeakSet<object>): unknown {
     if (!element) return null;
@@ -405,9 +406,7 @@ export class PageContainer {
     if (typeof element === 'object' && element !== null) {
       if (!visited) visited = new WeakSet();
       if (visited.has(element as object)) {
-        console.warn(
-          `[PageContainer] elementToDsl detected cycle on page ${this.pageId}; truncating`,
-        );
+        console.warn(`[PageContainer] elementToDsl detected cycle on page ${this.pageId}; truncating`);
         return null;
       }
       visited.add(element as object);
