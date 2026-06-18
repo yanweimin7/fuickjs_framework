@@ -49,6 +49,13 @@ class _FuickAppViewState extends State<FuickAppView> {
 
   final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
+  // 每个 FuickAppView 持有自己的 RouteObserver 实例。
+  // 历史上挂在 FuickAppController 单例上,导致两个 view 共享同一 observer 时
+  // 触发 Navigator.initState 断言 'observer.navigator == null'。
+  // 1 个 observer 只对应 1 个 Navigator(per-view 分配)。
+  final RouteObserver<Route<dynamic>> _routeObserver =
+      RouteObserver<Route<dynamic>>();
+
   late final NavigatorObserver _observer = _FuickNavigatorObserver(() {
     if (!mounted) return;
     final canPop = _canInnerNavigatorPop();
@@ -159,24 +166,28 @@ class _FuickAppViewState extends State<FuickAppView> {
             }
           },
           child: child!),
-      child: Navigator(
-        key: _navKey,
-        observers: [_observer, appContext!.appController.routeObserver],
-        onGenerateInitialRoutes: (NavigatorState nav, String initialRoute) {
-          return [
-            PageRouteBuilder(
-              transitionDuration: Duration.zero,
-              reverseTransitionDuration: Duration.zero,
-              pageBuilder: (_, __, ___) => FuickPage(
-                pageId: rootPageId,
-                controller: appContext!.appController,
-                routeInfo: RouteInfo(
-                    widget.initialRoute ?? '/', widget.initialParams ?? {}),
-                loadingBackgroundColor: widget.loadingBackgroundColor,
+      child: FuickPageScope(
+        pageId: rootPageId,
+        routeObserver: _routeObserver,
+        child: Navigator(
+          key: _navKey,
+          observers: [_observer, _routeObserver],
+          onGenerateInitialRoutes: (NavigatorState nav, String initialRoute) {
+            return [
+              PageRouteBuilder(
+                transitionDuration: Duration.zero,
+                reverseTransitionDuration: Duration.zero,
+                pageBuilder: (_, __, ___) => FuickPage(
+                  pageId: rootPageId,
+                  controller: appContext!.appController,
+                  routeInfo: RouteInfo(
+                      widget.initialRoute ?? '/', widget.initialParams ?? {}),
+                  loadingBackgroundColor: widget.loadingBackgroundColor,
+                ),
               ),
-            ),
-          ];
-        },
+            ];
+          },
+        ),
       ),
     );
   }

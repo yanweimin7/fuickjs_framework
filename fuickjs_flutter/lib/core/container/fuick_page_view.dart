@@ -37,6 +37,7 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
   bool _isVisible = false;
   bool _isFirstRender = true;
   bool _routeSubscribed = false;
+  RouteObserver<Route<dynamic>>? _routeObserverRef;
 
   Widget? _cachedChild;
   FuickNode? _lastBuiltNode;
@@ -57,13 +58,15 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
     super.didChangeDependencies();
     if (!_routeSubscribed) {
       _routeSubscribed = true;
-      widget.controller.routeObserver.subscribe(this, ModalRoute.of(context)!);
+      _routeObserverRef = FuickPageScope.of(context)!.routeObserver;
+      _routeObserverRef!.subscribe(this, ModalRoute.of(context)!);
     }
   }
 
   @override
   void dispose() {
-    widget.controller.routeObserver.unsubscribe(this);
+    _routeObserverRef?.unsubscribe(this);
+    _routeObserverRef = null;
     widget.controller.isBundleLoaded.removeListener(_checkAndRender);
     widget.controller.destroyPage(widget.pageId);
     widget.controller.onPageRender.remove(widget.pageId);
@@ -206,6 +209,8 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
           controller: widget.controller,
           child: FuickPageScope(
             pageId: widget.pageId,
+            routeObserver:
+                _routeObserverRef ?? FuickPageScope.of(context)!.routeObserver,
             child: widgetFactory.buildFromNode(
               context,
               rootNode!,
@@ -225,8 +230,14 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
 
 class FuickPageScope extends InheritedWidget {
   final int pageId;
+  final RouteObserver<Route<dynamic>> routeObserver;
 
-  const FuickPageScope({super.key, required this.pageId, required super.child});
+  const FuickPageScope({
+    super.key,
+    required this.pageId,
+    required this.routeObserver,
+    required super.child,
+  });
 
   static FuickPageScope? of(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<FuickPageScope>();
@@ -240,6 +251,7 @@ class FuickPageScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(FuickPageScope oldWidget) {
-    return pageId != oldWidget.pageId;
+    return pageId != oldWidget.pageId ||
+        !identical(routeObserver, oldWidget.routeObserver);
   }
 }

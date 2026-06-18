@@ -24,9 +24,6 @@ class FuickAppController {
   late final FuickNavigationDelegate navigation;
   late final FuickPageDelegate page;
 
-  final RouteObserver<Route<dynamic>> routeObserver =
-      RouteObserver<Route<dynamic>>();
-
   final FuickCommandBus commandBus = FuickCommandBus();
   final serviceBinder = AppServiceBinder();
   final ValueNotifier<bool> isBundleLoaded = ValueNotifier<bool>(false);

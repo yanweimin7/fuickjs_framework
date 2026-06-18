@@ -98,7 +98,11 @@ class _OverlayHostWidgetState extends State<_OverlayHostWidget> {
             : const SizedBox.shrink();
 
         if (pageScope != null) {
-          child = FuickPageScope(pageId: pageScope.pageId, child: child);
+          child = FuickPageScope(
+            pageId: pageScope.pageId,
+            routeObserver: pageScope.routeObserver,
+            child: child,
+          );
         }
         if (appScope != null) {
           child = FuickAppScope(controller: appScope, child: child);
