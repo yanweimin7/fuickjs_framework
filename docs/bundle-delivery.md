@@ -26,19 +26,19 @@ FuickJS 的业务逻辑以 QuickJS 代码（`.qjc` 字节码 / `.js` 源码）+ 
 
 现有 `fuickjs_flutter/lib/offline/` 是一套 DDD 分层清晰的**H5 离线包**加载器，作为底座可复用，但不足以支撑本需求。增量演进需补齐：
 
-| 现状 | 问题 | 本方案对策 |
-|------|------|-----------|
-| `_getFileMd5` 用 **MD5** | 哈希算法已不安全 | 全量切 **SHA-256** |
-| 无签名 | 信任锚仅是服务端下发 `shasum`，无密码学防线 | 引入 **Ed25519 签名 manifest** |
-| 只对整 zip 算一次 hash | 无 manifest、无逐文件校验 | 新增 **manifest（仅代码）+ 逐代码文件 SHA-256** |
-| `activePackages` 扁平覆盖 | 无 active/staged/history，**无法回滚** | 引入**包状态机 + 版本保留** |
-| 清理只留 active | 旧版本被删，回滚无包可回 | 清理保留 **active + staged + history** |
-| 无 staged 缓冲 | 解压即激活，不满足"下次打开生效" | 引入 **staged → 下次打开提升为 active** |
-| 路径写死 `assets/h5` | 面向 H5，不是 QuickJS | 切到 **`assets/js`** 并接通引擎 |
-| 下载写最终路径 + `exists` 短路 | 半包可能被当完整包 | 下载到 `.tmp` 再 rename |
-| `CleanService` 用空 `Package` 反推路径 + 读全局 `Offline.config` | 脆弱、难测 | 目录布局收敛到 `FileStorage`，依赖注入 |
-| `Offline` `late` 静态单例无守卫 | init 前调用 / 中途失败抛错 | 增加 `initialized` 守卫与安全访问 |
-| `DownloadRepository` 接口未实现 | 死抽象 | 移除或落地 |
+| 现状                                                             | 问题                                        | 本方案对策                                      |
+| ---------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------- |
+| `_getFileMd5` 用 **MD5**                                         | 哈希算法已不安全                            | 全量切 **SHA-256**                              |
+| 无签名                                                           | 信任锚仅是服务端下发 `shasum`，无密码学防线 | 引入 **Ed25519 签名 manifest**                  |
+| 只对整 zip 算一次 hash                                           | 无 manifest、无逐文件校验                   | 新增 **manifest（仅代码）+ 逐代码文件 SHA-256** |
+| `activePackages` 扁平覆盖                                        | 无 active/staged/history，**无法回滚**      | 引入**包状态机 + 版本保留**                     |
+| 清理只留 active                                                  | 旧版本被删，回滚无包可回                    | 清理保留 **active + staged + history**          |
+| 无 staged 缓冲                                                   | 解压即激活，不满足"下次打开生效"            | 引入 **staged → 下次打开提升为 active**         |
+| 路径写死 `assets/h5`                                             | 面向 H5，不是 QuickJS                       | 切到 **`assets/js`** 并接通引擎                 |
+| 下载写最终路径 + `exists` 短路                                   | 半包可能被当完整包                          | 下载到 `.tmp` 再 rename                         |
+| `CleanService` 用空 `Package` 反推路径 + 读全局 `Offline.config` | 脆弱、难测                                  | 目录布局收敛到 `FileStorage`，依赖注入          |
+| `Offline` `late` 静态单例无守卫                                  | init 前调用 / 中途失败抛错                  | 增加 `initialized` 守卫与安全访问               |
+| `DownloadRepository` 接口未实现                                  | 死抽象                                      | 移除或落地                                      |
 
 ## 3. 总体架构
 
@@ -57,9 +57,9 @@ FuickJS 的业务逻辑以 QuickJS 代码（`.qjc` 字节码 / `.js` 源码）+ 
 │  └────────────┘           └──────┬───────┘  +SHA256) └────────────┘ │
 │                                  │ promote (下次打开)                 │
 │                                  ▼                                   │
-│  ┌──────────────┐   packageRoot  ┌──────────────────┐  inject       │
-│  │ FuickAppContext │ ───────────▶ │ BundlePreloader   │  __FUICK_BUNDLE__ │
-│  │ (promote/加载)  │              │ (.qjc/.js 加载)   │ ─────────────▶ QuickJS ctx
+│  ┌──────────────┐   packageRoot  ┌─────────────────┐  inject        │
+│  │ FuickAppContext │ ───────────▶ │ qjc 字节码直送   │  __FUICK_BUNDLE__ │
+│  │ (promote/加载)  │              │ QuickJS C 层 fopen │ ─────────────▶ QuickJS ctx
 │  └──────────────┘                └──────────────────┘                │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -81,6 +81,7 @@ bundle zip 解压后的目录布局（解压根即 `<root>`）：
 ```
 
 约定：
+
 - 代码文件放在 `<root>` 顶层；资源统一放在 `<root>/assets/` 下。
 - 业务引用资源相对 `assets/` 目录：`<Image src="images/logo.png" />` ↔ `<root>/assets/images/logo.png`。
 
@@ -90,14 +91,15 @@ bundle zip 解压后的目录布局（解压根即 `<root>`）：
 {
   "name": "wallet_bundle",
   "version": "1.2.0",
-  "minAppVersion": "3.0.0",      // 兼容性：低于此 App 版本不加载
-  "keyId": "key-2026-01",        // 签名密钥标识，便于轮换
-  "entry": "bundle.qjc",       // 入口文件（zip 内固定 bundle.qjc / bundle.js）
-  "codeForm": "qjc",             // qjc | js
-  "files": [                     // 只列代码文件
-    { "path": "bundle.qjc", "sha256": "<hex>" }
+  "minAppVersion": "3.0.0", // 兼容性：低于此 App 版本不加载
+  "keyId": "key-2026-01", // 签名密钥标识，便于轮换
+  "entry": "bundle.qjc", // 入口文件（zip 内固定 bundle.qjc / bundle.js）
+  "codeForm": "qjc", // qjc | js
+  "files": [
+    // 只列代码文件
+    { "path": "bundle.qjc", "sha256": "<hex>" },
   ],
-  "encryption": null             // 预留：仅对代码可选；图片永不加密
+  "encryption": null, // 预留：仅对代码可选；图片永不加密
 }
 ```
 
@@ -108,10 +110,10 @@ bundle zip 解压后的目录布局（解压根即 `<root>`）：
 
 两层职责清晰：
 
-| 层级 | 覆盖对象 | 手段 | 失败处理 |
-|------|----------|------|---------|
-| 整包层 | 整个 zip（含图片） | 下载后校验 zip 的 SHA-256 == 版本接口下发值 | 丢弃，不解压 |
-| 代码层 | 仅代码文件 | Ed25519 验 `manifest.sig` + 对 `files` 内每个代码文件 SHA-256 比对 | 丢弃 staging，不激活 |
+| 层级   | 覆盖对象           | 手段                                                               | 失败处理             |
+| ------ | ------------------ | ------------------------------------------------------------------ | -------------------- |
+| 整包层 | 整个 zip（含图片） | 下载后校验 zip 的 SHA-256 == 版本接口下发值                        | 丢弃，不解压         |
+| 代码层 | 仅代码文件         | Ed25519 验 `manifest.sig` + 对 `files` 内每个代码文件 SHA-256 比对 | 丢弃 staging，不激活 |
 
 - **公钥内置 App，私钥后端签名服务持有**，App 永不接触私钥。
 - `BundleVerifier` 只遍历 `manifest.files` 做逐代码文件 hash 校验，**不枚举/不校验图片**。
@@ -134,10 +136,10 @@ download zip → sha256(zip) == meta.sha256 ?            // 整包层
 
 ### 7.1 状态
 
-| 状态 | 含义 |
-|------|------|
-| `staged` | 已下载校验通过，等待"下次打开"提升为 active |
-| `active` | 当前生效，引擎加载它 |
+| 状态      | 含义                                                |
+| --------- | --------------------------------------------------- |
+| `staged`  | 已下载校验通过，等待"下次打开"提升为 active         |
+| `active`  | 当前生效，引擎加载它                                |
 | `history` | 曾经 active 的旧版本，保留用于本地复用（默认 N 个） |
 
 `PackageRegistry`（持久化为 `registry.json`）维护三组列表：`active / staged / history`。
@@ -161,11 +163,11 @@ download zip → sha256(zip) == meta.sha256 ?            // 整包层
 
 **保留上限**
 
-| 槽位 | 数量 | 是否留文件 | 说明 |
-|------|------|-----------|------|
-| `active` | 恰好 1 | ✅ | 当前生效，**绝不删除** |
-| `staged` | **至多 1（单槽位）** | ✅ | 下次打开要切换的「最新候选」 |
-| `history` | 至多 N（`retainVersions`，默认 3） | ✅ | 曾经服役过的旧版，供回滚本地复用 |
+| 槽位      | 数量                               | 是否留文件 | 说明                             |
+| --------- | ---------------------------------- | ---------- | -------------------------------- |
+| `active`  | 恰好 1                             | ✅         | 当前生效，**绝不删除**           |
+| `staged`  | **至多 1（单槽位）**               | ✅         | 下次打开要切换的「最新候选」     |
+| `history` | 至多 N（`retainVersions`，默认 3） | ✅         | 曾经服役过的旧版，供回滚本地复用 |
 
 每个 bundle 磁盘占用上限 = `active(1) + staged(1) + history(N)` = **N+2** 份解压目录（N=3 → 最多 5）。下载用的 `.zip` 在**成功提升为 staged 后立即删除**。
 
@@ -232,12 +234,12 @@ history 增长只与「实际切换版本次数」相关，与「下载次数」
 
 `staged` 是单槽位的「待生效候选」，但它**就绪 ≠ 必然生效**。`promoteStaged` 在提升前会校验 staged 是否仍是「当前已知线上最新版本」，命中以下规则之一才放行，否则**丢弃 staged（删文件 + 移出 registry），沿用当前 active**：
 
-| 条件 | 判定 | 理由 |
-|------|------|------|
-| staged 是内置包 | **恒放行** | 内置是最终兜底；线上有更新版时内置 staged 必须能顶上，否则白屏 |
-| 远程列表未就绪（`_remotePackages` 空 / 不含该 name） | **放行** | 离线 / 首启后台 sync 未回来时不阻断，保证可用性 |
-| 远程包 staged 版本 == 线上最新版本 | **放行** | 正常升级路径 |
-| 远程包 staged 版本 ≠ 线上最新版本 | **丢弃** | 误发熔断：见下 |
+| 条件                                                 | 判定       | 理由                                                           |
+| ---------------------------------------------------- | ---------- | -------------------------------------------------------------- |
+| staged 是内置包                                      | **恒放行** | 内置是最终兜底；线上有更新版时内置 staged 必须能顶上，否则白屏 |
+| 远程列表未就绪（`_remotePackages` 空 / 不含该 name） | **放行**   | 离线 / 首启后台 sync 未回来时不阻断，保证可用性                |
+| 远程包 staged 版本 == 线上最新版本                   | **放行**   | 正常升级路径                                                   |
+| 远程包 staged 版本 ≠ 线上最新版本                    | **丢弃**   | 误发熔断：见下                                                 |
 
 **解决的问题**：误发包 v2 已下载并 `staged`，但**尚未** promote（用户还没打开）。运营发现后撤回、下发配置改回 v1。由于 sync 只以 active 为基准比对，**不会主动清理残留的 staged v2**——若无此校验，下次打开就会把 v2 提升为 active。加上本校验后：
 
@@ -261,11 +263,12 @@ staged = v2（误发，未 promote）
 
 ### 9.1 内置包解压时机（懒解压 + 版本幂等）
 
-**关键事实**：内置包的**代码不需要解压**——`BundlePreloader` 直接用 `rootBundle.load('assets/js/<name>.qjc')` 从 App 资源读字节码执行。解压内置包到磁盘目录的**唯一目的是图片**（`__FUICK_BUNDLE__.root` 需指向磁盘目录，图片才能解析为 `file://<root>/assets/...`）。
+**关键事实**：内置包的**代码不需要解压**——`FuickAppContext` 直接用 `rootBundle.load('assets/js/<name>.qjc')` 从 App 资源读字节码执行。解压内置包到磁盘目录的**唯一目的是图片**（`__FUICK_BUNDLE__.root` 需指向磁盘目录，图片才能解析为 `file://<root>/assets/...`）。
 
 **策略：只有当内置包真正成为加载目标时才解压，每个 App 版本至多一次。**
 
 内置包成为加载目标的场景：
+
 1. **首次启动**：registry 为空，无任何 remote active/staged。
 2. **App 升级后内置版本 > 当前 active**：内置胜出。
 3. **兜底**：无 active 时懒解压内置包。
@@ -292,7 +295,7 @@ staged = v2（误发，未 promote）
 - 若内置（或目标包）尚未解压完成，**先展示 loading 状态**，待 `root` 就绪再注入 `__FUICK_BUNDLE__.root` 并渲染。
 - 复用 `FuickAppContext.isReady` / `appController.isBundleLoaded` 等通知量驱动容器 UI：解压+加载未完成 → loading；完成 → 正常首屏。
 - 一次性成本：仅首次启动（或 App 升级后首次）付费解压；后续启动命中已解压目录，无 loading、直接渲染。
-- 代码可与解压并行预热（`BundlePreloader.prewarm` 已支持），但渲染发生在 `root` 就绪之后，保证图片首帧正确。
+- 代码与解压并行（assets rootBundle 已被框架内部缓存，IO 极轻），但渲染发生在 `root` 就绪之后，保证图片首帧正确。
 
 ### 9.3 无内置包场景（thin-app 模式）
 
@@ -322,10 +325,12 @@ FuickAppContext._doInit()
   → isReady=false → 容器展示 loading（见 §9.2）
   → root = await Offline.promoteAndGetRoot(appName)   // 下次打开生效 + 回滚后真实目录
        内部确保目标包已解压（内置首启/升级时按 §9.1 懒解压，await 完成）
-  → BundlePreloader.prewarm/consume(appName, packageRoot: root)
-       从 root 读 bundle.qjc（优先）/ bundle.js；root 为空回退 assets/js/<name>.qjc|.js
+  → _loadSingleBundle(appName, root)
+       优先 root/bundle.qjc：peek 首字节比对 BC_VERSION，不匹配隔离为 .stale 后回退 .js
+       匹配则 ctx.evalBinaryFileFromPath(qjcPath) —— C 层 fopen 直送，零 Dart 内存拷贝
+       root 为空回退 assets/js/<name>.qjc|.js（rootBundle）
   → 注入 globalThis.__FUICK_BUNDLE__ = { name, root }  // eval 业务代码之前
-  → evalBinary / eval
+  → ctx.evalBinaryFileFromPath / ctx.evalBinary / ctx.eval
   → isReady=true → 退出 loading，渲染首屏（root 已就绪，图片首帧正确）
 ```
 
@@ -350,6 +355,7 @@ Flutter ImageParser 现有 file:// 分支直接处理 ✅（零改动）
 ```
 
 要点：
+
 - 业务照写 `<Image src="images/logo.png" />`，改写在框架内部 `toDsl()` 单点完成。
 - `ImageParser` 已有完整 file:// 文件分支（存在性判断、SVG/栅格、降级 errorSrc），改写后的 src 直接命中，**Flutter 侧零改动**。
 - 内置包也 zip 化解压到包目录，图片始终在 `<root>/assets/...`，内置/线上路径一致；`root` 为空时退化为 `Image.asset`。
@@ -359,9 +365,9 @@ Flutter ImageParser 现有 file:// 分支直接处理 ✅（零改动）
 
 位于 `fuickjs_demo/js/tools/bundle/`（私钥不入库，`.gitignore` 排除）：
 
-| 脚本 | 职责 |
-|------|------|
-| `gen-keys.js` | 生成 Ed25519 密钥对：`bundle_signing_key.pem`（私钥）/ `bundle_signing_pub.pem` / `bundle_signing_pub.b64`（内置 App） |
+| 脚本             | 职责                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `gen-keys.js`    | 生成 Ed25519 密钥对：`bundle_signing_key.pem`（私钥）/ `bundle_signing_pub.pem` / `bundle_signing_pub.b64`（内置 App）         |
 | `pack-bundle.js` | 收集代码(+assets) → 算代码文件 SHA-256 → 写 `manifest.json` → 私钥签名 `manifest.sig` → 打 zip → 输出整包 SHA-256 供版本元数据 |
 
 `pack-bundle.js` 关键参数：`--name --version --key --keyId --minAppVersion --js --qjc --assets --out`。
@@ -386,12 +392,14 @@ Flutter ImageParser 现有 file:// 分支直接处理 ✅（零改动）
 ## 13. 影响文件清单
 
 **新增（Flutter）**
+
 - `offline/domain/entities/bundle_manifest.dart` — manifest 数据模型（仅代码文件）。
 - `offline/domain/services/bundle_verifier.dart` — Ed25519 验签 + 逐代码文件 SHA-256。
 - `offline/domain/value_objects/package_registry.dart` — active/staged/history。
 - `offline/util/version_utils.dart` — semver 比较 / minAppVersion 判定。
 
 **修改（Flutter）**
+
 - `pubspec.yaml` — 增加 `cryptography`（Ed25519）。
 - `offline/domain/entities/package.dart` — 见 §12.1。
 - `offline/config/offline_config.dart` — 见 §12.2。
@@ -406,10 +414,12 @@ Flutter ImageParser 现有 file:// 分支直接处理 ✅（零改动）
 - `core/engine/fuick_app_context.dart` — promote 取 root、注入 `__FUICK_BUNDLE__`。
 
 **修改（JS/TS）**
+
 - `fuickjs/src/node.ts` — `toDsl()` 对 Image `src/errorSrc` 相对路径自动改写为 `file://<root>/assets/...`。
 - （不新增 JS 公开 `resolveAsset`，不引入 `BundleScope`。）
 
 **新增（构建工具）**
+
 - `fuickjs_demo/js/tools/bundle/{gen-keys.js,pack-bundle.js,.gitignore}`，`package.json` 增加 `bundle:keys/bundle:pack`。
 
 ## 14. 测试计划
@@ -438,7 +448,7 @@ Flutter ImageParser 现有 file:// 分支直接处理 ✅（零改动）
 ## 17. 实施状态（P0–P4 已完成）
 
 - **P0–P3（Flutter offline 模块）**：`Package`/`PackageRegistry`/`BundleManifest`、`BundleVerifier`（Ed25519 + 逐代码文件 SHA-256）、`FileStorage`（staging/registry/`assets/js`/内置 zip）、`PackageRepository`、`DownloadService`（整包 SHA-256 + `.tmp` rename + staging 解压 + 验签 + minAppVersion + 原子提升）、`PackageService`（状态机 + `reuseLocalAsStaged` + staged 生效前校验线上最新/内置豁免）、`SyncService`（minAppVersion）、`CleanService`（引用集 GC + 低磁盘驱逐）、`Offline` 编排（sync 时先查 retained 再下载；`promoteAndGetRoot`/懒解压内置）。
-- **引擎集成**：`BundlePreloader`（`packageRoot` + 回退 `assets/js`）、`FuickAppContext`（解析 root → 注入 `__FUICK_BUNDLE__`）。
+- **引擎集成**：`FuickAppContext._loadSingleBundle`（fs 走 `evalBinaryFileFromPath` 零拷贝 + assets 回退 `rootBundle`）、`__FUICK_BUNDLE__` 注入。
 - **P4（JS/TS）**：`node.ts toDsl()` 透明改写 Image 相对路径。
 - **构建工具**：`fuickjs_demo/js/tools/bundle/{gen-keys.js,pack-bundle.js}` + npm `bundle:keys`/`bundle:pack`。
 - **测试**：`test/offline/` 全绿（含 Node 打包 → Dart 验签的跨语言一致性 fixture）。
@@ -459,6 +469,7 @@ await DemoOfflineBootstrap.init();
 ```
 
 配置要点：
+
 - `signaturePublicKeysB64`：从 `assets/js/bundle_signing_pub.b64` 读取，map key 为 `demo-key`（与 zip 内 `manifest.keyId` 一致；多公钥时在代码里配完整公钥表）。
 - `appVersionGetter`：与 `pubspec.yaml` version 对齐（当前 `1.0.0`）。
 - `offlinePackagesGetter`：Demo 返回 `null`（仅内置包）；联调时改为请求 CDN 元数据接口。
@@ -470,7 +481,7 @@ app/assets/js/
 ├── bundles.json              # { packages: [...] } — UI + offline 共用
 ├── bundle_signing_pub.b64    # Ed25519 公钥（可入库）
 ├── bundle.zip / taro-demo.zip / ...   # 各 bundle 内置 zip（验签 + 懒解压）
-├── bundle.js / bundle.qjc    # 开发兜底（zip 缺失时 BundlePreloader 回退）
+├── bundle.js / bundle.qjc    # 开发兜底（zip 缺失时回退 .js / 字节码版本不匹配时 .stale 隔离后回退）
 └── ...
 ```
 
@@ -495,4 +506,4 @@ npm run bundle:pack:all    # 批量打 zip + 刷新 bundles.json sha256 + 复制
 
 1. `Offline.promoteAndGetRoot(appName)` 懒解压内置 zip → 验签 → active
 2. 注入 `globalThis.__FUICK_BUNDLE__`
-3. `BundlePreloader` 从包目录加载 `.qjc`
+3. `_loadSingleBundle` 从包目录加载 `.qjc`（peek 字节码版本后 C 层 fopen）

@@ -227,9 +227,9 @@ final Uint8List bytecode = await ctx.compile('var x = 40 + 2; x;');
 // 2. 直接执行字节码
 final result = await ctx.evalBinary(bytecode, returnValue: true); // 42
 
-// 3. 或落盘缓存，下次启动直接加载执行
+// 3. 或落盘缓存，下次启动直接加载执行（直接传 fs 路径，C 层 fopen，避免内存拷贝）
 await File('cache/bundle.qjc').writeAsBytes(bytecode);
-await ctx.evalBinaryFile('cache/bundle.qjc', returnValue: false);
+await ctx.evalBinaryFileFromPath('cache/bundle.qjc', returnValue: false);
 ```
 
 底层链路：

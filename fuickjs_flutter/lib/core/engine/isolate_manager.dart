@@ -49,7 +49,11 @@ class IsolateHandler {
               binder.init(
                 ctx,
                 null,
-                allowedServices: [TimerService, ConsoleService, FileSystemService],
+                allowedServices: [
+                  TimerService,
+                  ConsoleService,
+                  FileSystemService
+                ],
                 fallbackSync: (method, args) {
                   try {
                     final responsePort = ReceivePort();
@@ -113,6 +117,18 @@ class IsolateHandler {
             final returnValue = payload['returnValue'] as bool? ?? false;
             final isModule = payload['isModule'] as bool? ?? false;
             result = await ctx!.evalBinary(bytecode,
+                returnValue: returnValue, isModule: isModule);
+          } else if (type == 'evalFileFromPath') {
+            final path = payload['path'] as String;
+            final returnValue = payload['returnValue'] as bool? ?? true;
+            final isModule = payload['isModule'] as bool? ?? false;
+            result = await ctx!.evalFileFromPath(path,
+                returnValue: returnValue, isModule: isModule);
+          } else if (type == 'evalBinaryFileFromPath') {
+            final path = payload['path'] as String;
+            final returnValue = payload['returnValue'] as bool? ?? false;
+            final isModule = payload['isModule'] as bool? ?? false;
+            result = await ctx!.evalBinaryFileFromPath(path,
                 returnValue: returnValue, isModule: isModule);
           } else if (type == 'compile') {
             final code = payload['code'] as String;

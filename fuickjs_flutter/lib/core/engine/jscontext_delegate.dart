@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:fjs_engine/core/jscontext_interface.dart';
-import 'package:flutter/services.dart';
 import 'package:fuickjs_flutter/core/engine/worker.dart';
 
 class JsContextDelegate implements IQuickJsContext {
@@ -52,7 +52,8 @@ class JsContextDelegate implements IQuickJsContext {
 
   @override
   Future<dynamic> eval(String code, {bool returnValue = true}) =>
-      _worker.sendRequest(contextId, 'eval', {'code': code, 'returnValue': returnValue});
+      _worker.sendRequest(
+          contextId, 'eval', {'code': code, 'returnValue': returnValue});
 
   @override
   Future<dynamic> evalModule(String code) =>
@@ -60,13 +61,34 @@ class JsContextDelegate implements IQuickJsContext {
 
   @override
   Future<dynamic> evalBinary(Uint8List bytecode,
-      {bool returnValue = false, bool isModule = false}) =>
-      _worker.sendRequest(contextId, 'evalBinary',
-          {'bytecode': bytecode, 'returnValue': returnValue, 'isModule': isModule});
+          {bool returnValue = false, bool isModule = false}) async =>
+      _worker.sendRequest(contextId, 'evalBinary', {
+        'bytecode': bytecode,
+        'returnValue': returnValue,
+        'isModule': isModule
+      });
+
+  @override
+  Future<dynamic> evalFileFromPath(String path,
+          {bool returnValue = true, bool isModule = false}) async =>
+      _worker.sendRequest(contextId, 'evalFileFromPath', {
+        'path': path,
+        'returnValue': returnValue,
+        'isModule': isModule,
+      });
+
+  @override
+  Future<dynamic> evalBinaryFileFromPath(String path,
+          {bool returnValue = false, bool isModule = false}) async =>
+      _worker.sendRequest(contextId, 'evalBinaryFileFromPath', {
+        'path': path,
+        'returnValue': returnValue,
+        'isModule': isModule,
+      });
 
   @override
   Future<Uint8List> compile(String code,
-          {bool isModule = false, bool stripSource = true}) async {
+      {bool isModule = false, bool stripSource = true}) async {
     final res = await _worker.sendRequest(contextId, 'compile', {
       'code': code,
       'isModule': isModule,
@@ -90,7 +112,10 @@ class JsContextDelegate implements IQuickJsContext {
       'code': code,
     }).catchError((e) {
       // Log but don't throw - registerModule is void in the interface
-      assert(() { print('[JsContextDelegate] registerModule error: $e'); return true; }());
+      assert(() {
+        print('[JsContextDelegate] registerModule error: $e');
+        return true;
+      }());
     });
   }
 
@@ -108,21 +133,5 @@ class JsContextDelegate implements IQuickJsContext {
   void dispose() {
     _worker.sendRequest(contextId, 'disposeContext', null);
     _worker.unregisterDelegate(contextId);
-  }
-
-  @override
-  Future evalBinaryFile(String path, {bool returnValue = false}) async {
-    final ByteData data = await rootBundle.load(path);
-    final Uint8List bytes = data.buffer.asUint8List(
-      data.offsetInBytes,
-      data.lengthInBytes,
-    );
-    return evalBinary(bytes, returnValue: returnValue);
-  }
-
-  @override
-  Future evalFile(String path, {bool returnValue = true}) async {
-    final String code = await rootBundle.loadString(path);
-    return eval(code, returnValue: returnValue);
   }
 }

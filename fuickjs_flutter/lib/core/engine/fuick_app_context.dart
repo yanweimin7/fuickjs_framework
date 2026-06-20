@@ -1,24 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 
 import '../../offline/offline.dart';
 import '../container/fuick_app_controller.dart';
 import '../logger.dart';
 import 'bundle_compiler.dart';
-import 'bundle_preloader.dart';
 import 'jscontext_delegate.dart';
 import 'worker.dart';
-
-/// qjsc -b 输出的 .qjc 起始字节就是 BC_VERSION（u8）。
-/// 验证：`bytecodeVersion=26` 对应首字节 `0x1a`。
-int? _peekBytecodeVersion(Uint8List bytes) {
-  return bytes.isEmpty ? null : bytes[0];
-}
 
 /// 预渲染页面描述
 class PrewarmPageConfig {
@@ -91,10 +84,6 @@ class FuickAppContext {
     final rootFuture = _resolveBundleRoot();
     rootFuture.then((root) {
       _activeBundleRoot = root ?? cachedBundleRoot;
-      if (root != null) {
-        BundlePreloader()
-            .prewarm(appName, useAot: useAotCode, packageRoot: root);
-      }
     });
 
     try {
@@ -187,73 +176,97 @@ class FuickAppContext {
     }
   }
 
+  /// 加载 bundle 的统一入口：fs 路径走 *FileFromPath（零拷贝），
+  /// assets 路径走 rootBundle 内置读取。
   Future<void> _loadSingleBundle(String bundleName, String? root) async {
     await _injectBundleGlobals(root);
-    // consume() 等待 IO 完成后立即释放 BundlePreloader 内的引用
-    final content = await BundlePreloader()
-        .consume(bundleName, useAot: useAotCode, packageRoot: root);
-    if (content.bytecode != null) {
-      final bc = content.bytecode!;
-      // 加载前先 peek bytecode header 中的 BC_VERSION，与 engine 版本直接比较。
-      // 不匹配时不调用 evalBinary，避免引擎内部抛 SyntaxError。
-      final peeked = _peekBytecodeVersion(bc);
+    if (root != null && root.isNotEmpty) {
+      await _loadFromPackageDir(bundleName, root);
+    } else {
+      await _loadFromAssets(bundleName);
+    }
+  }
+
+  /// 动态包目录加载：先 peek qjc 头判版本，匹配则走 *FileFromPath
+  /// 让 C 层直接 fopen 读取，避免 Dart 堆持有多 MB 字节码。
+  Future<void> _loadFromPackageDir(String bundleName, String root) async {
+    final qjc = File(p.join(root, 'bundle.qjc'));
+    if (await qjc.exists()) {
+      final peeked = await _peekBcVersionOfFile(qjc);
       final engineVersion = await ctx.bytecodeVersion;
       if (peeked != null && peeked != engineVersion) {
         logger.w(
           '[BundleLoader] bytecode version mismatch: file=$peeked engine=$engineVersion — root=$root',
         );
-        if (root == null || root.isEmpty) {
-          throw StateError(
-            'assets/$bundleName.qjc bytecode version $peeked is '
-            'incompatible with engine $engineVersion. Please rebuild the '
-            'app bundle against the new engine and republish the app.',
-          );
+        // 隔离旧 qjc：rename 让下一次 IO 自然 fall through 到 .js
+        try {
+          await qjc.rename(p.join(root, 'bundle.qjc.stale'));
+          logger.d('[BundleLoader] renamed stale bundle.qjc → .stale at $root');
+        } catch (err) {
+          logger
+              .w('[BundleLoader] failed to quarantine stale bundle.qjc: $err');
         }
-        final staleQjc = File(p.join(root, 'bundle.qjc'));
-        if (await staleQjc.exists()) {
-          // rename 而非 delete：失败时旧文件仍在，但下一句会再尝试读它，
-          // 用 .stale 后缀确保 _loadFromDir 不再误命中。
-          try {
-            await staleQjc.rename(p.join(root, 'bundle.qjc.stale'));
-            logger
-                .d('[BundleLoader] renamed stale bundle.qjc → .stale at $root');
-          } catch (err) {
-            logger.w(
-              '[BundleLoader] failed to quarantine stale bundle.qjc: $err',
-            );
-          }
-        }
-        // 重新拉取一次 bundle 内容：旧 qjc 已隔离，_loadContent 会回退到 .js
-        BundlePreloader().invalidate(bundleName, packageRoot: root);
-        final fallback = await BundlePreloader()
-            .consume(bundleName, useAot: false, packageRoot: root);
-        if (fallback.source == null) {
-          throw StateError(
-            'No JS source fallback for $bundleName at $root after '
-            'quarantining stale bytecode.',
-          );
-        }
-        logger.d('[Performance] load bundle js (fallback) for $bundleName');
-        await ctx.eval(fallback.source!, returnValue: false);
-        // 后台重编 bytecode，命中下次启动
-        BundleCompiler.compileIfNeeded(
-          ctx: ctx,
-          source: fallback.source!,
-          packageDir: root,
-        );
+        await _evalJsAt(bundleName, root);
         return;
       }
-      logger.d('[Performance] load bundle bytes for $bundleName');
-      await ctx.evalBinary(bc, returnValue: false);
-    } else if (content.source != null) {
-      logger.d('[Performance] load bundle js for $bundleName');
-      await ctx.eval(content.source!, returnValue: false);
-      // 后台编译 JS → 字节码，下次启动直接加载 qjc（fire-and-forget）
-      BundleCompiler.compileIfNeeded(
-        ctx: ctx,
-        source: content.source!,
-        packageDir: root,
+      logger.d('[Performance] load bundle bytes (fromPath) for $bundleName');
+      await ctx.evalBinaryFileFromPath(qjc.path, returnValue: false);
+      return;
+    }
+    await _evalJsAt(bundleName, root);
+  }
+
+  /// 内置 assets 加载（无 packageRoot 时）。
+  Future<void> _loadFromAssets(String bundleName) async {
+    if (useAotCode) {
+      try {
+        final byteData = await rootBundle.load('assets/js/$bundleName.qjc');
+        final bc = byteData.buffer
+            .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+        logger.d('[Performance] load bundle bytes for $bundleName');
+        await ctx.evalBinary(bc, returnValue: false);
+        return;
+      } catch (_) {}
+    }
+    final source =
+        await rootBundle.loadString('assets/js/$bundleName.js', cache: false);
+    logger.d('[Performance] load bundle js for $bundleName');
+    await ctx.eval(source, returnValue: false);
+    BundleCompiler.compileIfNeeded(
+      ctx: ctx,
+      source: source,
+      packageDir: null,
+    );
+  }
+
+  /// 加载 fs 上的 .js：C 层直接 fopen 读取。
+  /// 后台编译需要 source 文本，fs 路径下读一次（频率低，可接受）。
+  Future<void> _evalJsAt(String bundleName, String root) async {
+    final js = File(p.join(root, 'bundle.js'));
+    if (!await js.exists()) {
+      throw StateError(
+        'No JS source fallback for $bundleName at $root after '
+        'quarantining stale bytecode.',
       );
+    }
+    logger.d('[Performance] load bundle js (fromPath) for $bundleName');
+    await ctx.evalFileFromPath(js.path, returnValue: false);
+    final sourceText = await js.readAsString();
+    BundleCompiler.compileIfNeeded(
+      ctx: ctx,
+      source: sourceText,
+      packageDir: root,
+    );
+  }
+
+  /// 读取 qjc 首字节作为 BC_VERSION 预判。
+  static Future<int?> _peekBcVersionOfFile(File f) async {
+    final raf = await f.open();
+    try {
+      final first = await raf.read(1);
+      return first.isNotEmpty ? first[0] : null;
+    } finally {
+      await raf.close();
     }
   }
 
