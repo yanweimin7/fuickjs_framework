@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:path/path.dart' as p;
 
 import '../../offline/offline.dart';
 import '../container/fuick_app_controller.dart';
@@ -10,6 +13,12 @@ import 'bundle_compiler.dart';
 import 'bundle_preloader.dart';
 import 'jscontext_delegate.dart';
 import 'worker.dart';
+
+/// qjsc -b 输出的 .qjc 起始字节就是 BC_VERSION（u8）。
+/// 验证：`bytecodeVersion=26` 对应首字节 `0x1a`。
+int? _peekBytecodeVersion(Uint8List bytes) {
+  return bytes.isEmpty ? null : bytes[0];
+}
 
 /// 预渲染页面描述
 class PrewarmPageConfig {
@@ -184,8 +193,58 @@ class FuickAppContext {
     final content = await BundlePreloader()
         .consume(bundleName, useAot: useAotCode, packageRoot: root);
     if (content.bytecode != null) {
-    logger.d('[Performance] load bundle bytes for $bundleName');
-      await ctx.evalBinary(content.bytecode!, returnValue: false);
+      final bc = content.bytecode!;
+      // 加载前先 peek bytecode header 中的 BC_VERSION，与 engine 版本直接比较。
+      // 不匹配时不调用 evalBinary，避免引擎内部抛 SyntaxError。
+      final peeked = _peekBytecodeVersion(bc);
+      final engineVersion = await ctx.bytecodeVersion;
+      if (peeked != null && peeked != engineVersion) {
+        logger.w(
+          '[BundleLoader] bytecode version mismatch: file=$peeked engine=$engineVersion — root=$root',
+        );
+        if (root == null || root.isEmpty) {
+          throw StateError(
+            'assets/$bundleName.qjc bytecode version $peeked is '
+            'incompatible with engine $engineVersion. Please rebuild the '
+            'app bundle against the new engine and republish the app.',
+          );
+        }
+        final staleQjc = File(p.join(root, 'bundle.qjc'));
+        if (await staleQjc.exists()) {
+          // rename 而非 delete：失败时旧文件仍在，但下一句会再尝试读它，
+          // 用 .stale 后缀确保 _loadFromDir 不再误命中。
+          try {
+            await staleQjc.rename(p.join(root, 'bundle.qjc.stale'));
+            logger
+                .d('[BundleLoader] renamed stale bundle.qjc → .stale at $root');
+          } catch (err) {
+            logger.w(
+              '[BundleLoader] failed to quarantine stale bundle.qjc: $err',
+            );
+          }
+        }
+        // 重新拉取一次 bundle 内容：旧 qjc 已隔离，_loadContent 会回退到 .js
+        BundlePreloader().invalidate(bundleName, packageRoot: root);
+        final fallback = await BundlePreloader()
+            .consume(bundleName, useAot: false, packageRoot: root);
+        if (fallback.source == null) {
+          throw StateError(
+            'No JS source fallback for $bundleName at $root after '
+            'quarantining stale bytecode.',
+          );
+        }
+        logger.d('[Performance] load bundle js (fallback) for $bundleName');
+        await ctx.eval(fallback.source!, returnValue: false);
+        // 后台重编 bytecode，命中下次启动
+        BundleCompiler.compileIfNeeded(
+          ctx: ctx,
+          source: fallback.source!,
+          packageDir: root,
+        );
+        return;
+      }
+      logger.d('[Performance] load bundle bytes for $bundleName');
+      await ctx.evalBinary(bc, returnValue: false);
     } else if (content.source != null) {
       logger.d('[Performance] load bundle js for $bundleName');
       await ctx.eval(content.source!, returnValue: false);

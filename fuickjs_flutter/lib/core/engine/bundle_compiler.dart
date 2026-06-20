@@ -52,6 +52,16 @@ class BundleCompiler {
       logger.d(
         '[BundleCompiler] compiled bundle.qjc: ${bytecode.length} bytes → $qjcPath',
       );
+      // 新版本 qjc 落盘后，清掉旧版本隔离出来的 .stale 文件
+      final stale = File('$qjcPath.stale');
+      if (await stale.exists()) {
+        try {
+          await stale.delete();
+          logger.d('[BundleCompiler] cleaned stale $qjcPath.stale');
+        } catch (e) {
+          logger.d('[BundleCompiler] failed to clean stale: $e');
+        }
+      }
     } catch (e) {
       logger.d('[BundleCompiler] compile skipped: $e');
     } finally {

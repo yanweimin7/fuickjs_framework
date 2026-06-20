@@ -39,6 +39,13 @@ class JsContextDelegate implements IQuickJsContext {
   @override
   int get handleAddress => identityHashCode(this);
 
+  @override
+  Future<int> get bytecodeVersion async => await _worker.sendRequest(
+        contextId,
+        'bytecodeVersion',
+        null,
+      ) as int;
+
   Future<void> init() async {
     await _worker.sendRequest(contextId, 'createContext', null);
   }

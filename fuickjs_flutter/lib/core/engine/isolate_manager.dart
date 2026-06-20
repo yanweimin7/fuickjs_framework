@@ -122,6 +122,8 @@ class IsolateHandler {
                 .compile(code, isModule: isModule, stripSource: stripSource);
           } else if (type == 'runJobs') {
             result = await ctx!.runJobs();
+          } else if (type == 'bytecodeVersion') {
+            result = await ctx!.bytecodeVersion;
           } else if (type == 'invoke') {
             final objectName = payload['objectName'] as String?;
             final methodName = payload['methodName'] as String;
