@@ -29,15 +29,18 @@ class BundlePreloader {
     return Future.value();
   }
 
-  /// 取出加载结果（一次性消费）。若未 prewarm 则在此加载。
+  /// 取出加载结果（一次性消费）。
+  ///
+  /// - prewarm 过的：从 [_pendingLoads] 取出**已完成**的 future，**无 IO**。
+  /// - 未 prewarm 的：直接调 [_loadContent] 同步加载。
+  ///
+  /// 取出后立即从 map 释放引用，避免 .qjc 之类的多 MB 字节码继续占堆。
   Future<BundleContent> consume(String bundleName,
       {required bool useAot, String? packageRoot}) {
     final key = _key(bundleName, packageRoot);
-    return _getOrStartLoad(bundleName, useAot: useAot, packageRoot: packageRoot)
-        .then((content) {
-      _pendingLoads.remove(key);
-      return content;
-    });
+    final pending = _pendingLoads.remove(key);
+    if (pending != null) return pending;
+    return _loadContent(bundleName, useAot: useAot, packageRoot: packageRoot);
   }
 
   /// 失效指定 bundle 的飞行中缓存（回滚/切换包时调用）。
@@ -59,7 +62,8 @@ class BundlePreloader {
     if (packageRoot != null && packageRoot.isNotEmpty) {
       final fromPkg = await _loadFromDir(bundleName, packageRoot, useAot);
       if (fromPkg != null) return fromPkg;
-      logger.d('[BundlePreloader] packageRoot miss, fallback assets for $bundleName');
+      logger.d(
+          '[BundlePreloader] packageRoot miss, fallback assets for $bundleName');
     }
 
     // 2. 回退到内置 assets/js。
