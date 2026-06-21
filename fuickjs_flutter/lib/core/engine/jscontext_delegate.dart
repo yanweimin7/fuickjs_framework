@@ -106,6 +106,20 @@ class JsContextDelegate implements IQuickJsContext {
       });
 
   @override
+  Future<dynamic> invokeAsync(
+    String? objectName,
+    String methodName,
+    List<dynamic> args, {
+    Duration? timeout,
+  }) =>
+      _worker.sendRequest(contextId, 'invokeAsync', {
+        'objectName': objectName,
+        'methodName': methodName,
+        'args': args,
+        'timeoutMs': timeout?.inMilliseconds,
+      });
+
+  @override
   void registerModule(String name, String code) {
     _worker.sendRequest(contextId, 'registerModule', {
       'name': name,

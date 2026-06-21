@@ -145,6 +145,18 @@ class IsolateHandler {
             final methodName = payload['methodName'] as String;
             final args = payload['args'] as List;
             result = await ctx!.invoke(objectName, methodName, args);
+          } else if (type == 'invokeAsync') {
+            final objectName = payload['objectName'] as String?;
+            final methodName = payload['methodName'] as String;
+            final args = payload['args'] as List;
+            final timeoutMs = payload['timeoutMs'] as int?;
+            result = await ctx!.invokeAsync(
+              objectName,
+              methodName,
+              args,
+              timeout:
+                  timeoutMs == null ? null : Duration(milliseconds: timeoutMs),
+            );
           } else if (type == 'registerModule') {
             final name = payload['name'] as String;
             final code = payload['code'] as String;
