@@ -146,8 +146,19 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
         final newNode = nodeManager.createNode(prewarm.dsl!, nodeManager);
         rootNode = newNode;
       } else {
-        prewarm.future.then((dsl) {
-          if (mounted) _handleRenderDsl(dsl);
+        // 关键：等 prewarm 完成后，必须复用 prebuilt 节点（用于 Hero flight）。
+        // 不能直接调 _handleRenderDsl，因为它会用新建的 nodeManager，
+        // 浪费 prewarm 已经构建好的 prebuilt 节点。
+        prewarm.future.then((_) {
+          if (!mounted) return;
+          if (prewarm.hasPrebuiltNodes) {
+            setState(() {
+              nodeManager = prewarm.prebuiltNodeManager!;
+              rootNode = prewarm.prebuiltRootNode!;
+            });
+          } else if (prewarm.hasDsl) {
+            _handleRenderDsl(prewarm.dsl!);
+          }
         });
       }
     }

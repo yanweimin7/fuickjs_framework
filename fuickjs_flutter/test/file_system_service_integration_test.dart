@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -48,7 +47,7 @@ void main() {
   });
 
   tearDown(() {
-    binder.dispose(ctx);
+    binder.dispose();
     ctx.dispose();
   });
 

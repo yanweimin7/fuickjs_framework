@@ -84,3 +84,8 @@ export * from './AnimatedSwitcher';
 export * from './AnimatedCrossFade';
 export * from './NestedScrollView';
 export * from './Overlay';
+export * from './Align';
+export * from './Hero';
+export * from './FadeTransition';
+export * from './SizeTransition';
+export * from './PositionedTransition';

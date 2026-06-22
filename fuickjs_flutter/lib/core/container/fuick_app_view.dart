@@ -166,27 +166,39 @@ class _FuickAppViewState extends State<FuickAppView> {
             }
           },
           child: child!),
-      child: FuickPageScope(
-        pageId: rootPageId,
-        routeObserver: _routeObserver,
-        child: Navigator(
-          key: _navKey,
-          observers: [_observer, _routeObserver],
-          onGenerateInitialRoutes: (NavigatorState nav, String initialRoute) {
-            return [
-              PageRouteBuilder(
-                transitionDuration: Duration.zero,
-                reverseTransitionDuration: Duration.zero,
-                pageBuilder: (_, __, ___) => FuickPage(
-                  pageId: rootPageId,
-                  controller: appContext!.appController,
-                  routeInfo: RouteInfo(
-                      widget.initialRoute ?? '/', widget.initialParams ?? {}),
-                  loadingBackgroundColor: widget.loadingBackgroundColor,
+      child: HeroControllerScope(
+        // 必须：内层 Navigator 显式创建 HeroController。
+        // 即使宿主 MaterialApp 已提供 HeroController，
+        // 由于 inner Navigator 位于 MaterialApp 之内但不在其 heroController 管辖范围
+        // （这是 Flutter Hero 实现的边界），push 时源/目标 Hero 无法匹配，
+        // 表现就是 cupertino 滑动而 Hero 不飞。
+        controller: HeroController(),
+        child: FuickPageScope(
+          pageId: rootPageId,
+          routeObserver: _routeObserver,
+          child: Navigator(
+            key: _navKey,
+            observers: [_observer, _routeObserver],
+            onGenerateInitialRoutes:
+                (NavigatorState nav, String initialRoute) {
+              // 初始路由必须用带 transitionDuration 的 PageRoute，
+              // 不能用 PageRouteBuilder(transitionDuration: zero)，
+              // 否则 Hero flight 拿不到源路由 transition 曲线。
+              return [
+                CupertinoPageRoute<void>(
+                  settings: RouteSettings(name: initialRoute),
+                  builder: (_) => FuickPage(
+                    pageId: rootPageId,
+                    controller: appContext!.appController,
+                    routeInfo: RouteInfo(widget.initialRoute ?? '/',
+                        widget.initialParams ?? {}),
+                    loadingBackgroundColor:
+                        widget.loadingBackgroundColor,
+                  ),
                 ),
-              ),
-            ];
-          },
+              ];
+            },
+          ),
         ),
       ),
     );

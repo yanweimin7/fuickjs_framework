@@ -3,6 +3,7 @@
 FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件。以下是目前已支持的所有组件及其功能描述。
 
 ## 1. 基础布局组件
+
 - **Container**: 最常用的容器组件，支持 padding, margin, color, width, height, alignment 以及复杂的 decoration (圆角、阴影、边框)。
 - **Column / Row**: 线性布局组件，支持主轴 (`mainAxisAlignment`) 和交叉轴 (`crossAxisAlignment`) 对齐。
 - **Stack / Positioned**: 绝对定位布局，允许组件重叠。
@@ -10,13 +11,14 @@ FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件
 - **SizedBox**: 固定尺寸容器，常用于撑开间距。
 - **Padding**: 专门用于设置内边距的封装组件。
 - **Center**: 将子组件居中对齐。
-- **Align**: 精确控制子组件在父容器中的位置。
+- **Align**: 精确控制子组件在父容器中的位置。Props: `alignment`（topLeft/topCenter/topRight/centerLeft/center/centerRight/bottomLeft/bottomCenter/bottomRight），`widthFactor`（可选，>0 时父容器宽度=子节点×factor），`heightFactor`（同 widthFactor，作用于高度）。当 factor 为 null 时父容器保持原大小。
 - **ConstrainedBox**: 为子组件设置额外的约束（最大/最小宽高度）。
 - **Wrap**: 流式布局，当空间不足时自动折行。
 - **AspectRatio**: 按指定宽高比约束子组件尺寸，props: `aspectRatio`（必填）。
 - **FractionallySizedBox**: 按父容器的百分比控制子组件尺寸，props: `widthFactor`, `heightFactor`, `alignment`。
 
 ## 2. 交互与输入
+
 - **Button**: 原生按钮。Props: `text`, `onTap`, `disabled`, `loading`, `backgroundColor`, `textColor`, `fontSize`, `borderRadius`, `elevation`, `outlined`（OutlinedButton 变体）, `borderColor`, `borderWidth`, `minWidth`, `minHeight`, `paddingH`, `paddingV`。
 - **InkWell**: 水波纹点击效果，可包裹任何组件使其具备交互能力。
 - **GestureDetector**: 万能手势检测，支持 `onTap`, `onLongPress`, `onDoubleTap` 等。
@@ -25,6 +27,7 @@ FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件
 - **Switch**: 开关组件。
 
 ## 3. 展示类组件
+
 - **Text**: 文本显示，支持样式 (fontSize, color, fontWeight)、行数限制 (`maxLines`)、溢出处理 (`overflow`)。
 - **Image**: 图片加载，支持以下来源类型：
   - 网络图片 `https://...`（含 SVG）：自动缓存，支持 `placeholderColor`、`errorSrc` 备用图
@@ -42,6 +45,7 @@ FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件
 - **ColorFiltered**: CSS `mix-blend-mode` 实现，通过 `ShaderMask` + `BlendMode` 模拟混合模式。Props: `blendMode`。
 
 ## 4. 滚动列表
+
 - **ListView**: 高性能线性列表，支持 `itemBuilder` 按需渲染（Lazy Loading）。
 - **GridView**: 网格列表，支持固定列数或最大宽度配置。
 - **SingleChildScrollView**: 滚动单个子组件，适用于表单等长页面。
@@ -54,6 +58,7 @@ FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件
 `itemBuilder` / `renderItem` 构造的 item **不经过 React Reconciler**，每次 Flutter 滚动到新位置时直接调用函数求值并生成 DSL，等价于"模板函数"而非真实组件。
 
 **以下在 item 内无效：**
+
 - `useState` / `useEffect` / `useRef` 等任意 Hook（会抛 "Invalid hook call"）
 - `this.setState()`（能调但不触发重渲染）
 - `componentDidMount` / `componentWillUnmount`
@@ -84,7 +89,11 @@ function MyList() {
 }
 
 // ItemRow：纯函数组件，无 Hook
-function ItemRow({ index, selected, onTap }: {
+function ItemRow({
+  index,
+  selected,
+  onTap,
+}: {
   index: number;
   selected: boolean;
   onTap: () => void;
@@ -92,25 +101,31 @@ function ItemRow({ index, selected, onTap }: {
   return (
     <Container
       onTap={onTap}
-      decoration={{ color: selected ? '#e0f0ff' : '#ffffff' }}
+      decoration={{ color: selected ? "#e0f0ff" : "#ffffff" }}
       padding={12}
     >
-      <Text text={`Item ${index}${selected ? ' ✓' : ''}`} />
+      <Text text={`Item ${index}${selected ? " ✓" : ""}`} />
     </Container>
   );
 }
 ```
 
 ## 5. 动画组件
+
 - **AnimatedContainer**: 属性变更时自动执行补间动画的容器。支持 `onTap`/`onLongPress` 手势，以及 `constraints` 约束（与 Container 行为对齐）。
 - **AnimatedOpacity**: 自动淡入淡出。
 - **AnimatedAlign / AnimatedPadding**: 自动位置/边距动画。
 - **AnimatedPositioned**: Stack 中的自动位移动画。
 - **Transition系列**: `SlideTransition`, `ScaleTransition`, `RotationTransition` 等基于控制器驱动的动画。
+- **FadeTransition**: 静态/动画版本的透明度过渡。Props: `opacity`（0.0~1.0，必填）。本框架当前为静态终态实现（`AlwaysStoppedAnimation`），如需真正驱动可在外层包 `TweenAnimationBuilder`。
+- **SizeTransition**: 沿指定轴对子节点做尺寸裁剪的过渡。Props: `sizeFactor`（0.0~1.0，必填），`axis`（horizontal/vertical，默认 vertical），`axisAlignment`（`top*`/`center*`/`bottom*` 字符串映射 0.0/0.5/1.0）。
+- **PositionedTransition**: 必须在 `Stack` 内使用的位移动画。Props: `end: { left?, top?, right?, bottom? }`。当前为静态终态版（包装成 `AlwaysStoppedAnimation<RelativeRect>`，begin 默认 RelativeRect.zero）。如需真实过渡请外层包 `TweenAnimationBuilder`。
+- **Hero**: 用于两个路由间相同 `tag` 的"飞行"过渡。Props: `tag`（必填，唯一标识）。源/目标页 Hero 的 tag 一致时，Flutter 会在 Overlay 上自动播放飞行体动画。tag 缺失时安全降级为渲染子节点（不抛错）。
 - **AnimatedSwitcher**: 当子组件 `key` 变化时自动执行切换动画，props: `duration`, `reverseDuration`, `switchInCurve`, `switchOutCurve`。
 - **AnimatedCrossFade**: 在两个子组件之间执行交叉淡入淡出，通过 `FlutterProps propsKey="firstChild"` / `"secondChild"` 传入两个子组件，用 `crossFadeState: 'showFirst' | 'showSecond'` 控制显示。支持 `duration`, `firstCurve`, `secondCurve`, `sizeCurve`, `alignment`。
 
 ## 6. 功能性组件
+
 - **Scaffold**: 页面脚手架，包含 `appBar`, `body`, `bottomNavigationBar`, `floatingActionButton` 等槽位。
 - **AppBar**: 标准导航栏。
 - **SafeArea**: 自动避开屏幕刘海和底部状态栏。
