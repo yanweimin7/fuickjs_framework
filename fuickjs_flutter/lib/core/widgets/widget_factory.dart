@@ -12,6 +12,7 @@ import 'parsers/animated_padding_parser.dart';
 import 'parsers/animated_positioned_parser.dart';
 import 'parsers/animated_rotation_parser.dart';
 import 'parsers/animated_scale_parser.dart';
+import 'parsers/animated_size_parser.dart';
 import 'parsers/animated_slide_parser.dart';
 import 'parsers/animated_switcher_parser.dart';
 import 'parsers/app_bar_parser.dart';
@@ -33,6 +34,7 @@ import 'parsers/custom_paint_parser.dart';
 import 'parsers/custom_scroll_view_parser.dart';
 import 'parsers/decorated_box_outline_parser.dart';
 import 'parsers/dialog_parser.dart';
+import 'parsers/dismissible_parser.dart';
 import 'parsers/divider_parser.dart';
 import 'parsers/drawer_parser.dart';
 import 'parsers/expanded_parser.dart';
@@ -48,6 +50,7 @@ import 'parsers/hero_parser.dart';
 import 'parsers/icon_parser.dart';
 import 'parsers/ignore_pointer_parser.dart';
 import 'parsers/image_filtered_parser.dart';
+import 'parsers/indexed_stack_parser.dart';
 import 'parsers/image_parser.dart';
 import 'parsers/ink_well_parser.dart';
 import 'parsers/intrinsic_height_parser.dart';
@@ -201,6 +204,9 @@ class WidgetFactory {
     register(FadeTransitionParser());
     register(SizeTransitionParser());
     register(PositionedTransitionParser());
+    register(IndexedStackParser());
+    register(AnimatedSizeParser());
+    register(DismissibleParser());
   }
 
   void register(WidgetParser parser) {
@@ -362,6 +368,9 @@ class WidgetFactory {
     'ClipPath': {},
     'ColorFiltered': {},
     'NestedScrollView': {},
+    'IndexedStack': {'index': 0},
+    'AnimatedSize': {'duration': 300},
+    'Dismissible': {'direction': 'horizontal'},
   };
 
   void warmup(BuildContext context) {
