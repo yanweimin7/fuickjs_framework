@@ -2,6 +2,7 @@ import 'base_fuick_service.dart';
 import 'clipboard_service.dart';
 import 'console_service.dart';
 import 'device_info_service.dart';
+import 'error_report_service.dart';
 import 'file_system_service.dart';
 import 'native_event_service.dart';
 import 'navigation_service.dart';
@@ -41,6 +42,7 @@ class NativeServiceManager {
     registerService(() => WebSocketService());
     registerService(() => SoundService());
     registerService(() => LifecycleService());
+    registerService(() => ErrorReportService());
   }
 
   void registerService(ServiceBuilder serviceBuilder) {

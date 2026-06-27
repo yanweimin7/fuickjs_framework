@@ -4,7 +4,9 @@ import 'package:flutter/cupertino.dart';
 
 import '../engine/fuick_app_context.dart';
 import '../engine/fuick_app_context_manager.dart';
+import '../fuick_config.dart';
 import '../logger.dart';
+import '../widgets/red_box.dart';
 import 'fuick_app_controller.dart';
 import 'fuick_navigation_delegate.dart';
 import 'fuick_page.dart';
@@ -153,7 +155,7 @@ class _FuickAppViewState extends State<FuickAppView> {
         ),
       );
     }
-    return ValueListenableBuilder(
+    final app = ValueListenableBuilder(
       valueListenable: _canInnerPop,
       builder: (_, __, child) => PopScope(
           canPop: !_canInnerPop.value,
@@ -202,6 +204,10 @@ class _FuickAppViewState extends State<FuickAppView> {
         ),
       ),
     );
+    // debug 模式下叠加红屏错误提示
+    return FuickConfig().debug
+        ? RedBoxOverlay(child: app)
+        : app;
   }
 
   @override

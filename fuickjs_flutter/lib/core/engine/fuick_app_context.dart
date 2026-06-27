@@ -130,7 +130,9 @@ class FuickAppContext {
     appController = FuickAppController(ctx);
   }
 
-  /// 将 sourcemap 发送到 isolate 侧，供 ConsoleService 做堆栈解析。
+  /// 将 sourcemap 发送到 isolate 侧，供 ErrorReportService 做堆栈解析。
+  /// ErrorReportService 跑在 isolate 里（在 allowedServices 中），
+  /// 避免同步 dartCallNative 走 fallbackSync 回 main isolate 时死锁。
   Future<void> _forwardSourceMap() async {
     if (sourceMap == null || _contextId == null) return;
     try {
@@ -147,7 +149,7 @@ class FuickAppContext {
     try {
       if (debugBusinessCode != null) {
         await _injectBundleGlobals(_activeBundleRoot);
-        // 有 sourcemap 时先发到 isolate，eval 后的 console.error 就能直接解析
+        // 有 sourcemap 时先发到 isolate，eval 后的 ErrorReport.report 就能直接解析
         await _forwardSourceMap();
         await ctx.eval(debugBusinessCode!, returnValue: false);
         logger.d(

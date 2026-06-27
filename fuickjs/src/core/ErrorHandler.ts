@@ -1,3 +1,5 @@
+import { ErrorReportService } from '../services/ErrorReportService';
+
 export type ErrorSource = 'render' | 'event' | 'timer' | 'promise' | 'runtime' | 'unknown';
 
 export type ErrorHandlerFn = (error: unknown, source: ErrorSource, detail?: unknown) => void;
@@ -10,11 +12,11 @@ function notify(error: unknown, source: ErrorSource, detail?: unknown) {
   if (isNotifying) {
     return;
   }
-  // 兜底：没人注册 handler 时默认走 console.error，确保任何未捕获异常
-  // 都会经过 ConsoleService → Flutter 日志（带 sourcemap 解析）。
+  // 兜底：没人注册 handler 时通过 ErrorReportService 上报到 Flutter，
+  // 由 Flutter 侧做 sourcemap 还原并打印结构化错误（保留 source / detail 上下文）。
   const hasHandler = currentHandler != null || globalListeners.length > 0;
   if (!hasHandler) {
-    console.error(error);
+    ErrorReportService.report(error, source, detail);
     return;
   }
   try {
@@ -30,8 +32,10 @@ function notify(error: unknown, source: ErrorSource, detail?: unknown) {
       }
     });
   } catch (handlerError) {
+    // handler 自身抛异常（含 re-throw 原始错误），同样走 ErrorReportService
+    // 以获得 sourcemap 还原。保留原始 source / detail 上下文。
     try {
-      console.error('[ErrorHandler] Handler error:', handlerError);
+      ErrorReportService.report(handlerError, source, detail);
     } catch {}
   } finally {
     isNotifying = false;
