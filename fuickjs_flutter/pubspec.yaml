@@ -1,7 +1,7 @@
 name: fuickjs_flutter
-description: "A new Flutter package project."
-version: 0.0.1
-homepage:
+description: "FuickJS Flutter 框架层 — React + QuickJS + Flutter 动态化渲染框架的 Flutter 端：DSL 解析、Widget 工厂、Native 服务、Bundle 动态下发。"
+version: 0.1.0
+homepage: https://github.com/fuickjs/fuickjs
 
 environment:
   sdk: ^3.6.0

@@ -55,6 +55,15 @@ class FuickNavigationDelegate {
     _pageContexts[pageId] = context;
   }
 
+  /// 按 pageId 查找页面 BuildContext（UIService.getTheme / getMediaQuery 用）。
+  /// 未找到时回退到最近一次注册的 context（pageId 为 null 的情况）。
+  BuildContext? findPageContext(int? pageId) {
+    if (pageId != null && _pageContexts.containsKey(pageId)) {
+      return _pageContexts[pageId];
+    }
+    return _pageContexts.isNotEmpty ? _pageContexts.values.last : null;
+  }
+
   void unregisterNavigator(int pageId) {
     _navigators.remove(pageId);
     _pageContexts.remove(pageId);

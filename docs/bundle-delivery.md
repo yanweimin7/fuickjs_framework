@@ -1,7 +1,8 @@
 # Bundle 动态下发技术方案
 
-> 状态：方案稿（待评审 → 评审通过后进入实现）
+> 状态：**已实现**（`fuickjs_flutter/lib/offline/` 全量落地：Ed25519 验签 + SHA-256 + staged/active/history 状态机 + 内置包懒解压 + 回滚）
 > 适用范围：FuickJS 的 QuickJS 业务 bundle（`assets/js`）的可信下发、回滚与端上加载。
+> 公开 API：`Offline.init(OfflineConfig(...))`，详见 [fuickjs_flutter/README.md](../fuickjs_flutter/README.md)。
 
 ## 1. 背景与目标
 

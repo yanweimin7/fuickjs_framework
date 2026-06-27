@@ -38,15 +38,34 @@ class SizeTransitionParser extends WidgetParser {
     dynamic children,
     WidgetFactory factory,
   ) {
-    return SizeTransition(
-      sizeFactor:
-          AlwaysStoppedAnimation(asDoubleOrNull(props['sizeFactor']) ?? 1.0),
-      axis: WidgetUtils.axis(props['axis'] as String?,
-          defaultAxis: Axis.vertical),
-      // axisAlignment 已在最新 Flutter 中标记为 deprecated（被 alignment 取代），
-      // 项目 SDK 下限仍保留该 API。
-      axisAlignment: _parseAxisAlignment(props['axisAlignment'], 0.0),
-      child: factory.buildFirstChild(context, children, type),
+    final sizeFactor = asDoubleOrNull(props['sizeFactor']) ?? 1.0;
+    final durationMs = asIntOrNull(props['duration']);
+    final axis = WidgetUtils.axis(props['axis'] as String?,
+        defaultAxis: Axis.vertical);
+    final axisAlignment = _parseAxisAlignment(props['axisAlignment'], 0.0);
+    final child = factory.buildFirstChild(context, children, type);
+
+    if (durationMs == null || durationMs <= 0) {
+      return SizeTransition(
+        sizeFactor: AlwaysStoppedAnimation<double>(sizeFactor),
+        axis: axis,
+        axisAlignment: axisAlignment,
+        child: child,
+      );
+    }
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: sizeFactor, end: sizeFactor),
+      duration: Duration(milliseconds: durationMs),
+      curve: WidgetUtils.parseCurve(props['curve'] as String?),
+      builder: (context, value, _) {
+        return SizeTransition(
+          sizeFactor: AlwaysStoppedAnimation<double>(value),
+          axis: axis,
+          axisAlignment: axisAlignment,
+          child: child,
+        );
+      },
     );
   }
 }

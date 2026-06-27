@@ -1,22 +1,39 @@
 import React, { ReactNode } from 'react';
 import { BaseProps } from './types';
 
+export interface RelativeRect {
+  left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
+}
+
 export interface PositionedTransitionProps extends BaseProps {
   /**
    * 终态 rect（相对父 Stack 边界的偏移），与 Flutter RelativeRect.fromLTRB 语义一致。
-   * 缺省视为 0。begin 在解析端默认为 RelativeRect.zero。
+   * 缺省视为 0。
    */
-  end?: {
-    left?: number;
-    top?: number;
-    right?: number;
-    bottom?: number;
-  };
+  end?: RelativeRect;
+  /**
+   * 起始 rect。仅在 `duration` > 0 时生效；缺省时与 `end` 相同（无动画起点）。
+   */
+  begin?: RelativeRect;
+  /**
+   * 动画时长（毫秒）。未传或 ≤0 时走静态终态常显 `end` 位置。
+   */
+  duration?: number;
+  /**
+   * 缓动曲线名称，见 WidgetUtils.parseCurve。
+   */
+  curve?: string;
 }
 
 /**
- * 静态终态版的 PositionedTransition：常显 end 位置。
- * 如需真正的过渡动画，请在外层用 TweenAnimationBuilder / AnimatedBuilder 包裹。
+ * PositionedTransition：
+ *
+ * - 未传 `duration`：常显 `end` 位置（静态终态，向后兼容）。
+ * - 传 `duration`：通过 `TweenAnimationBuilder` 在 `begin` 与 `end` 之间插值，
+ *   实现 RelativeRect 平滑过渡。
  */
 export class PositionedTransition extends React.Component<PositionedTransitionProps> {
   render(): ReactNode {

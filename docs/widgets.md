@@ -116,10 +116,15 @@ function ItemRow({
 - **AnimatedOpacity**: 自动淡入淡出。
 - **AnimatedAlign / AnimatedPadding**: 自动位置/边距动画。
 - **AnimatedPositioned**: Stack 中的自动位移动画。
-- **Transition系列**: `SlideTransition`, `ScaleTransition`, `RotationTransition` 等基于控制器驱动的动画。
-- **FadeTransition**: 静态/动画版本的透明度过渡。Props: `opacity`（0.0~1.0，必填）。本框架当前为静态终态实现（`AlwaysStoppedAnimation`），如需真正驱动可在外层包 `TweenAnimationBuilder`。
-- **SizeTransition**: 沿指定轴对子节点做尺寸裁剪的过渡。Props: `sizeFactor`（0.0~1.0，必填），`axis`（horizontal/vertical，默认 vertical），`axisAlignment`（`top*`/`center*`/`bottom*` 字符串映射 0.0/0.5/1.0）。
-- **PositionedTransition**: 必须在 `Stack` 内使用的位移动画。Props: `end: { left?, top?, right?, bottom? }`。当前为静态终态版（包装成 `AlwaysStoppedAnimation<RelativeRect>`，begin 默认 RelativeRect.zero）。如需真实过渡请外层包 `TweenAnimationBuilder`。
+- **Transition系列**: `SlideTransition`, `ScaleTransition`, `RotationTransition` 等基于控制器驱动的动画。所有 Transition 组件统一支持以下动画驱动模式：
+  - **静态终态**（默认）：未传 `duration` 时以 `AlwaysStoppedAnimation` 包装，常显目标值（向后兼容）。
+  - **隐式动画驱动**：传 `duration`（毫秒）后走 `TweenAnimationBuilder`，在前一次值与当前值之间插值。可同时传 `curve` 缓动曲线（取值见 WidgetUtils.parseCurve：`ease`/`easeIn`/`easeOut`/`easeInOut`/`linear`/`decelerate`/`fastOutSlowIn`/`bounceIn`/`bounceOut`/`bounceInOut`/`elasticIn`/`elasticOut`/`elasticInOut`）。
+- **FadeTransition**: 透明度过渡。Props: `opacity`（0.0~1.0，必填），`duration?`，`curve?`。
+- **SizeTransition**: 沿指定轴对子节点做尺寸裁剪的过渡。Props: `sizeFactor`（0.0~1.0，必填），`axis`（horizontal/vertical，默认 vertical），`axisAlignment`（`top*`/`center*`/`bottom*` 字符串映射 0.0/0.5/1.0），`duration?`，`curve?`。
+- **ScaleTransition**: Props: `scale`（必填），`alignment?`，`duration?`，`curve?`。
+- **RotationTransition**: Props: `turns`（必填，1.0 = 一圈），`alignment?`，`duration?`，`curve?`。
+- **SlideTransition**: Props: `position: { dx, dy }`（必填），`transformHitTests?`，`duration?`，`curve?`。
+- **PositionedTransition**: 必须在 `Stack` 内使用的位移动画。Props: `end?: { left?, top?, right?, bottom? }`（终态），`begin?: { ... }`（起点，仅在传 duration 时生效；缺省与 end 相同），`duration?`，`curve?`。
 - **Hero**: 用于两个路由间相同 `tag` 的"飞行"过渡。Props: `tag`（必填，唯一标识）。源/目标页 Hero 的 tag 一致时，Flutter 会在 Overlay 上自动播放飞行体动画。tag 缺失时安全降级为渲染子节点（不抛错）。
 - **AnimatedSwitcher**: 当子组件 `key` 变化时自动执行切换动画，props: `duration`, `reverseDuration`, `switchInCurve`, `switchOutCurve`。
 - **AnimatedCrossFade**: 在两个子组件之间执行交叉淡入淡出，通过 `FlutterProps propsKey="firstChild"` / `"secondChild"` 传入两个子组件，用 `crossFadeState: 'showFirst' | 'showSecond'` 控制显示。支持 `duration`, `firstCurve`, `secondCurve`, `sizeCurve`, `alignment`。

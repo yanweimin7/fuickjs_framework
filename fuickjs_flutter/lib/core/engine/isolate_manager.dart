@@ -9,7 +9,6 @@ import 'package:flutter/foundation.dart';
 import '../logger.dart';
 import '../service/app_service_binder.dart';
 import '../service/console_service.dart';
-import '../service/error_report_service.dart';
 import '../service/file_system_service.dart';
 import '../service/timer_service.dart';
 import 'engine.dart';
@@ -54,7 +53,6 @@ class IsolateHandler {
                   TimerService,
                   ConsoleService,
                   FileSystemService,
-                  ErrorReportService,
                 ],
                 fallbackSync: (method, args) {
                   try {
@@ -83,12 +81,6 @@ class IsolateHandler {
                 },
               );
 
-              // 注入 mainSendPort，让 ErrorReportService 能非阻塞发送错误到 main isolate
-              final errorService = binder.getService<ErrorReportService>();
-              if (errorService != null) {
-                errorService.mainSendPort = mainSendPort;
-              }
-
               mainSendPort.send({
                 'type': 'response',
                 'id': id,
@@ -110,13 +102,7 @@ class IsolateHandler {
           }
 
           dynamic result;
-          if (type == 'setSourceMap') {
-            final map = payload as Map<String, dynamic>?;
-            _binders[contextId]
-                ?.getService<ErrorReportService>()
-                ?.setSourceMap(map);
-            result = null;
-          } else if (type == 'eval') {
+          if (type == 'eval') {
             final code = payload['code'] as String;
             final returnValue = payload['returnValue'] as bool? ?? true;
             result = await ctx!.eval(code, returnValue: returnValue);

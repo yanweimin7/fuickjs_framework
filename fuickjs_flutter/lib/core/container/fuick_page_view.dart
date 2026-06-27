@@ -1,7 +1,10 @@
 import 'package:flutter/cupertino.dart' hide widgetFactory;
+import 'package:flutter/material.dart' show Theme;
 
 import '../logger.dart';
+import '../widgets/fuick_media_query_provider.dart';
 import '../widgets/fuick_node.dart';
+import '../widgets/fuick_theme_provider.dart';
 import '../widgets/widget_factory.dart';
 import 'fuick_app_controller.dart';
 
@@ -222,10 +225,12 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
             pageId: widget.pageId,
             routeObserver:
                 _routeObserverRef ?? FuickPageScope.of(context)!.routeObserver,
-            child: widgetFactory.buildFromNode(
-              context,
-              rootNode!,
-              forceWrap: true,
+            child: _FuickScopeProviders(
+              child: widgetFactory.buildFromNode(
+                context,
+                rootNode!,
+                forceWrap: true,
+              ),
             ),
           ),
         ),
@@ -264,5 +269,69 @@ class FuickPageScope extends InheritedWidget {
   bool updateShouldNotify(FuickPageScope oldWidget) {
     return pageId != oldWidget.pageId ||
         !identical(routeObserver, oldWidget.routeObserver);
+  }
+}
+
+/// 在 JS 根 Widget 上方注入 [FuickThemeProvider] 与 [FuickMediaQueryProvider]。
+///
+/// - 监听宿主 [Theme] / [MediaQuery] 变化，自动重建下层的 DSL 树。
+/// - Theme/MediaQuery 变化时通过 NativeEvent 推送 'themeChange' / 'mediaQueryChange'
+///   事件，JS 端 `useTheme()` / `useMediaQuery()` hook 订阅后刷新 state。
+class _FuickScopeProviders extends StatefulWidget {
+  final Widget child;
+
+  const _FuickScopeProviders({required this.child});
+
+  @override
+  State<_FuickScopeProviders> createState() => _FuickScopeProvidersState();
+}
+
+class _FuickScopeProvidersState extends State<_FuickScopeProviders> {
+  FuickThemeData? _lastTheme;
+  FuickMediaQueryData? _lastMq;
+
+  void _maybeEmitThemeChange(FuickThemeData data) {
+    if (_lastTheme != null && _lastTheme != data) {
+      _emitToJs('themeChange', data.toMap());
+    }
+    _lastTheme = data;
+  }
+
+  void _maybeEmitMediaQueryChange(FuickMediaQueryData data) {
+    if (_lastMq != null && _lastMq != data) {
+      _emitToJs('mediaQueryChange', data.toMap());
+    }
+    _lastMq = data;
+  }
+
+  void _emitToJs(String event, Map<String, dynamic> data) {
+    // 通过当前 BuildContext 找到 FuickAppController.commandBus → jsProxy.ctx.invoke。
+    // 简化处理：使用全 App 共享的 NativeEventService 单例通道。
+    try {
+      final controller = FuickAppScope.of(context);
+      controller?.jsProxy.ctx.invoke('NativeEvent', 'receive', [event, data]);
+    } catch (e) {
+      // ignore: avoid_print
+      print('[_FuickScopeProviders] emit $event failed: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final mq = MediaQuery.of(context);
+    final themeData = FuickThemeData.fromThemeData(theme);
+    final mqData = FuickMediaQueryData.fromMediaQuery(mq);
+
+    _maybeEmitThemeChange(themeData);
+    _maybeEmitMediaQueryChange(mqData);
+
+    return FuickThemeProvider(
+      data: themeData,
+      child: FuickMediaQueryProvider(
+        data: mqData,
+        child: widget.child,
+      ),
+    );
   }
 }

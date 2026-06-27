@@ -165,6 +165,8 @@ NativeEvent.emit('jsReady', { version: '1.0.0' });
 | `useInvisible(callback)`               | 页面不可见时触发 callback                             |
 | `usePageConfig(config)`                | 配置 incrementalMode / dslCacheEnabled                |
 | `useRouteTransitionComplete(callback)` | 路由动画结束后触发 (pageId, path)                     |
+| `useTheme()`                           | 订阅宿主 ThemeData 快照，主题切换时自动重渲染          |
+| `useMediaQuery()`                      | 订阅 MediaQuery 快照，屏幕旋转/键盘弹起/暗黑切换时重渲染 |
 
 ---
 

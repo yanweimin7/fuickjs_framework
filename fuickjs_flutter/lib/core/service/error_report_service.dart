@@ -1,5 +1,3 @@
-import 'dart:isolate';
-
 import '../logger.dart';
 import '../utils/source_map_resolver.dart';
 import 'base_fuick_service.dart';
@@ -7,22 +5,18 @@ import 'js_error_bus.dart';
 
 /// 专用错误上报服务。
 ///
-/// **跑在 isolate 里**（注册在 allowedServices），因为 isolate 里的同步
-/// `dartCallNative` 不能走 `fallbackSync` 回 main isolate（会死锁：
-/// main isolate 可能正在等待 isolate 的 invoke/runJobs 返回）。
+/// **跑在 main isolate**（不在 isolate 的 allowedServices 里）。
+/// JS 调用 ErrorReport.report 时 isolate 找不到 handler → 走 fallbackSync
+/// 转发到 main isolate 执行。
 ///
 /// 职责：
-/// 1. 用 [SourceMapResolver] 还原堆栈并打印日志（isolate 里完成）
-/// 2. 通过 [mainSendPort] **非阻塞**发送错误到 main isolate，
-///    由 [JsErrorBus] 广播，供 [RedBoxOverlay] 显示红屏
+/// 1. 用 [SourceMapResolver] 还原堆栈并打印日志
+/// 2. 通过 [JsErrorBus] 广播错误，供 [RedBoxOverlay] 显示红屏
 class ErrorReportService extends BaseFuickService {
   @override
   String get name => 'ErrorReport';
 
   SourceMapResolver? _resolver;
-
-  /// 由 [IsolateHandler] 注入，用于非阻塞发送错误到 main isolate。
-  SendPort? mainSendPort;
 
   ErrorReportService() {
     registerMethod('report', (args) {
@@ -44,24 +38,19 @@ class ErrorReportService extends BaseFuickService {
         logger.e('Detail: $detail');
       }
 
-      // 2. 非阻塞发送到 main isolate 触发红屏
-      if (mainSendPort != null) {
-        final ts = m['timestamp'];
-        mainSendPort!.send({
-          'type': 'jsError',
-          'payload': {
-            'message': message,
-            'stack': resolvedStack,
-            'source': source,
-            'detail': detail,
-            'timestamp': ts is int
-                ? ts
-                : (ts is num
-                    ? ts.toInt()
-                    : DateTime.now().millisecondsSinceEpoch),
-          },
-        });
-      }
+      // 2. 广播到 JsErrorBus，触发红屏
+      final ts = m['timestamp'];
+      JsErrorBus.instance.report(JsErrorInfo(
+        message: message,
+        stack: resolvedStack,
+        source: source,
+        detail: detail,
+        timestamp: ts is int
+            ? ts
+            : (ts is num
+                ? ts.toInt()
+                : DateTime.now().millisecondsSinceEpoch),
+      ));
       return null;
     });
   }

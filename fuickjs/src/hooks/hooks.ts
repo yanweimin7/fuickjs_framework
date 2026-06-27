@@ -5,6 +5,7 @@ import * as PageRender from '../core/page_render';
 import { NavigatorService } from '../services/NavigatorService';
 import { NativeEvent } from '../runtime/NativeEvent';
 import { LifecycleService } from '../services/LifecycleService';
+import { UIService } from '../services/UIService';
 
 export function usePageId() {
   const { pageId } = useContext(PageContext);
@@ -147,4 +148,150 @@ export function useAppState(): { isInBackground: boolean } {
   }, []);
 
   return { isInBackground };
+}
+
+/**
+ * 主题快照结构（与 Flutter 端 FuickThemeData.toMap() 对齐）。
+ */
+export interface FuickThemeData {
+  /** 'light' | 'dark' */
+  brightness: 'light' | 'dark';
+  isDark: boolean;
+  /** '#AARRGGBB' 格式 */
+  primaryColor: string;
+  scaffoldBackgroundColor: string;
+  surfaceColor: string;
+  textColor?: string;
+  secondaryTextColor?: string;
+  borderRadius: number;
+}
+
+const EMPTY_THEME: FuickThemeData = {
+  brightness: 'light',
+  isDark: false,
+  primaryColor: '#FF2196F3',
+  scaffoldBackgroundColor: '#FFFFFFFF',
+  surfaceColor: '#FFFFFFFF',
+  textColor: '#FF000000',
+  secondaryTextColor: '#FF757575',
+  borderRadius: 8.0,
+};
+
+/**
+ * 读取宿主 [Theme] 当前快照，并在主题变化时触发组件重渲染。
+ *
+ * 主题切换由 Flutter 端 [FuickThemeProvider] 在 build 时下推；
+ * 当宿主调用 `MaterialApp.theme` / 暗黑模式切换时，根 Widget 重建，
+ * Provider 中的 [FuickThemeData] 也随之更新并触发 'themeChange' 事件，
+ * 本 hook 监听该事件并刷新 state。
+ *
+ * @example
+ * ```tsx
+ * const theme = useTheme();
+ * return <Container color={theme.isDark ? '#FF000000' : '#FFFFFFFF'} />;
+ * ```
+ */
+export function useTheme(): FuickThemeData {
+  const pageId = usePageId();
+  const [theme, setTheme] = useState<FuickThemeData>(() => {
+    try {
+      const raw = UIService.getTheme(pageId);
+      return (raw as FuickThemeData) ?? EMPTY_THEME;
+    } catch {
+      return EMPTY_THEME;
+    }
+  });
+
+  useEffect(() => {
+    // 首次同步拉取一次，保证 pageContext 已注册后能拿到正确值。
+    try {
+      const raw = UIService.getTheme(pageId);
+      if (raw) setTheme(raw as FuickThemeData);
+    } catch {
+      /* ignore */
+    }
+    const unsubscribe = NativeEvent.on(
+      'themeChange',
+      (data) => {
+        if (data && typeof data === 'object') {
+          setTheme(data as FuickThemeData);
+        }
+      },
+      pageId,
+    );
+    return unsubscribe;
+  }, [pageId]);
+
+  return theme;
+}
+
+/**
+ * MediaQuery 快照结构（与 Flutter 端 FuickMediaQueryData.toMap() 对齐）。
+ */
+export interface FuickMediaQueryData {
+  screenWidth: number;
+  screenHeight: number;
+  pixelRatio: number;
+  /** 'light' | 'dark' */
+  platformBrightness: 'light' | 'dark';
+  isDark: boolean;
+  textScaleFactor: number;
+  viewPadding: { top: number; bottom: number; left: number; right: number };
+  viewInsets: { top: number; bottom: number; left: number; right: number };
+}
+
+const EMPTY_MEDIA_QUERY: FuickMediaQueryData = {
+  screenWidth: 0,
+  screenHeight: 0,
+  pixelRatio: 1.0,
+  platformBrightness: 'light',
+  isDark: false,
+  textScaleFactor: 1.0,
+  viewPadding: { top: 0, bottom: 0, left: 0, right: 0 },
+  viewInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+};
+
+/**
+ * 读取宿主 [MediaQuery] 当前快照，并在屏幕尺寸、方向、暗黑模式等变化时重渲染。
+ *
+ * - 屏幕旋转、键盘弹起、暗黑模式切换都会触发 'mediaQueryChange' 事件。
+ * - 首次挂载时同步调用 `UIService.getMediaQuery(pageId)` 拿当前值。
+ *
+ * @example
+ * ```tsx
+ * const mq = useMediaQuery();
+ * const isLandscape = mq.screenWidth > mq.screenHeight;
+ * ```
+ */
+export function useMediaQuery(): FuickMediaQueryData {
+  const pageId = usePageId();
+  const [mq, setMq] = useState<FuickMediaQueryData>(() => {
+    try {
+      const raw = UIService.getMediaQuery(pageId);
+      return (raw as FuickMediaQueryData) ?? EMPTY_MEDIA_QUERY;
+    } catch {
+      return EMPTY_MEDIA_QUERY;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const raw = UIService.getMediaQuery(pageId);
+      if (raw) setMq(raw as FuickMediaQueryData);
+    } catch {
+      /* ignore */
+    }
+    const unsubscribe = NativeEvent.on(
+      'mediaQueryChange',
+      (data) => {
+        if (data && typeof data === 'object') {
+          setMq(data as FuickMediaQueryData);
+        }
+      },
+      pageId,
+    );
+    return unsubscribe;
+  }, [pageId]);
+
+  return mq;
 }

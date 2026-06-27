@@ -9,9 +9,12 @@
 - `src/renderer.ts`: 核心 React 渲染器 (Reconciler) 与渲染逻辑。
 
 ### Flutter 框架层 (`fuickjs_flutter/`)
+- `lib/fuickjs_flutter.dart`: **公开 API 入口**，宿主与扩展包统一从此导入。
 - `lib/core/widgets/parsers`: 将 JS DSL 转换为 Flutter Widget 的解析器。
 - `lib/core/service`: 桥接服务的原生实现。
 - `lib/core/engine`: QuickJS 引擎集成与 Isolate 管理。
+- `lib/offline`: Bundle 动态下发（Ed25519 验签 + SHA-256 + 状态机 + 回滚）。
+- `lib/core/fuick_config.dart`: 全局配置（debug/logLevel/hotReload/devPage）。
 
 ## 文档索引
 

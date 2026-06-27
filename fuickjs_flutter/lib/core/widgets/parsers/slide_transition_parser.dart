@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widget_factory.dart';
+import '../widget_utils.dart';
 import '../../utils/extensions.dart';
 import 'widget_parser.dart';
 
@@ -19,11 +20,29 @@ class SlideTransitionParser extends WidgetParser {
       asDoubleOrNull(offsetMap?['dx']) ?? 0.0,
       asDoubleOrNull(offsetMap?['dy']) ?? 0.0,
     );
+    final durationMs = asIntOrNull(props['duration']);
+    final transformHitTests = props['transformHitTests'] as bool? ?? true;
+    final child = factory.buildFirstChild(context, children, type);
 
-    return SlideTransition(
-      position: AlwaysStoppedAnimation(offset),
-      transformHitTests: props['transformHitTests'] as bool? ?? true,
-      child: factory.buildFirstChild(context, children, type),
+    if (durationMs == null || durationMs <= 0) {
+      return SlideTransition(
+        position: AlwaysStoppedAnimation<Offset>(offset),
+        transformHitTests: transformHitTests,
+        child: child,
+      );
+    }
+
+    return TweenAnimationBuilder<Offset>(
+      tween: Tween<Offset>(begin: offset, end: offset),
+      duration: Duration(milliseconds: durationMs),
+      curve: WidgetUtils.parseCurve(props['curve'] as String?),
+      builder: (context, value, _) {
+        return SlideTransition(
+          position: AlwaysStoppedAnimation<Offset>(value),
+          transformHitTests: transformHitTests,
+          child: child,
+        );
+      },
     );
   }
 }

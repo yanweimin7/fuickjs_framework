@@ -32,6 +32,44 @@
 **UIService（底层 UI 控制）**
 - `isWidgetRegistered(type): boolean`: 检查 Widget 类型是否已在 Flutter 侧注册 parser
 - `componentCommand(pageId, refId, method, args, nodeType)`: 向原生组件发指令（如滚动列表跳转）
+- `getTheme(pageId): FuickThemeData`: 同步获取当前页面的主题快照（由 Flutter `FuickThemeProvider` 注入）。返回值结构见 [useTheme](#hooks)
+- `getMediaQuery(pageId): FuickMediaQueryData`: 同步获取当前页面的 MediaQuery 快照（屏幕尺寸/暗黑模式/键盘弹起等）。返回值结构见 [useMediaQuery](#hooks)
+
+### Hooks（在 `fuickjs/hooks` 中）
+
+主题与 MediaQuery 通过 hook 订阅，变化时自动触发组件重渲染（Flutter 端通过 `NativeEvent` 推送 `themeChange` / `mediaQueryChange` 事件）。
+
+- **`useTheme(): FuickThemeData`** — 当前主题快照，结构：
+  ```ts
+  {
+    brightness: 'light' | 'dark',
+    isDark: boolean,
+    primaryColor: string,        // '#AARRGGBB'
+    scaffoldBackgroundColor: string,
+    surfaceColor: string,
+    textColor?: string,
+    secondaryTextColor?: string,
+    borderRadius: number,
+  }
+  ```
+  示例：`const theme = useTheme(); <Container color={theme.isDark ? '#FF000000' : '#FFFFFFFF'} />`
+
+- **`useMediaQuery(): FuickMediaQueryData`** — 当前 MediaQuery 快照，结构：
+  ```ts
+  {
+    screenWidth: number,
+    screenHeight: number,
+    pixelRatio: number,
+    platformBrightness: 'light' | 'dark',
+    isDark: boolean,
+    textScaleFactor: number,
+    viewPadding: { top, bottom, left, right },
+    viewInsets: { top, bottom, left, right },  // 键盘弹起等
+  }
+  ```
+  示例：`const mq = useMediaQuery(); const isLandscape = mq.screenWidth > mq.screenHeight;`
+
+> 主题切换由 Flutter 端 `MaterialApp.theme` / 暗黑模式切换驱动；屏幕旋转、键盘弹起也会触发 `mediaQueryChange`。
 
 **PickerService（选择器）**
 - `showPicker({ range, value?, title?, cancelText?, confirmText? })`: 单列选择

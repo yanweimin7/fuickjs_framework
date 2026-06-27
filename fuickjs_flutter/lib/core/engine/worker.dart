@@ -4,7 +4,6 @@ import 'dart:isolate';
 
 import 'package:easy_isolate/easy_isolate.dart';
 
-import '../service/js_error_bus.dart';
 import 'isolate_manager.dart';
 import 'jscontext_delegate.dart';
 
@@ -105,11 +104,6 @@ class IsolateWorker {
       } else {
         replyPort?.send(null);
       }
-    } else if (type == 'jsError') {
-      // isolate 里 ErrorReportService 非阻塞发回的 JS 错误，转发到 JsErrorBus
-      JsErrorBus.instance.report(
-        JsErrorInfo.fromMap(payload as Map<String, dynamic>),
-      );
     }
   }
 

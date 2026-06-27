@@ -15,11 +15,32 @@ class ScaleTransitionParser extends WidgetParser {
     dynamic children,
     WidgetFactory factory,
   ) {
-    return ScaleTransition(
-      scale: AlwaysStoppedAnimation(asDoubleOrNull(props['scale']) ?? 1.0),
-      alignment: WidgetUtils.alignment(props['alignment'] as String?) ??
-          Alignment.center,
-      child: factory.buildFirstChild(context, children, type),
+    final scale = asDoubleOrNull(props['scale']) ?? 1.0;
+    final durationMs = asIntOrNull(props['duration']);
+    final alignment =
+        WidgetUtils.alignment(props['alignment'] as String?) ??
+            Alignment.center;
+    final child = factory.buildFirstChild(context, children, type);
+
+    if (durationMs == null || durationMs <= 0) {
+      return ScaleTransition(
+        scale: AlwaysStoppedAnimation<double>(scale),
+        alignment: alignment,
+        child: child,
+      );
+    }
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: scale, end: scale),
+      duration: Duration(milliseconds: durationMs),
+      curve: WidgetUtils.parseCurve(props['curve'] as String?),
+      builder: (context, value, _) {
+        return ScaleTransition(
+          scale: AlwaysStoppedAnimation<double>(value),
+          alignment: alignment,
+          child: child,
+        );
+      },
     );
   }
 }
