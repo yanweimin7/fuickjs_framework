@@ -4,7 +4,8 @@ export class DialogService {
    * @param result Optional result to return from the dialog.
    */
   static dismiss(result?: any) {
-    dartCallNative('Dialog.dismiss', result);
+    // worker isolate 中 DialogService 不在白名单, 必须 async。
+    void dartCallNativeAsync('Dialog.dismiss', result);
   }
 
   /** 显示系统风格的确认框 */

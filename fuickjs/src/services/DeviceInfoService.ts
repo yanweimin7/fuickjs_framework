@@ -31,10 +31,11 @@ export class DeviceInfoService {
   }
 
   static startNetworkListener(): void {
-    dartCallNative('DeviceInfo.startNetworkListener', {});
+    // worker isolate 中 DeviceInfoService 不在白名单, 必须 async。
+    void dartCallNativeAsync('DeviceInfo.startNetworkListener', {});
   }
 
   static stopNetworkListener(): void {
-    dartCallNative('DeviceInfo.stopNetworkListener', {});
+    void dartCallNativeAsync('DeviceInfo.stopNetworkListener', {});
   }
 }

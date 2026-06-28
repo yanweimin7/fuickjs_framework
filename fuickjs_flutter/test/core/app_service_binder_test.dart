@@ -11,7 +11,8 @@ class _MockContext implements IQuickJsContext {
   FutureOr<dynamic> Function(String method, dynamic args)? _onCallNativeAsync;
 
   @override
-  set onCallNative(FutureOr<dynamic> Function(String method, dynamic args)? cb) {
+  set onCallNative(
+      FutureOr<dynamic> Function(String method, dynamic args)? cb) {
     _onCallNative = cb;
   }
 
@@ -76,13 +77,22 @@ void main() {
       expect(result, 'pong');
     });
 
-    test('callNative hits async handler and returns Future', () async {
+    test('callNative hits async handler should throw strict-policy error', () {
       service.registerAsyncMethod('fetch', (args) async => {'ok': true});
       binder.init(ctx, null);
 
-      final result = ctx.callNative('Test.fetch', null);
-      expect(result, isA<Future>());
-      expect(await result, {'ok': true});
+      // 严格策略: sync 桥不允许命中 registerAsyncMethod 注册的方法,
+      // 必须 throw 让用户立即改用 dartCallNativeAsync。
+      expect(
+        () => ctx.callNative('Test.fetch', null),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('"Test.fetch"'), contains('registered as async')),
+          ),
+        ),
+      );
     });
 
     test('callNativeAsync awaits sync handler returning Future', () async {

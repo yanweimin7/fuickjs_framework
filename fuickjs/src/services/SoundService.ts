@@ -1,5 +1,6 @@
 export class SoundService {
   static play(type?: 'move' | 'capture' | 'check' | 'win'): void {
-    dartCallNative('Sound.play', { type: type ?? 'move' });
+    // worker isolate 中 SoundService 不在白名单, 必须 async。
+    void dartCallNativeAsync('Sound.play', { type: type ?? 'move' });
   }
 }

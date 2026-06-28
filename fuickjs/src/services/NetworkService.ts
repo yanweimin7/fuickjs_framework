@@ -25,9 +25,11 @@ export class NetworkService {
   }
 
   static cancel(requestId: string): void {
-    if (typeof dartCallNative === 'function') {
-      dartCallNative('Network.cancel', { requestId });
+    if (typeof dartCallNativeAsync !== 'function') {
+      return;
     }
+    // worker isolate 中 NetworkService 不在白名单, 必须 async。
+    void dartCallNativeAsync('Network.cancel', { requestId });
   }
 
   static async uploadFile(

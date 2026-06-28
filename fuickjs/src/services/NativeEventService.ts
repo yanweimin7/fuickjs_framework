@@ -1,5 +1,6 @@
 export class NativeEventService {
   static emit(event: string, data: unknown) {
-    dartCallNative('NativeEvent.emit', [event, data]);
+    // worker isolate 中 NativeEventService 不在白名单, 必须 async。
+    void dartCallNativeAsync('NativeEvent.emit', [event, data]);
   }
 }

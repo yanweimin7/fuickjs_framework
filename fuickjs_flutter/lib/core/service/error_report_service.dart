@@ -5,12 +5,14 @@ import 'js_error_bus.dart';
 
 /// 专用错误上报服务。
 ///
-/// **跑在 main isolate**（不在 isolate 的 allowedServices 中），JS 同步调用
-/// `ErrorReport.report` 会通过 isolate 的 `fallbackSync` 转发到 main isolate 执行。
+/// **跑在 main isolate**(不在 worker isolate 的 allowedServices 中)。
+/// JS 调用应使用 `dartCallNativeAsync` —— 用 `dartCallNative` 同步调用会被
+/// binder 拦截并抛 `dartCallNative("ErrorReport.report") is not allowed:
+/// method is registered as async` 之类的错。
 ///
-/// 职责：
+/// 职责:
 /// 1. 用 [SourceMapResolver] 还原堆栈并打印日志
-/// 2. 通过 [JsErrorBus] 广播错误，供 [RedBoxOverlay] 显示红屏
+/// 2. 通过 [JsErrorBus] 广播错误,供 [RedBoxOverlay] 显示红屏
 class ErrorReportService extends BaseFuickService {
   @override
   String get name => 'ErrorReport';
@@ -28,7 +30,7 @@ class ErrorReportService extends BaseFuickService {
       final resolvedStack = _resolver?.resolveStack(stack) ?? stack;
 
       // 1. 日志打印
-      
+
       logger.e('Message: $message');
       if (resolvedStack != null && resolvedStack.isNotEmpty) {
         logger.e('Stack:\n$resolvedStack');

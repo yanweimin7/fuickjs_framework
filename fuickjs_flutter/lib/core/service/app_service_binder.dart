@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:fjs_engine/core/jscontext_interface.dart';
 
 import '../container/fuick_app_controller.dart';
@@ -16,7 +14,6 @@ class AppServiceBinder {
     IQuickJsContext ctx,
     FuickAppController? controller, {
     List<Type>? allowedServices,
-    FutureOr<dynamic> Function(String, dynamic)? fallbackSync,
     Future<dynamic> Function(String, dynamic)? fallbackAsync,
   }) {
     _services = NativeServiceManager()
@@ -42,6 +39,10 @@ class AppServiceBinder {
       }
     }
 
+    // 严格策略: dartCallNative (sync) 只能命中 Dart 端 registerMethod 注册的同步方法。
+    // 命中异步方法 / 未注册方法 都要立即抛错,绝不允许静默返回 Future ——
+    // 在 worker isolate 这会经 trampoline 走主 isolate 拿到 Promise 对象,
+    // JS 侧继续当普通对象用会出 viewInsets == undefined 之类的隐蔽 bug。
     ctx.onCallNative = (method, args) {
       final syncH = _handlers[method];
       if (syncH != null) {
@@ -49,19 +50,23 @@ class AppServiceBinder {
           return syncH(args);
         } catch (e, s) {
           logger.e("failed to callNative $method $e , $s");
-        }
-      }
-      // TS 同步调用命中 Dart 异步方法 → 返回 Future，由引擎映射为 JS Promise。
-      final asyncH = _asyncHandlers[method];
-      if (asyncH != null) {
-        try {
-          return asyncH(args);
-        } catch (e, s) {
-          logger.e("failed to callNative(async) $method $e , $s");
           rethrow;
         }
       }
-      return fallbackSync?.call(method, args);
+      final asyncH = _asyncHandlers[method];
+      if (asyncH != null) {
+        throw StateError(
+          'dartCallNative("$method") is not allowed: method is registered as async. '
+          'Use dartCallNativeAsync("$method", args) instead.',
+        );
+      }
+      final hint = allowedServices == null
+          ? ''
+          : ' Worker isolate only exposes ${_services.map((s) => s.name).join(", ")} '
+              'via dartCallNative (sync). Use dartCallNativeAsync to call main-isolate services.';
+      throw StateError(
+        'dartCallNative("$method") is not allowed: no handler registered.$hint',
+      );
     };
 
     ctx.onCallNativeAsync = (method, args) async {

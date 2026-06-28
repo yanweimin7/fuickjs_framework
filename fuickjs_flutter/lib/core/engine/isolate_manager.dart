@@ -54,21 +54,10 @@ class IsolateHandler {
                   ConsoleService,
                   FileSystemService,
                 ],
-                fallbackSync: (method, args) {
-                  try {
-                    final responsePort = ReceivePort();
-                    mainSendPort.send({
-                      'contextId': contextId,
-                      'type': 'callNative',
-                      'replyPort': responsePort.sendPort,
-                      'payload': {'method': method, 'args': args},
-                    });
-                    return _waitForResponse(responsePort);
-                  } catch (e, s) {
-                    logger.e("Isolate onCallNative error: $e\n$s");
-                    rethrow;
-                  }
-                },
+                // worker isolate 只允许 dartCallNative 命中 Timer/Console/FileSystem。
+                // 其他 service 一律走 dartCallNativeAsync,经 fallbackAsync 转发到主 isolate。
+                // 绝不允许 dartCallNative 静默 fallthrough 到主 isolate ——
+                // 那会让 JS 端把 Promise 当对象用,触发 viewInsets == undefined 这类 bug。
                 fallbackAsync: (method, args) async {
                   final responsePort = ReceivePort();
                   mainSendPort.send({

@@ -67,15 +67,17 @@ export class NavigatorService {
   }
 
   static pop(pageId?: number | null, rootNavigator?: boolean, result?: unknown) {
-    dartCallNative('Navigator.pop', { pageId, rootNavigator, result });
+    // worker isolate 中 NavigationService 不在白名单, 必须 async。
+    // 这里 fire-and-forget 即可, 不阻塞业务。
+    void dartCallNativeAsync('Navigator.pop', { pageId, rootNavigator, result });
   }
 
   static popTo(name: string, pageId?: number | null) {
-    dartCallNative('Navigator.popTo', { name, pageId });
+    void dartCallNativeAsync('Navigator.popTo', { name, pageId });
   }
 
   static popAll(pageId?: number | null) {
-    dartCallNative('Navigator.popAll', { pageId });
+    void dartCallNativeAsync('Navigator.popAll', { pageId });
   }
 
   static prewarm(path: string, params: unknown, pageId?: number | null, prewarmMs = 50): void {
@@ -87,6 +89,6 @@ export class NavigatorService {
   }
 
   static cancelPrewarm(path: string): void {
-    dartCallNative('Navigator.cancelPrewarm', { path });
+    void dartCallNativeAsync('Navigator.cancelPrewarm', { path });
   }
 }

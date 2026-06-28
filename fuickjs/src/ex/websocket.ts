@@ -281,8 +281,9 @@ export class WebSocket extends EventTarget {
 
     this._bufferedAmount += messageData.length;
 
-    // Send through native service
-    dartCallNative('WebSocket.send', {
+    // Send through native service.
+    // worker isolate 中 WebSocketService 不在白名单, 必须 async。
+    void dartCallNativeAsync('WebSocket.send', {
       socketId: this._socketId,
       data: messageData,
       isBinary: typeof data !== 'string',

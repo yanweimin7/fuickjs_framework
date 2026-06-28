@@ -33,9 +33,11 @@ export class ErrorReportService {
       timestamp: Date.now(),
     };
     try {
-      dartCallNative('ErrorReport.report', payload);
+      // worker isolate 中 ErrorReportService 不在白名单, 必须 async。
+      // 不 await: 错误上报是 fire-and-forget, 不阻塞业务 + 失败 console.error 兜底。
+      void dartCallNativeAsync('ErrorReport.report', payload);
     } catch {
-      // 兜底：dartCallNative 不可用时退回 console.error
+      // 兜底：dartCallNativeAsync 不可用时退回 console.error
       console.error(payload.message, payload.stack);
     }
   }
