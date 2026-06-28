@@ -28,7 +28,7 @@ class ErrorReportService extends BaseFuickService {
       final resolvedStack = _resolver?.resolveStack(stack) ?? stack;
 
       // 1. 日志打印
-      logger.e('=== JS Error [$source] ===');
+      
       logger.e('Message: $message');
       if (resolvedStack != null && resolvedStack.isNotEmpty) {
         logger.e('Stack:\n$resolvedStack');

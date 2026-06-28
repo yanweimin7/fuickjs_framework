@@ -20,8 +20,7 @@ class UIService extends BaseFuickService {
         if (pageId != null) {
           controller?.render(pageId, renderData);
           sw.stop();
-          logger.i(
-              '[Perf] Flutter renderUI page=$pageId dartSide=${sw.elapsedMilliseconds}ms');
+          
           return true;
         }
       }

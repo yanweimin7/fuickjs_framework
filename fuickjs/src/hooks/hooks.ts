@@ -193,23 +193,20 @@ const EMPTY_THEME: FuickThemeData = {
  */
 export function useTheme(): FuickThemeData {
   const pageId = usePageId();
-  const [theme, setTheme] = useState<FuickThemeData>(() => {
-    try {
-      const raw = UIService.getTheme(pageId);
-      return (raw as FuickThemeData) ?? EMPTY_THEME;
-    } catch {
-      return EMPTY_THEME;
-    }
-  });
+  // worker isolate 中 UIService.getTheme 走 dartCallNativeAsync,初始必须用占位符,
+  // 不能在 useState 初始化里 await,否则会卡住渲染。
+  const [theme, setTheme] = useState<FuickThemeData>(EMPTY_THEME);
 
   useEffect(() => {
-    // 首次同步拉取一次，保证 pageContext 已注册后能拿到正确值。
-    try {
-      const raw = UIService.getTheme(pageId);
-      if (raw) setTheme(raw as FuickThemeData);
-    } catch {
-      /* ignore */
-    }
+    let cancelled = false;
+    UIService.getTheme(pageId)
+      .then((raw) => {
+        if (cancelled || !raw) return;
+        setTheme(raw as unknown as FuickThemeData);
+      })
+      .catch(() => {
+        /* ignore */
+      });
     const unsubscribe = NativeEvent.on(
       'themeChange',
       (data) => {
@@ -219,7 +216,10 @@ export function useTheme(): FuickThemeData {
       },
       pageId,
     );
-    return unsubscribe;
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [pageId]);
 
   return theme;
@@ -265,22 +265,20 @@ const EMPTY_MEDIA_QUERY: FuickMediaQueryData = {
  */
 export function useMediaQuery(): FuickMediaQueryData {
   const pageId = usePageId();
-  const [mq, setMq] = useState<FuickMediaQueryData>(() => {
-    try {
-      const raw = UIService.getMediaQuery(pageId);
-      return (raw as FuickMediaQueryData) ?? EMPTY_MEDIA_QUERY;
-    } catch {
-      return EMPTY_MEDIA_QUERY;
-    }
-  });
+  // worker isolate 中 UIService.getMediaQuery 走 dartCallNativeAsync,初始必须用占位符,
+  // 不能在 useState 初始化里 await,否则会卡住渲染。
+  const [mq, setMq] = useState<FuickMediaQueryData>(EMPTY_MEDIA_QUERY);
 
   useEffect(() => {
-    try {
-      const raw = UIService.getMediaQuery(pageId);
-      if (raw) setMq(raw as FuickMediaQueryData);
-    } catch {
-      /* ignore */
-    }
+    let cancelled = false;
+    UIService.getMediaQuery(pageId)
+      .then((raw) => {
+        if (cancelled || !raw) return;
+        setMq(raw as unknown as FuickMediaQueryData);
+      })
+      .catch(() => {
+        /* ignore */
+      });
     const unsubscribe = NativeEvent.on(
       'mediaQueryChange',
       (data) => {
@@ -290,7 +288,10 @@ export function useMediaQuery(): FuickMediaQueryData {
       },
       pageId,
     );
-    return unsubscribe;
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [pageId]);
 
   return mq;

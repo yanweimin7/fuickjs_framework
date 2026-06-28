@@ -40,11 +40,11 @@ export function report(pageId: number, path: string): void {
   const end = Date.now();
   const dslReady = t.dslReady ?? end;
   const sendEnd = t.sendEnd ?? end;
-  console.log(
-    `[PerfTiming] page=${pageId} path=${path} |` +
-      ` t_js_to_dsl=${dslReady - t.start}ms |` +
-      ` t_transfer=${sendEnd - dslReady}ms |` +
-      ` t_total=${end - t.start}ms`,
-  );
+  // console.log(
+  //   `[PerfTiming] page=${pageId} path=${path} |` +
+  //     ` t_js_to_dsl=${dslReady - t.start}ms |` +
+  //     ` t_transfer=${sendEnd - dslReady}ms |` +
+  //     ` t_total=${end - t.start}ms`,
+  // );
   delete timings[pageId];
 }

@@ -128,8 +128,6 @@ class _JsUiHostState extends State<FuickPageView> with RouteAware {
 
     if (rootNode != newNode && mounted) {
       rootNode = newNode;
-      logger.i(
-          '[Perf] Flutter createNode+setState page=${widget.pageId} buildNode=${sw.elapsedMilliseconds}ms');
       setState(() {});
     }
   }
@@ -289,6 +287,7 @@ class _FuickScopeProviders extends StatefulWidget {
 class _FuickScopeProvidersState extends State<_FuickScopeProviders> {
   FuickThemeData? _lastTheme;
   FuickMediaQueryData? _lastMq;
+  bool _pageContextRegistered = false;
 
   void _maybeEmitThemeChange(FuickThemeData data) {
     if (_lastTheme != null && _lastTheme != data) {
@@ -330,7 +329,25 @@ class _FuickScopeProvidersState extends State<_FuickScopeProviders> {
       data: themeData,
       child: FuickMediaQueryProvider(
         data: mqData,
-        child: widget.child,
+        // Builder 的 context 是 FuickThemeProvider / FuickMediaQueryProvider 的子孙，
+        // 用它注册 page context，使得 UIService.getTheme / getMediaQuery 中
+        // 调用的 FuickThemeProvider.of / FuickMediaQueryProvider.of 能沿父链找到 provider。
+        child: Builder(
+          builder: (innerContext) {
+            if (!_pageContextRegistered) {
+              _pageContextRegistered = true;
+              final controller = FuickAppScope.of(innerContext);
+              final pageScope = FuickPageScope.of(innerContext);
+              if (controller != null && pageScope != null) {
+                controller.registerPageContext(
+                  pageScope.pageId,
+                  innerContext,
+                );
+              }
+            }
+            return widget.child;
+          },
+        ),
       ),
     );
   }

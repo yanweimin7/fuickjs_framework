@@ -30,7 +30,9 @@ class _FuickAppPageState extends State<FuickPage> {
 
   @override
   Widget build(BuildContext context) {
-    widget.controller.registerPageContext(widget.pageId, context);
+    // 注意：page context 的注册放在 _FuickScopeProviders.build 里（用 providers 下方的
+    // Builder context 注册），这样 UIService.getTheme / getMediaQuery 中的
+    // FuickThemeProvider.of / FuickMediaQueryProvider.of 才能沿父链命中 provider。
     return FuickPageView(
       pageId: widget.pageId,
       controller: widget.controller,
