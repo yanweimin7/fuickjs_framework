@@ -20,7 +20,7 @@ class ErrorReportService extends BaseFuickService {
   SourceMapResolver? _resolver;
 
   ErrorReportService() {
-    registerMethod('report', (args) {
+    registerAsyncMethod('report', (args) async {
       final m = args is Map ? args : <String, dynamic>{};
       final message = m['message']?.toString() ?? '';
       final stack = m['stack']?.toString();

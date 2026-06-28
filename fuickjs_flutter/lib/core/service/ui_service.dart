@@ -10,7 +10,7 @@ class UIService extends BaseFuickService {
   String get name => 'UI';
 
   UIService() {
-    registerMethod('renderUI', (args) {
+    registerAsyncMethod('renderUI', (args) async {
       final sw = Stopwatch()..start();
       final List listArgs = args is List ? args : [args];
       if (listArgs.length == 1 && listArgs[0] is Map) {
@@ -20,14 +20,14 @@ class UIService extends BaseFuickService {
         if (pageId != null) {
           controller?.render(pageId, renderData);
           sw.stop();
-          
+
           return true;
         }
       }
       return false;
     });
 
-    registerMethod('patchUI', (args) {
+    registerAsyncMethod('patchUI', (args) async {
       final List listArgs = args is List ? args : [args];
       if (listArgs.length == 1 && listArgs[0] is Map) {
         final m = listArgs[0] as Map;
@@ -41,7 +41,7 @@ class UIService extends BaseFuickService {
       return false;
     });
 
-    registerMethod('patchOps', (args) {
+    registerAsyncMethod('patchOps', (args) async {
       final sw = Stopwatch()..start();
       final List listArgs = args is List ? args : [args];
       if (listArgs.length == 1 && listArgs[0] is Map) {
@@ -59,7 +59,7 @@ class UIService extends BaseFuickService {
       return false;
     });
 
-    registerMethod('componentCommand', (args) {
+    registerAsyncMethod('componentCommand', (args) async {
       final List listArgs = args is List ? args : [args];
       if (listArgs.length == 1 && listArgs[0] is Map) {
         final m = listArgs[0] as Map;
@@ -75,7 +75,7 @@ class UIService extends BaseFuickService {
       return false;
     });
 
-    registerMethod('isWidgetRegistered', (args) {
+    registerAsyncMethod('isWidgetRegistered', (args) async {
       final List listArgs = args is List ? args : [args];
       if (listArgs.isNotEmpty && listArgs[0] is String) {
         final type = listArgs[0] as String;
@@ -84,14 +84,14 @@ class UIService extends BaseFuickService {
       return false;
     });
 
-    registerMethod('getRegisteredWidgets', (args) {
+    registerAsyncMethod('getRegisteredWidgets', (args) async {
       return widgetFactory.registeredTypes;
     });
 
     // 返回当前页面的主题快照（来自 FuickThemeProvider）。
-    // JS 端 useTheme() hook 通过此同步调用拿当前主题，并在主题变化时
+    // JS 端 useTheme() hook 通过此异步调用拿当前主题，并在主题变化时
     // 由 _maybeEmitThemeChange 推送 'themeChange' 事件触发重新渲染。
-    registerMethod('getTheme', (args) {
+    registerAsyncMethod('getTheme', (args) async {
       final pageId = _extractPageId(args);
       final ctx = controller?.navigation.findPageContext(pageId);
       if (ctx == null) return null;
@@ -100,7 +100,7 @@ class UIService extends BaseFuickService {
     });
 
     // 返回当前页面的 MediaQuery 快照（来自 FuickMediaQueryProvider）。
-    registerMethod('getMediaQuery', (args) {
+    registerAsyncMethod('getMediaQuery', (args) async {
       final pageId = _extractPageId(args);
       final ctx = controller?.navigation.findPageContext(pageId);
       if (ctx == null) return null;

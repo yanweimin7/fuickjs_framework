@@ -72,7 +72,7 @@ class NavigationService extends BaseFuickService {
     });
 
     // cancelPrewarm：取消预热，清理缓存，避免 tap cancel 后残留 DSL
-    registerMethod('cancelPrewarm', (args) {
+    registerAsyncMethod('cancelPrewarm', (args) async {
       final m = args is Map ? args : {};
       final path = m['path']?.toString() ?? '';
       if (path.isNotEmpty) {
@@ -99,7 +99,7 @@ class NavigationService extends BaseFuickService {
       return null;
     });
 
-    registerMethod('pop', (args) {
+    registerAsyncMethod('pop', (args) async {
       final m = args is Map ? args : {};
       final pageId = asIntOrNull(m['pageId']);
       // final rootNavigator = m['rootNavigator'] == true;
@@ -110,7 +110,7 @@ class NavigationService extends BaseFuickService {
     });
 
     // popTo：弹出路由直到指定路由名称
-    registerMethod('popTo', (args) {
+    registerAsyncMethod('popTo', (args) async {
       final m = args is Map ? args : {};
       final name = m['name']?.toString() ?? '';
       final pageId = asIntOrNull(m['pageId']);
@@ -121,7 +121,7 @@ class NavigationService extends BaseFuickService {
     });
 
     // popAll：清空路由栈回到根页面
-    registerMethod('popAll', (args) {
+    registerAsyncMethod('popAll', (args) async {
       final m = args is Map ? args : {};
       final pageId = asIntOrNull(m['pageId']);
       controller?.popAll(pageId: pageId);
@@ -146,7 +146,7 @@ class NavigationService extends BaseFuickService {
     });
 
     // switchTab: 切换 TabBar 选中项（通过路径）
-    registerMethod('switchTab', (args) {
+    registerAsyncMethod('switchTab', (args) async {
       final m = args is Map ? args : {};
       final path = m['path']?.toString() ?? '';
       // 触发 TabBar 切换事件，由 Flutter 侧 TabBar 组件监听处理

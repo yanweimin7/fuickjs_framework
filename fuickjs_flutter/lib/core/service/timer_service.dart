@@ -6,9 +6,11 @@ import 'package:fuickjs_flutter/core/engine/fuick_js_proxy.dart';
 import '../container/fuick_app_controller.dart';
 import '../logger.dart';
 import '../utils/extensions.dart';
-import 'base_fuick_service.dart';
+import 'sync_fuick_service.dart';
 
-class TimerService extends BaseFuickService {
+/// 跑在 worker isolate 白名单中的 service —— 保留 `registerMethod` 同步注册能力。
+/// 详见 [SyncFuickService] 注释。
+class TimerService extends SyncFuickService {
   @override
   String get name => 'Timer';
 

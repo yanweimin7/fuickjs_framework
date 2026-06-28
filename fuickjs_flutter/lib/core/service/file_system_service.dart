@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../logger.dart';
-import 'base_fuick_service.dart';
+import 'sync_fuick_service.dart';
 
-class FileSystemService extends BaseFuickService {
+/// 跑在 worker isolate 白名单中的 service —— 保留 `registerMethod` 同步注册能力。
+/// 同步文件系统 API（`readFileSync` / `writeFileSync` / ...）由 JS 侧 fs.readFileSync 等
+/// 通过 `dartCallNative` 直接命中，避免 trampoline 转主 isolate 的开销。
+/// 详见 [SyncFuickService] 注释。
+class FileSystemService extends SyncFuickService {
   @override
   String get name => 'FileSystem';
 

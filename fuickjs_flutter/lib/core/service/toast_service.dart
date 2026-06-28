@@ -7,7 +7,7 @@ class ToastService extends BaseFuickService {
   String get name => 'Toast';
 
   ToastService() {
-    registerMethod('show', (args) {
+    registerAsyncMethod('show', (args) async {
       final String message;
       final int duration;
 
@@ -45,7 +45,7 @@ class ToastService extends BaseFuickService {
       return false;
     });
 
-    registerMethod('hide', (args) {
+    registerAsyncMethod('hide', (args) async {
       if (controller != null) {
         final contexts = controller!.navigation.pageContexts;
         if (contexts.isNotEmpty) {

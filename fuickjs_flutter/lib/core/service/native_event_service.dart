@@ -11,7 +11,7 @@ class NativeEventService extends BaseFuickService {
 
   NativeEventService() {
     // 注册供 JS 调用的 emit 方法
-    registerMethod('emit', (args) {
+    registerAsyncMethod('emit', (args) async {
       final List listArgs = args is List ? args : [args];
       if (listArgs.isNotEmpty && listArgs[0] is String) {
         final event = listArgs[0] as String;

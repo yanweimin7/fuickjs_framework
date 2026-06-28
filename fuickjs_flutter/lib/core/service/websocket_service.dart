@@ -28,12 +28,12 @@ class WebSocketService extends BaseFuickService {
   WebSocketService() {
     // Client mode
     registerAsyncMethod('connect', _handleConnect);
-    registerMethod('send', _handleSend);
-    registerMethod('close', _handleClose);
+    registerAsyncMethod('send', _handleSend);
+    registerAsyncMethod('close', _handleClose);
     // Server mode
     registerAsyncMethod('listen', _handleListen);
-    registerMethod('sendToClient', _handleSendToClient);
-    registerMethod('stopListen', _handleStopListen);
+    registerAsyncMethod('sendToClient', _handleSendToClient);
+    registerAsyncMethod('stopListen', _handleStopListen);
   }
 
   // ── Client mode ───────────────────────────────────────────────────────────
@@ -43,7 +43,8 @@ class WebSocketService extends BaseFuickService {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? socketId = options['socketId']?.toString();
       final String? url = options['url']?.toString();
-      final List<dynamic> protocols = (options['protocols'] as List<dynamic>?) ?? [];
+      final List<dynamic> protocols =
+          (options['protocols'] as List<dynamic>?) ?? [];
 
       if (socketId == null || socketId.isEmpty) {
         return {'success': false, 'error': 'Socket ID is required'};
@@ -56,7 +57,8 @@ class WebSocketService extends BaseFuickService {
       // Close existing socket with same ID if any
       await _closeSocket(socketId);
 
-      logger.i('[WebSocketService] Connecting to $url with socketId: $socketId');
+      logger
+          .i('[WebSocketService] Connecting to $url with socketId: $socketId');
 
       final wsUrl = Uri.parse(url);
       final socket = WebSocketChannel.connect(
@@ -144,7 +146,8 @@ class WebSocketService extends BaseFuickService {
       // Call JS handler
       final jsHandler = '_ws_$socketId';
       final encodedReason = jsonEncode(closeReason);
-      final jsCode = '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleClose) { socket._handleClose($closeCode, $encodedReason, $wasClean); } delete globalThis["$jsHandler"]; })();''';
+      final jsCode =
+          '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleClose) { socket._handleClose($closeCode, $encodedReason, $wasClean); } delete globalThis["$jsHandler"]; })();''';
       ctx.eval(jsCode);
 
       // Clean up
@@ -159,14 +162,15 @@ class WebSocketService extends BaseFuickService {
     try {
       // Call JS handler
       final jsHandler = '_ws_$socketId';
-      final jsCode = '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleError) { socket._handleError(); } })();''';
+      final jsCode =
+          '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleError) { socket._handleError(); } })();''';
       ctx.eval(jsCode);
     } catch (e, s) {
       logger.e('[WebSocketService] Error handling error event: $e\n$s');
     }
   }
 
-  dynamic _handleSend(dynamic args) {
+  Future<dynamic> _handleSend(dynamic args) async {
     try {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? socketId = options['socketId']?.toString();
@@ -204,7 +208,7 @@ class WebSocketService extends BaseFuickService {
     }
   }
 
-  dynamic _handleClose(dynamic args) {
+  Future<dynamic> _handleClose(dynamic args) async {
     try {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? socketId = options['socketId']?.toString();
@@ -222,7 +226,8 @@ class WebSocketService extends BaseFuickService {
     }
   }
 
-  Future<bool> _closeSocket(String socketId, {int? code, String? reason}) async {
+  Future<bool> _closeSocket(String socketId,
+      {int? code, String? reason}) async {
     final socket = _sockets[socketId];
     if (socket == null) {
       return false;
@@ -266,7 +271,8 @@ class WebSocketService extends BaseFuickService {
       final actualPort = httpServer.port;
       final ip = await _findLocalIp();
 
-      logger.i('[WebSocketService] Server $serverId listening on $ip:$actualPort');
+      logger.i(
+          '[WebSocketService] Server $serverId listening on $ip:$actualPort');
 
       // Accept WebSocket upgrades
       httpServer.transform(WebSocketTransformer()).listen(
@@ -274,7 +280,8 @@ class WebSocketService extends BaseFuickService {
           final clientId = (++_clientCounter).toString();
           _serverClients[serverId]![clientId] = ws;
 
-          logger.i('[WebSocketService] Server $serverId: client $clientId connected');
+          logger.i(
+              '[WebSocketService] Server $serverId: client $clientId connected');
           _fireServerEvent(serverId, '_handleClientConnected', clientId, null);
 
           ws.listen(
@@ -282,14 +289,18 @@ class WebSocketService extends BaseFuickService {
               _handleServerClientMessage(serverId, clientId, message);
             },
             onDone: () {
-              logger.i('[WebSocketService] Server $serverId: client $clientId disconnected');
+              logger.i(
+                  '[WebSocketService] Server $serverId: client $clientId disconnected');
               _serverClients[serverId]?.remove(clientId);
-              _fireServerEvent(serverId, '_handleClientDisconnected', clientId, null);
+              _fireServerEvent(
+                  serverId, '_handleClientDisconnected', clientId, null);
             },
             onError: (e) {
-              logger.e('[WebSocketService] Server $serverId client $clientId error: $e');
+              logger.e(
+                  '[WebSocketService] Server $serverId client $clientId error: $e');
               _serverClients[serverId]?.remove(clientId);
-              _fireServerEvent(serverId, '_handleClientDisconnected', clientId, null);
+              _fireServerEvent(
+                  serverId, '_handleClientDisconnected', clientId, null);
             },
           );
         },
@@ -305,7 +316,8 @@ class WebSocketService extends BaseFuickService {
     }
   }
 
-  void _handleServerClientMessage(String serverId, String clientId, dynamic message) {
+  void _handleServerClientMessage(
+      String serverId, String clientId, dynamic message) {
     if (_isDisposed) return;
     try {
       String data;
@@ -324,7 +336,8 @@ class WebSocketService extends BaseFuickService {
     }
   }
 
-  void _fireServerEvent(String serverId, String method, String clientId, String? data) {
+  void _fireServerEvent(
+      String serverId, String method, String clientId, String? data) {
     if (_isDisposed) return;
     try {
       final jsGlobal = '_ws_server_$serverId';
@@ -332,9 +345,11 @@ class WebSocketService extends BaseFuickService {
       String jsCode;
       if (data != null) {
         final encodedData = jsonEncode(data);
-        jsCode = '(function(){ var s=globalThis["$jsGlobal"]; if(s&&s.$method) s.$method($encodedClientId,$encodedData); })();';
+        jsCode =
+            '(function(){ var s=globalThis["$jsGlobal"]; if(s&&s.$method) s.$method($encodedClientId,$encodedData); })();';
       } else {
-        jsCode = '(function(){ var s=globalThis["$jsGlobal"]; if(s&&s.$method) s.$method($encodedClientId); })();';
+        jsCode =
+            '(function(){ var s=globalThis["$jsGlobal"]; if(s&&s.$method) s.$method($encodedClientId); })();';
       }
       ctx.eval(jsCode);
     } catch (e, s) {
@@ -342,7 +357,7 @@ class WebSocketService extends BaseFuickService {
     }
   }
 
-  dynamic _handleSendToClient(dynamic args) {
+  Future<dynamic> _handleSendToClient(dynamic args) async {
     try {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? serverId = options['serverId']?.toString();
@@ -350,13 +365,15 @@ class WebSocketService extends BaseFuickService {
       final String? data = options['data']?.toString();
 
       if (serverId == null || clientId == null || data == null) {
-        logger.w('[WebSocketService] sendToClient: missing serverId/clientId/data');
+        logger.w(
+            '[WebSocketService] sendToClient: missing serverId/clientId/data');
         return false;
       }
 
       final ws = _serverClients[serverId]?[clientId];
       if (ws == null) {
-        logger.w('[WebSocketService] sendToClient: client not found $serverId/$clientId');
+        logger.w(
+            '[WebSocketService] sendToClient: client not found $serverId/$clientId');
         return false;
       }
 
@@ -368,7 +385,7 @@ class WebSocketService extends BaseFuickService {
     }
   }
 
-  dynamic _handleStopListen(dynamic args) {
+  Future<dynamic> _handleStopListen(dynamic args) async {
     try {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? serverId = options['serverId']?.toString();

@@ -4,6 +4,7 @@ import '../container/fuick_app_controller.dart';
 import '../logger.dart';
 import 'base_fuick_service.dart';
 import 'native_services.dart';
+import 'sync_fuick_service.dart';
 
 class AppServiceBinder {
   List<BaseFuickService> _services = [];
@@ -31,8 +32,12 @@ class AppServiceBinder {
     _asyncHandlers = {};
 
     for (var e in _services) {
-      for (var entry in e.syncMethods.entries) {
-        _handlers['${e.name}.${entry.key}'] = entry.value;
+      // 同步方法只在 [SyncFuickService] 子类上 —— 即 worker isolate 白名单
+      // （Timer / Console / FileSystem）。其他业务 service 只能挂异步方法。
+      if (e is SyncFuickService) {
+        for (var entry in e.syncMethods.entries) {
+          _handlers['${e.name}.${entry.key}'] = entry.value;
+        }
       }
       for (var entry in e.asyncMethods.entries) {
         _asyncHandlers['${e.name}.${entry.key}'] = entry.value;

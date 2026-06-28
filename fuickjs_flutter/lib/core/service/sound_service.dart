@@ -7,10 +7,10 @@ class SoundService extends BaseFuickService {
   String get name => 'Sound';
 
   SoundService() {
-    registerMethod('play', _play);
+    registerAsyncMethod('play', _play);
   }
 
-  dynamic _play(dynamic args) {
+  Future<dynamic> _play(dynamic args) async {
     final type = args is Map ? (args['type']?.toString() ?? 'move') : 'move';
     switch (type) {
       case 'capture':

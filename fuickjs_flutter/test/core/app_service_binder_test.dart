@@ -5,6 +5,7 @@ import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:fuickjs_flutter/core/service/app_service_binder.dart';
 import 'package:fuickjs_flutter/core/service/base_fuick_service.dart';
 import 'package:fuickjs_flutter/core/service/native_services.dart';
+import 'package:fuickjs_flutter/core/service/sync_fuick_service.dart';
 
 class _MockContext implements IQuickJsContext {
   FutureOr<dynamic> Function(String method, dynamic args)? _onCallNative;
@@ -33,8 +34,19 @@ class _MockContext implements IQuickJsContext {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _TestService extends BaseFuickService {
-  _TestService(this.serviceName);
+/// 测试用同步 service —— 继承 [SyncFuickService] 才能调 `registerMethod`。
+class _TestSyncService extends SyncFuickService {
+  _TestSyncService(this.serviceName);
+
+  final String serviceName;
+
+  @override
+  String get name => serviceName;
+}
+
+/// 测试用异步 service —— 继承 [BaseFuickService] 只能调 `registerAsyncMethod`。
+class _TestAsyncService extends BaseFuickService {
+  _TestAsyncService(this.serviceName);
 
   final String serviceName;
 
@@ -46,14 +58,14 @@ void main() {
   group('AppServiceBinder sync/async compatibility', () {
     late _MockContext ctx;
     late AppServiceBinder binder;
-    late _TestService service;
+    late _TestSyncService service;
 
     late List<ServiceBuilder> savedBuilders;
 
     setUp(() {
       ctx = _MockContext();
       binder = AppServiceBinder();
-      service = _TestService('Test');
+      service = _TestSyncService('Test');
       savedBuilders = List<ServiceBuilder>.from(
         NativeServiceManager().serviceBuilders,
       );
@@ -104,6 +116,52 @@ void main() {
 
       final result = await ctx.callNativeAsync('Test.delayed', null);
       expect(result, 'done');
+    });
+  });
+
+  group('AppServiceBinder strict sync gate', () {
+    late _MockContext ctx;
+    late AppServiceBinder binder;
+    late _TestAsyncService asyncOnlyService;
+
+    late List<ServiceBuilder> savedBuilders;
+
+    setUp(() {
+      ctx = _MockContext();
+      binder = AppServiceBinder();
+      asyncOnlyService = _TestAsyncService('AsyncOnly');
+      savedBuilders = List<ServiceBuilder>.from(
+        NativeServiceManager().serviceBuilders,
+      );
+      NativeServiceManager().serviceBuilders
+        ..clear()
+        ..add(() => asyncOnlyService);
+    });
+
+    tearDown(() {
+      binder.dispose();
+      NativeServiceManager().serviceBuilders
+        ..clear()
+        ..addAll(savedBuilders);
+    });
+
+    test(
+        'BaseFuickService (non-白名单) dartCallNative hits no sync handler — '
+        'throws StateError instead of returning a Promise', () {
+      asyncOnlyService.registerAsyncMethod('renderUI', (args) async => true);
+      binder.init(ctx, null);
+
+      expect(
+        () => ctx.callNative('AsyncOnly.renderUI', null),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('"AsyncOnly.renderUI"'),
+                contains('registered as async')),
+          ),
+        ),
+      );
     });
   });
 }

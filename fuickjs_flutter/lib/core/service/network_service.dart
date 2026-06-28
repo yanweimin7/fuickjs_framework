@@ -183,7 +183,7 @@ class NetworkService extends BaseFuickService {
       }
     });
 
-    registerMethod('cancel', (args) {
+    registerAsyncMethod('cancel', (args) async {
       final Map<dynamic, dynamic> options = args is Map ? args : {};
       final String? requestId = options['requestId']?.toString();
       if (requestId != null) {

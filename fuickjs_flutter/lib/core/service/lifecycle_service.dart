@@ -22,7 +22,7 @@ class LifecycleService extends BaseFuickService with WidgetsBindingObserver {
   bool _isInBackground = false;
 
   LifecycleService() {
-    registerMethod('getState', (_) => _state.name);
+    registerAsyncMethod('getState', (_) async => _state.name);
   }
 
   @override

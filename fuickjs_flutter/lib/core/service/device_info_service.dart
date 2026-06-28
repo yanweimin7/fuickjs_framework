@@ -82,7 +82,7 @@ class DeviceInfoService extends BaseFuickService {
       }
     });
 
-    registerMethod('startNetworkListener', (args) {
+    registerAsyncMethod('startNetworkListener', (args) async {
       _connectivitySubscription?.cancel();
       _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
         // 回调可能在 service dispose 后才到达；此时 ctx 已不可用，必须先短路。
@@ -97,7 +97,7 @@ class DeviceInfoService extends BaseFuickService {
       return true;
     });
 
-    registerMethod('stopNetworkListener', (args) {
+    registerAsyncMethod('stopNetworkListener', (args) async {
       _connectivitySubscription?.cancel();
       _connectivitySubscription = null;
       return true;

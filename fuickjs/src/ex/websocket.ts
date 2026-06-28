@@ -303,8 +303,9 @@ export class WebSocket extends EventTarget {
     console.log(`[WebSocket] close() socketId=${this._socketId}, code=${code ?? 1000}`);
     this._readyState = WebSocketReadyState.CLOSING;
 
-    // Send close through native service
-    dartCallNative('WebSocket.close', {
+    // Send close through native service.
+    // worker isolate 中 WebSocketService 不在白名单, 必须 async。
+    void dartCallNativeAsync('WebSocket.close', {
       socketId: this._socketId,
       code: code ?? 1000,
       reason: reason ?? '',

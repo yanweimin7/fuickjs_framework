@@ -14,7 +14,7 @@ class DialogService extends BaseFuickService {
   final List<BuildContext> _dialogContexts = [];
 
   DialogService() {
-    registerMethod('dismiss', _dismiss);
+    registerAsyncMethod('dismiss', _dismissAsync);
     registerAsyncMethod('showModal', _showModal);
     registerAsyncMethod('showActionSheet', _showActionSheet);
     registerAsyncMethod('showPicker', _showPicker);
@@ -77,9 +77,9 @@ class DialogService extends BaseFuickService {
           mainAxisSize: MainAxisSize.min,
           children: [
             ...items.asMap().entries.map((entry) => ListTile(
-              title: Text(entry.value.toString()),
-              onTap: () => Navigator.of(ctx).pop(entry.key),
-            )),
+                  title: Text(entry.value.toString()),
+                  onTap: () => Navigator.of(ctx).pop(entry.key),
+                )),
             const Divider(height: 1),
             ListTile(
               title: const Text('取消', textAlign: TextAlign.center),
@@ -107,9 +107,11 @@ class DialogService extends BaseFuickService {
     if (!context.mounted) return null;
 
     if (mode == 'multiSelector') {
-      return _showMultiColumnPicker(context, params, cancelText, confirmText, title);
+      return _showMultiColumnPicker(
+          context, params, cancelText, confirmText, title);
     } else {
-      return _showSingleColumnPicker(context, params, cancelText, confirmText, title);
+      return _showSingleColumnPicker(
+          context, params, cancelText, confirmText, title);
     }
   }
 
@@ -122,7 +124,8 @@ class DialogService extends BaseFuickService {
   ) async {
     final List range = params['range'] is List ? params['range'] as List : [];
     final int initialIndex = asInt(params['value'] ?? 0);
-    int selectedIndex = initialIndex.clamp(0, range.isEmpty ? 0 : range.length - 1);
+    int selectedIndex =
+        initialIndex.clamp(0, range.isEmpty ? 0 : range.length - 1);
 
     final result = await showModalBottomSheet<int>(
       context: context,
@@ -137,7 +140,8 @@ class DialogService extends BaseFuickService {
             children: [
               // 顶部操作栏
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
                 ),
@@ -146,13 +150,16 @@ class DialogService extends BaseFuickService {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx2).pop(null),
-                      child: Text(cancelText, style: const TextStyle(color: Colors.grey)),
+                      child: Text(cancelText,
+                          style: const TextStyle(color: Colors.grey)),
                     ),
                     if (title != null)
-                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(title,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () => Navigator.of(ctx2).pop(selectedIndex),
-                      child: Text(confirmText, style: const TextStyle(color: Color(0xFF1976D2))),
+                      child: Text(confirmText,
+                          style: const TextStyle(color: Color(0xFF1976D2))),
                     ),
                   ],
                 ),
@@ -160,11 +167,14 @@ class DialogService extends BaseFuickService {
               // 滚轮
               Expanded(
                 child: CupertinoPicker(
-                  scrollController: FixedExtentScrollController(initialItem: selectedIndex),
+                  scrollController:
+                      FixedExtentScrollController(initialItem: selectedIndex),
                   itemExtent: 44,
                   onSelectedItemChanged: (i) => selectedIndex = i,
                   children: range
-                      .map((e) => Center(child: Text(e.toString(), style: const TextStyle(fontSize: 16))))
+                      .map((e) => Center(
+                          child: Text(e.toString(),
+                              style: const TextStyle(fontSize: 16))))
                       .toList(),
                 ),
               ),
@@ -175,7 +185,10 @@ class DialogService extends BaseFuickService {
     );
 
     if (result == null) return null;
-    return {'value': result, 'label': range.isNotEmpty ? range[result].toString() : ''};
+    return {
+      'value': result,
+      'label': range.isNotEmpty ? range[result].toString() : ''
+    };
   }
 
   Future<Map?> _showMultiColumnPicker(
@@ -185,12 +198,17 @@ class DialogService extends BaseFuickService {
     String confirmText,
     String? title,
   ) async {
-    final List rangeList = params['range'] is List ? params['range'] as List : [];
-    final List initialValues = params['value'] is List ? params['value'] as List : [];
+    final List rangeList =
+        params['range'] is List ? params['range'] as List : [];
+    final List initialValues =
+        params['value'] is List ? params['value'] as List : [];
     final List<int> selectedIndices = List.generate(
       rangeList.length,
-      (i) => (i < initialValues.length ? asInt(initialValues[i]) : 0)
-          .clamp(0, rangeList[i] is List && (rangeList[i] as List).isNotEmpty ? (rangeList[i] as List).length - 1 : 0),
+      (i) => (i < initialValues.length ? asInt(initialValues[i]) : 0).clamp(
+          0,
+          rangeList[i] is List && (rangeList[i] as List).isNotEmpty
+              ? (rangeList[i] as List).length - 1
+              : 0),
     );
 
     final result = await showModalBottomSheet<List<int>>(
@@ -205,7 +223,8 @@ class DialogService extends BaseFuickService {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
                 ),
@@ -214,13 +233,17 @@ class DialogService extends BaseFuickService {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx2).pop(null),
-                      child: Text(cancelText, style: const TextStyle(color: Colors.grey)),
+                      child: Text(cancelText,
+                          style: const TextStyle(color: Colors.grey)),
                     ),
                     if (title != null)
-                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(title,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                     TextButton(
-                      onPressed: () => Navigator.of(ctx2).pop(List<int>.from(selectedIndices)),
-                      child: Text(confirmText, style: const TextStyle(color: Color(0xFF1976D2))),
+                      onPressed: () => Navigator.of(ctx2)
+                          .pop(List<int>.from(selectedIndices)),
+                      child: Text(confirmText,
+                          style: const TextStyle(color: Color(0xFF1976D2))),
                     ),
                   ],
                 ),
@@ -228,14 +251,20 @@ class DialogService extends BaseFuickService {
               Expanded(
                 child: Row(
                   children: List.generate(rangeList.length, (colIdx) {
-                    final col = rangeList[colIdx] is List ? rangeList[colIdx] as List : [];
+                    final col = rangeList[colIdx] is List
+                        ? rangeList[colIdx] as List
+                        : [];
                     return Expanded(
                       child: CupertinoPicker(
-                        scrollController: FixedExtentScrollController(initialItem: selectedIndices[colIdx]),
+                        scrollController: FixedExtentScrollController(
+                            initialItem: selectedIndices[colIdx]),
                         itemExtent: 44,
-                        onSelectedItemChanged: (i) => selectedIndices[colIdx] = i,
+                        onSelectedItemChanged: (i) =>
+                            selectedIndices[colIdx] = i,
                         children: col
-                            .map((e) => Center(child: Text(e.toString(), style: const TextStyle(fontSize: 16))))
+                            .map((e) => Center(
+                                child: Text(e.toString(),
+                                    style: const TextStyle(fontSize: 16))))
                             .toList(),
                       ),
                     );
@@ -267,7 +296,11 @@ class DialogService extends BaseFuickService {
 
     DateTime parseDate(String? s, DateTime fallback) {
       if (s == null) return fallback;
-      try { return DateTime.parse(s.replaceAll('/', '-')); } catch (_) { return fallback; }
+      try {
+        return DateTime.parse(s.replaceAll('/', '-'));
+      } catch (_) {
+        return fallback;
+      }
     }
 
     final now = DateTime.now();
@@ -283,7 +316,9 @@ class DialogService extends BaseFuickService {
 
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial.isBefore(start) ? start : (initial.isAfter(end) ? end : initial),
+      initialDate: initial.isBefore(start)
+          ? start
+          : (initial.isAfter(end) ? end : initial),
       firstDate: start,
       lastDate: end,
     );
@@ -300,7 +335,9 @@ class DialogService extends BaseFuickService {
     if (valueStr != null) {
       final parts = valueStr.split(':');
       if (parts.length >= 2) {
-        initial = TimeOfDay(hour: int.tryParse(parts[0]) ?? 0, minute: int.tryParse(parts[1]) ?? 0);
+        initial = TimeOfDay(
+            hour: int.tryParse(parts[0]) ?? 0,
+            minute: int.tryParse(parts[1]) ?? 0);
       }
     }
 
@@ -338,4 +375,7 @@ class DialogService extends BaseFuickService {
     }
     return false;
   }
+
+  /// Async wrapper around [_dismiss] to satisfy [AsyncMethodHandler] signature.
+  Future<bool> _dismissAsync(dynamic args) async => _dismiss(args);
 }
