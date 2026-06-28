@@ -131,19 +131,15 @@ class FuickAppContext {
     appController = FuickAppController(ctx);
   }
 
-  /// 在 main isolate 设置 sourcemap，供 ErrorReportService 做堆栈解析。
-  /// ErrorReportService 跑在 main isolate（不在 isolate 的 allowedServices 里），
-  /// JS 调用 ErrorReport.report 时通过 fallbackSync 转发到 main isolate 执行。
-  void _forwardSourceMap() {
+  /// 将 sourcemap 注入 main isolate 侧的 ErrorReportService，供其做堆栈还原。
+  /// ErrorReportService 跑在 main isolate（不在 isolate 的 allowedServices 中），
+  /// 通过 getService 直接访问，无需跨 isolate 通信。
+  Future<void> _forwardSourceMap() async {
     if (sourceMap == null) return;
-    try {
-      appController
-          ?.getService<ErrorReportService>()
-          ?.setSourceMap(sourceMap);
-      logger.d('[Debug] Sourcemap set on main isolate');
-    } catch (e) {
-      logger.e('[Debug] Failed to set sourcemap: $e');
-    }
+    final errorService =
+        appController.serviceBinder.getService<ErrorReportService>();
+    errorService?.setSourceMap(sourceMap);
+    logger.d('[Debug] Sourcemap injected to ErrorReportService');
   }
 
   Future<void> _loadBundle() async {
@@ -151,8 +147,8 @@ class FuickAppContext {
     try {
       if (debugBusinessCode != null) {
         await _injectBundleGlobals(_activeBundleRoot);
-        // 有 sourcemap 时先设置到 main isolate，eval 后的 ErrorReport.report 就能直接解析
-        _forwardSourceMap();
+        // 有 sourcemap 时先发到 isolate，eval 后的 ErrorReport.report 就能直接解析
+        await _forwardSourceMap();
         await ctx.eval(debugBusinessCode!, returnValue: false);
         logger.d(
           '[Debug] Successfully loaded business bundle from debug payload',

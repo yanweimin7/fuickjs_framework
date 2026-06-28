@@ -1,6 +1,6 @@
 import 'dart:async';
 
-/// JS 错误信息（从 isolate 传回主 isolate）。
+/// JS 错误信息。
 class JsErrorInfo {
   final String message;
   final String? stack;
@@ -40,8 +40,7 @@ class JsErrorInfo {
 
 /// 全局 JS 错误总线。
 ///
-/// isolate 里的 [ErrorReportService] 通过 mainSendPort 把错误发回主 isolate，
-/// 主 isolate 的 [IsolateWorker] 收到后调用 [report] 广播。
+/// 跑在 main isolate 的 [ErrorReportService] 收到 JS 错误后调用 [report] 广播。
 /// [FuickAppView] 监听 [stream] 在 debug 模式下显示红屏。
 class JsErrorBus {
   static final JsErrorBus instance = JsErrorBus._();

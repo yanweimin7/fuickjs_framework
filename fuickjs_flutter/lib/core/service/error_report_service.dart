@@ -5,9 +5,8 @@ import 'js_error_bus.dart';
 
 /// 专用错误上报服务。
 ///
-/// **跑在 main isolate**（不在 isolate 的 allowedServices 里）。
-/// JS 调用 ErrorReport.report 时 isolate 找不到 handler → 走 fallbackSync
-/// 转发到 main isolate 执行。
+/// **跑在 main isolate**（不在 isolate 的 allowedServices 中），JS 同步调用
+/// `ErrorReport.report` 会通过 isolate 的 `fallbackSync` 转发到 main isolate 执行。
 ///
 /// 职责：
 /// 1. 用 [SourceMapResolver] 还原堆栈并打印日志
@@ -47,9 +46,7 @@ class ErrorReportService extends BaseFuickService {
         detail: detail,
         timestamp: ts is int
             ? ts
-            : (ts is num
-                ? ts.toInt()
-                : DateTime.now().millisecondsSinceEpoch),
+            : (ts is num ? ts.toInt() : DateTime.now().millisecondsSinceEpoch),
       ));
       return null;
     });

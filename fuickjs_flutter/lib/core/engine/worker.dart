@@ -14,13 +14,14 @@ class IsolateWorker {
 
   /// Platform-appropriate worker: JSC on iOS (when [EngineInit.useJscOnIos] is true), QuickJS elsewhere.
   static IsolateWorker get instance => _instance ??= IsolateWorker._(
-    Platform.isIOS && useJscOnIos ? jscIsolateEntry : quickJsIsolateEntry,
-  );
+        Platform.isIOS && useJscOnIos ? jscIsolateEntry : quickJsIsolateEntry,
+      );
   static IsolateWorker? _instance;
 
   IsolateWorker._(this._isolateEntry);
 
-  final FutureOr<void> Function(dynamic, SendPort, SendErrorFunction) _isolateEntry;
+  final FutureOr<void> Function(dynamic, SendPort, SendErrorFunction)
+      _isolateEntry;
 
   final Worker _worker = Worker();
   final Completer<void> _ready = Completer<void>();
