@@ -811,23 +811,20 @@ class WidgetUtils {
 
       switch (fn) {
         case 'translate':
-          matrix.translateByDouble(args.isNotEmpty ? args[0] : 0.0,
-              args.length > 1 ? args[1] : 0.0, 0.0, 1.0);
+          matrix.translate(args.isNotEmpty ? args[0] : 0.0,
+              args.length > 1 ? args[1] : 0.0, 0.0);
           break;
         case 'translateX':
-          matrix.translateByDouble(
-              args.isNotEmpty ? args[0] : 0.0, 0.0, 0.0, 1.0);
+          matrix.translate(args.isNotEmpty ? args[0] : 0.0, 0.0, 0.0);
           break;
         case 'translateY':
-          matrix.translateByDouble(
-              0.0, args.isNotEmpty ? args[0] : 0.0, 0.0, 1.0);
+          matrix.translate(0.0, args.isNotEmpty ? args[0] : 0.0, 0.0);
           break;
         case 'translate3d':
-          matrix.translateByDouble(
+          matrix.translate(
             args.isNotEmpty ? args[0] : 0.0,
             args.length > 1 ? args[1] : 0.0,
             args.length > 2 ? args[2] : 0.0,
-            1.0,
           );
           break;
         case 'rotate':
@@ -843,13 +840,13 @@ class WidgetUtils {
         case 'scale':
           final sx = args.isNotEmpty ? args[0] : 1.0;
           final sy = args.length > 1 ? args[1] : sx;
-          matrix.scaleByDouble(sx, sy, 1.0, 1.0);
+          matrix.scale(sx, sy, 1.0);
           break;
         case 'scaleX':
-          matrix.scaleByDouble(args.isNotEmpty ? args[0] : 1.0, 1.0, 1.0, 1.0);
+          matrix.scale(args.isNotEmpty ? args[0] : 1.0, 1.0, 1.0);
           break;
         case 'scaleY':
-          matrix.scaleByDouble(1.0, args.isNotEmpty ? args[0] : 1.0, 1.0, 1.0);
+          matrix.scale(1.0, args.isNotEmpty ? args[0] : 1.0, 1.0);
           break;
         case 'skew':
           // skew 通过矩阵实现
