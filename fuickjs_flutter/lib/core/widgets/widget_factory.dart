@@ -410,7 +410,8 @@ class WidgetFactory {
       return parser.parse(context, props, children, this);
     }
     // 未知 type 不应让整棵 widget 树崩溃，与 build() 顶层的容错策略保持一致。
-    logger.w('[WidgetFactory] Unknown widget type: $type, falling back to SizedBox.shrink()');
+    logger.w(
+        '[WidgetFactory] Unknown widget type: $type, falling back to SizedBox.shrink()');
     return const SizedBox.shrink();
   }
 

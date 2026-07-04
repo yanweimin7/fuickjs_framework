@@ -426,19 +426,43 @@ class WidgetUtils {
     final gradientProp = dec != null ? dec['gradient'] : props['gradient'];
     final imageProp = dec != null ? dec['image'] : null;
 
+    // RN 风格阴影：shadow-color / shadow-offset / shadow-opacity / shadow-radius
+    // 当存在 shadowColor 时，将其作为 BoxShadow（boxShadowProp 优先）
+    final shadowColorProp = props['shadowColor'] as String?;
+    final shadowOffsetProp = props['shadowOffset'];
+    final shadowOpacity = asDoubleOrNull(props['shadowOpacity']);
+    final shadowRadius = asDoubleOrNull(props['shadowRadius']);
+
+    List<BoxShadow>? rnShadows;
+    if (shadowColorProp != null) {
+      final color = colorFromHex(shadowColorProp) ?? Colors.black;
+      final offsetMap = shadowOffsetProp is Map ? asMap(shadowOffsetProp) : null;
+      final dx = asDoubleOrNull(offsetMap?['width']) ?? 0.0;
+      final dy = asDoubleOrNull(offsetMap?['height']) ?? 0.0;
+      rnShadows = [
+        BoxShadow(
+          color: color.withOpacity((shadowOpacity ?? 1.0).clamp(0.0, 1.0)),
+          blurRadius: shadowRadius ?? 0.0,
+          spreadRadius: 0.0,
+          offset: Offset(dx, dy),
+        ),
+      ];
+    }
+
     if (colorStr == null &&
         borderRadiusProp == null &&
         borderProp == null &&
         boxShadowProp == null &&
         gradientProp == null &&
-        imageProp == null) {
+        imageProp == null &&
+        rnShadows == null) {
       return null;
     }
 
     final color = colorFromHex(colorStr);
     final borderRadius = getBorderRadius(borderRadiusProp);
     final border = getBorder(borderProp);
-    final boxShadow = getBoxShadow(boxShadowProp);
+    final boxShadow = getBoxShadow(boxShadowProp) ?? rnShadows;
     final gradient = getGradient(gradientProp);
     final image = getDecorationImage(imageProp);
 
@@ -474,6 +498,26 @@ class WidgetUtils {
     final fontSize = asDoubleOrNull(props['fontSize']);
     final lineHeight = asDoubleOrNull(props['lineHeight']);
     final lineHeightIsAbsolute = props['_lineHeightIsAbsolute'] == true;
+
+    // 文字阴影：优先使用 RN 风格的 textShadowColor/Offset/Radius，回退到旧 textShadow
+    List<Shadow>? textShadows = getTextShadow(props['textShadow']);
+    final tsColor = props['textShadowColor'] as String?;
+    if (tsColor != null) {
+      final offsetMap = props['textShadowOffset'] is Map
+          ? asMap(props['textShadowOffset'])
+          : null;
+      textShadows = [
+        Shadow(
+          color: colorFromHex(tsColor) ?? Colors.black54,
+          blurRadius: asDoubleOrNull(props['textShadowRadius']) ?? 0.0,
+          offset: Offset(
+            asDoubleOrNull(offsetMap?['width']) ?? 0.0,
+            asDoubleOrNull(offsetMap?['height']) ?? 0.0,
+          ),
+        ),
+      ];
+    }
+
     final style = TextStyle(
       fontSize: fontSize,
       color: colorFromHex(props['color'] as String?),
@@ -482,7 +526,7 @@ class WidgetUtils {
           props['fontStyle'] == 'italic' ? FontStyle.italic : FontStyle.normal,
       fontFamily: props['fontFamily'] as String?,
       decoration: textDecoration(props['textDecoration'] as String?),
-      shadows: getTextShadow(props['textShadow']),
+      shadows: textShadows,
       letterSpacing: asDoubleOrNull(props['letterSpacing']),
       wordSpacing: asDoubleOrNull(props['wordSpacing']),
       height: lineHeight != null

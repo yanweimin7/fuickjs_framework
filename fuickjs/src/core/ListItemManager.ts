@@ -79,10 +79,19 @@ export class ListItemManager {
 
     try {
       // flushSync 保证同步渲染，渲染完成后 Node 树已提交
-      // React 19: reconciler.flushSync → reconciler.flushSyncFromReconciler
-      this.reconciler.flushSyncFromReconciler(() => {
+      // React 19 compatible: try flushSyncFromReconciler, fallback to flushSync
+      if (this.reconciler.flushSyncFromReconciler) {
+        this.reconciler.flushSyncFromReconciler(() => {
+          this.reconciler.updateContainer(element, entry!.root, null, null);
+        });
+      } else if (this.reconciler.flushSync) {
+        this.reconciler.flushSync(() => {
+          this.reconciler.updateContainer(element, entry!.root, null, null);
+        });
+      } else {
+        // Fallback: direct call without flushSync
         this.reconciler.updateContainer(element, entry!.root, null, null);
-      });
+      }
 
       // 标记初始渲染完成，后续状态变更将发送增量补丁
       entry.container.markInitialRenderDone();

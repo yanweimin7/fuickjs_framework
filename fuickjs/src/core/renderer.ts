@@ -125,10 +125,19 @@ export function createRenderer(): Renderer {
         const updateStart = Date.now();
         try {
           if (isFirstRender) {
-            // React 19: reconciler.flushSync → reconciler.flushSyncFromReconciler
-            (reconciler as any).flushSyncFromReconciler(() => {
+            // React 19 compatible: try flushSyncFromReconciler, fallback to flushSync
+            if ((reconciler as any).flushSyncFromReconciler) {
+              (reconciler as any).flushSyncFromReconciler(() => {
+                reconciler.updateContainer(element, root, null, null);
+              });
+            } else if ((reconciler as any).flushSync) {
+              (reconciler as any).flushSync(() => {
+                reconciler.updateContainer(element, root, null, null);
+              });
+            } else {
+              // Fallback: direct call without flushSync
               reconciler.updateContainer(element, root, null, null);
-            });
+            }
             renderedPages.add(pageId);
           } else {
             reconciler.updateContainer(element, root, null, null);
