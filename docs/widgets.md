@@ -34,7 +34,8 @@ FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件
   - Asset 图片 `assets/images/logo.png`（含 SVG）
   - 本地文件 `/data/user/.../img.jpg` 或 `file:///...`（含 SVG）：自动检测绝对路径
   - base64 内联 `data:image/png;base64,...`（含 SVG）
-  - 核心 props：`src`（推荐）/ `url`（兼容）、`fit`、`tintColor`（推荐）/ `color`（兼容）、`placeholderColor`、`errorSrc`、`gaplessPlayback`、`onLoad`、`onError`
+  - 核心 props：`src`（推荐）/ `url`（兼容）、`fit`、`tintColor`（推荐）/ `color`（兼容）、`placeholderColor`、`errorSrc`、`gaplessPlayback`、`centerSlice`、`onLoad`、`onError`
+  - `centerSlice`：九宫格拉伸（9-patch），坐标以图片原始像素为单位。【硬约束 1】必须配 `fit="fill"`；【硬约束 2】边框（`left + imageWidth - right`）必须 <= widget 宽高，否则 parser 自动丢弃并打 warning
 - **Icon**: 显示 Material Design 图标。
 - **RichText**: 富文本组件，支持在同一行显示不同样式的文本片段。
 - **CircularProgressIndicator**: 圆形进度条。

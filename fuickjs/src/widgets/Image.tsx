@@ -62,6 +62,31 @@ export interface ImageProps extends WidgetProps {
    */
   gaplessPlayback?: boolean;
 
+  /**
+   * 九宫格拉伸区域（9-patch / Scale-9）。把图片按 `{ left, top, right, bottom }`
+   * 切成 9 块，4 个角保持原大小绘制，4 条边单向拉伸，中心双向拉伸。
+   * 常用于聊天气泡、按钮背景等需要任意尺寸自适应的场景。
+   *
+   * 坐标以**图片原始像素**为单位（不是显示尺寸），调用方需知道图源尺寸。
+   * 仅对栅格图生效，SVG 不支持（已自动忽略）。
+   *
+   * 【硬约束 1】必须配 `fit="fill"`，其他 fit（cover/contain/...）会触发
+   * Flutter `sourceSize == inputSize` 断言崩溃。传其他 fit 时 parser
+   * 会自动强制改为 fill 并打 warning。
+   *
+   * 【硬约束 2】centerSlice 边框（`left + (imageWidth - right)`，
+   * `top + (imageHeight - bottom)`）必须 <= widget 宽高。否则 Flutter
+   * `paintImage` 内部 outputSize 变负 → `applyBoxFit` 返回 Size.zero →
+   * 触发断言崩溃。Parser 已添加运行时防御（`SafeCenterSliceImage`），
+   * 图片加载后自动检测边框是否超出，如超出则丢弃 centerSlice 并打 warning。
+   */
+  centerSlice?: {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  };
+
   /** 图片加载完成回调 */
   onLoad?: () => void;
   /** 图片加载失败回调 */

@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../container/fuick_action.dart';
+import '../../logger.dart';
+import '../../utils/extensions.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
 import 'widget_parser.dart';
@@ -23,15 +25,31 @@ class ImageParser extends WidgetParser {
 
     final width = WidgetUtils.sizeNum(props['width']);
     final height = WidgetUtils.sizeNum(props['height']);
-    final fit = WidgetUtils.boxFit(props['fit'] as String?);
+    var fit = WidgetUtils.boxFit(props['fit'] as String?);
     final borderRadius = WidgetUtils.getBorderRadius(props['borderRadius']);
     final bool gaplessPlayback = props['gaplessPlayback'] == true;
 
     // tintColor 和 color 都支持，tintColor 优先
-    final tintColorStr =
-        (props['tintColor'] ?? props['color']) as String?;
+    final tintColorStr = (props['tintColor'] ?? props['color']) as String?;
     final tintColor =
         tintColorStr != null ? WidgetUtils.colorFromHex(tintColorStr) : null;
+
+    // 九宫格拉伸区域（centerSlice）：{ left, top, right, bottom }，单位为图片原始像素
+    final centerSlice = _parseCenterSlice(props['centerSlice']);
+
+    // Flutter 硬约束：centerSlice 只能和 BoxFit.fill 一起用，
+    // 其他 fit 会裁剪/留白，paint 时会触发 sourceSize == inputSize 断言崩溃。
+    // 无条件把 fit 改成 fill（即使原值是 null，Image 内部也以 fill 为准）。
+    // 改之前的代码留了 fit==null 路径未走防御，是潜在风险点。
+    if (centerSlice != null && fit != BoxFit.fill) {
+      if (fit != null) {
+        logger.w(
+          '[ImageParser] centerSlice requires fit=fill, '
+          'auto-coercing from $fit to BoxFit.fill (src=$src)',
+        );
+      }
+      fit = BoxFit.fill;
+    }
 
     // 占位背景色（加载中）
     final placeholderColorStr = props['placeholderColor'] as String?;
@@ -56,6 +74,7 @@ class ImageParser extends WidgetParser {
       gaplessPlayback: gaplessPlayback,
       placeholderColor: placeholderColor,
       errorSrc: errorSrc,
+      centerSlice: centerSlice,
       onLoad: onLoad,
       onError: onError,
     );
@@ -77,6 +96,7 @@ class ImageParser extends WidgetParser {
     required bool gaplessPlayback,
     Color? placeholderColor,
     String? errorSrc,
+    Rect? centerSlice,
     dynamic onLoad,
     dynamic onError,
   }) {
@@ -101,19 +121,30 @@ class ImageParser extends WidgetParser {
         fit: fit,
         color: tintColor,
         useOldImageOnUrlChange: gaplessPlayback,
-        imageBuilder: onLoad != null
+        imageBuilder: (onLoad != null || centerSlice != null)
             ? (ctx, imageProvider) {
-                FuickAction.event(ctx, onLoad);
+                if (onLoad != null) FuickAction.event(ctx, onLoad);
+                if (centerSlice != null) {
+                  return SafeCenterSliceImage(
+                    imageProvider: imageProvider,
+                    width: width,
+                    height: height,
+                    fit: fit ?? BoxFit.fill,
+                    color: tintColor,
+                    colorBlendMode: tintColor != null ? BlendMode.srcIn : null,
+                    centerSlice: centerSlice,
+                  );
+                }
                 return Image(
                   image: imageProvider,
                   fit: fit,
                   color: tintColor,
-                  colorBlendMode:
-                      tintColor != null ? BlendMode.srcIn : null,
+                  colorBlendMode: tintColor != null ? BlendMode.srcIn : null,
                 );
               }
             : null,
-        placeholder: (ctx, url) => _placeholder(width, height, placeholderColor),
+        placeholder: (ctx, url) =>
+            _placeholder(width, height, placeholderColor),
         errorWidget: (ctx, url, error) {
           if (onError != null) FuickAction.event(ctx, onError);
           if (errorSrc != null && errorSrc.isNotEmpty) {
@@ -126,6 +157,7 @@ class ImageParser extends WidgetParser {
               tintColor: tintColor,
               gaplessPlayback: false,
               placeholderColor: placeholderColor,
+              centerSlice: centerSlice,
             );
           }
           return _errorWidget(width, height);
@@ -149,8 +181,21 @@ class ImageParser extends WidgetParser {
     // ── base64 栅格图 ──
     if (src.startsWith('data:image')) {
       final base64Str = src.split(',').last;
+      final bytes = base64Decode(base64Str);
+      if (centerSlice != null) {
+        return SafeCenterSliceImage(
+          imageProvider: MemoryImage(bytes),
+          width: width,
+          height: height,
+          fit: fit ?? BoxFit.fill,
+          color: tintColor,
+          colorBlendMode: tintColor != null ? BlendMode.srcIn : null,
+          centerSlice: centerSlice,
+          gaplessPlayback: gaplessPlayback,
+        );
+      }
       return Image.memory(
-        base64Decode(base64Str),
+        bytes,
         width: width,
         height: height,
         gaplessPlayback: gaplessPlayback,
@@ -175,6 +220,23 @@ class ImageParser extends WidgetParser {
             colorFilter: colorFilter,
           );
         }
+        final fileErrorBuilder = (ctx, error, stack) {
+          if (onError != null) FuickAction.event(ctx, onError);
+          return _errorWidget(width, height);
+        };
+        if (centerSlice != null) {
+          return SafeCenterSliceImage(
+            imageProvider: FileImage(file),
+            width: width,
+            height: height,
+            fit: fit ?? BoxFit.fill,
+            color: tintColor,
+            colorBlendMode: tintColor != null ? BlendMode.srcIn : null,
+            centerSlice: centerSlice,
+            gaplessPlayback: gaplessPlayback,
+            errorBuilder: fileErrorBuilder,
+          );
+        }
         return Image.file(
           file,
           width: width,
@@ -183,10 +245,7 @@ class ImageParser extends WidgetParser {
           gaplessPlayback: gaplessPlayback,
           color: tintColor,
           colorBlendMode: tintColor != null ? BlendMode.srcIn : null,
-          errorBuilder: (ctx, error, stack) {
-            if (onError != null) FuickAction.event(ctx, onError);
-            return _errorWidget(width, height);
-          },
+          errorBuilder: fileErrorBuilder,
         );
       }
       // 文件不存在，降级到 errorSrc 或占位
@@ -200,6 +259,7 @@ class ImageParser extends WidgetParser {
           tintColor: tintColor,
           gaplessPlayback: false,
           placeholderColor: placeholderColor,
+          centerSlice: centerSlice,
         );
       }
       return _errorWidget(width, height);
@@ -217,6 +277,36 @@ class ImageParser extends WidgetParser {
     }
 
     // ── Asset 栅格图（默认 fallback）──
+    final assetErrorBuilder = (ctx, error, stack) {
+      if (onError != null) FuickAction.event(ctx, onError);
+      if (errorSrc != null && errorSrc.isNotEmpty) {
+        return _buildImage(
+          context: ctx,
+          src: errorSrc,
+          width: width,
+          height: height,
+          fit: fit,
+          tintColor: tintColor,
+          gaplessPlayback: false,
+          placeholderColor: placeholderColor,
+          centerSlice: centerSlice,
+        );
+      }
+      return _errorWidget(width, height);
+    };
+    if (centerSlice != null) {
+      return SafeCenterSliceImage(
+        imageProvider: AssetImage(src),
+        width: width,
+        height: height,
+        fit: fit ?? BoxFit.fill,
+        color: tintColor,
+        colorBlendMode: tintColor != null ? BlendMode.srcIn : null,
+        centerSlice: centerSlice,
+        gaplessPlayback: gaplessPlayback,
+        errorBuilder: assetErrorBuilder,
+      );
+    }
     return Image.asset(
       src,
       width: width,
@@ -225,23 +315,22 @@ class ImageParser extends WidgetParser {
       fit: fit,
       color: tintColor,
       colorBlendMode: tintColor != null ? BlendMode.srcIn : null,
-      errorBuilder: (ctx, error, stack) {
-        if (onError != null) FuickAction.event(ctx, onError);
-        if (errorSrc != null && errorSrc.isNotEmpty) {
-          return _buildImage(
-            context: ctx,
-            src: errorSrc,
-            width: width,
-            height: height,
-            fit: fit,
-            tintColor: tintColor,
-            gaplessPlayback: false,
-            placeholderColor: placeholderColor,
-          );
-        }
-        return _errorWidget(width, height);
-      },
+      errorBuilder: assetErrorBuilder,
     );
+  }
+
+  /// 解析 centerSlice：{ left, top, right, bottom } → Rect
+  /// 单位为图片原始像素坐标。SVG 不适用，传给 SVG 时会被静默忽略。
+  Rect? _parseCenterSlice(dynamic v) {
+    if (v is! Map) return null;
+    final m = asMap(v);
+    final l = WidgetUtils.sizeNum(m['left']);
+    final t = WidgetUtils.sizeNum(m['top']);
+    final r = WidgetUtils.sizeNum(m['right']);
+    final b = WidgetUtils.sizeNum(m['bottom']);
+    if (l == null || t == null || r == null || b == null) return null;
+    if (l < 0 || t < 0 || r <= l || b <= t) return null;
+    return Rect.fromLTRB(l, t, r, b);
   }
 
   bool _isSvgUrl(String url) {
@@ -271,6 +360,132 @@ class ImageParser extends WidgetParser {
       height: height,
       color: Colors.grey[200],
       child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+    );
+  }
+}
+
+/// centerSlice runtime safety wrapper.
+///
+/// Checks if centerSlice borders fit within widget size after image loads.
+/// If not, drops centerSlice to prevent paintImage assertion crash.
+class SafeCenterSliceImage extends StatefulWidget {
+  final ImageProvider imageProvider;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final Color? color;
+  final BlendMode? colorBlendMode;
+  final Rect centerSlice;
+  final bool gaplessPlayback;
+  final ImageErrorWidgetBuilder? errorBuilder;
+
+  const SafeCenterSliceImage({
+    super.key,
+    required this.imageProvider,
+    this.width,
+    this.height,
+    required this.fit,
+    this.color,
+    this.colorBlendMode,
+    required this.centerSlice,
+    this.gaplessPlayback = false,
+    this.errorBuilder,
+  });
+
+  @override
+  State<SafeCenterSliceImage> createState() => _SafeCenterSliceImageState();
+}
+
+class _SafeCenterSliceImageState extends State<SafeCenterSliceImage> {
+  ImageInfo? _imageInfo;
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _disposeStream();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(SafeCenterSliceImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.imageProvider != oldWidget.imageProvider) {
+      _disposeStream();
+      _resolve();
+    }
+  }
+
+  void _resolve() {
+    final stream = widget.imageProvider.resolve(
+      createLocalImageConfiguration(context),
+    );
+    _stream = stream;
+    _listener = ImageStreamListener(_onImage, onError: _onError);
+    stream.addListener(_listener!);
+  }
+
+  void _onImage(ImageInfo info, bool _) {
+    _imageInfo?.dispose();
+    _imageInfo = info;
+    if (mounted) setState(() {});
+  }
+
+  void _onError(Object exception, StackTrace? stackTrace) {
+    if (mounted) setState(() {});
+  }
+
+  void _disposeStream() {
+    if (_listener != null && _stream != null) {
+      _stream!.removeListener(_listener!);
+    }
+    _stream = null;
+    _listener = null;
+    _imageInfo?.dispose();
+    _imageInfo = null;
+  }
+
+  @override
+  void dispose() {
+    _disposeStream();
+    super.dispose();
+  }
+
+  Rect? _effectiveCenterSlice() {
+    if (_imageInfo == null) return widget.centerSlice;
+    final imageWidth = _imageInfo!.image.width.toDouble();
+    final imageHeight = _imageInfo!.image.height.toDouble();
+    final slice = widget.centerSlice;
+    final borderW = slice.left + (imageWidth - slice.right);
+    final borderH = slice.top + (imageHeight - slice.bottom);
+    final widgetW = widget.width;
+    final widgetH = widget.height;
+    if ((widgetW != null && borderW > widgetW) ||
+        (widgetH != null && borderH > widgetH)) {
+      logger.w(
+        "[SafeCenterSliceImage] centerSlice dropped: borders "
+        "(${borderW.toStringAsFixed(0)}x${borderH.toStringAsFixed(0)}) "
+        "exceed widget size. Image: ${imageWidth.toStringAsFixed(0)}x"
+        "${imageHeight.toStringAsFixed(0)}, slice: $slice",
+      );
+      return null;
+    }
+    return widget.centerSlice;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Image(
+      image: widget.imageProvider,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      color: widget.color,
+      colorBlendMode: widget.colorBlendMode,
+      centerSlice: _effectiveCenterSlice(),
+      gaplessPlayback: widget.gaplessPlayback,
+      errorBuilder: widget.errorBuilder,
     );
   }
 }
