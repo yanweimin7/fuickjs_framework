@@ -20,7 +20,8 @@ class FuickAppContextManager {
   /// 获取指定 id 的上下文（待销毁的不返回）
   FuickAppContext? getContext(String id) {
     if (_pendingDestroy.contains(id)) {
-      logger.w('FuickAppContextManager: getContext($id) — context is in _pendingDestroy, returning null. '
+      logger.w(
+          'FuickAppContextManager: getContext($id) — context is in _pendingDestroy, returning null. '
           'PendingDestroy: $_pendingDestroy, RefCounts: $_refCounts');
       return null;
     }
@@ -37,7 +38,8 @@ class FuickAppContextManager {
         'currentRefCount: ${_refCounts[id]}');
     // 如果旧的正在待销毁，立即销毁旧的，换成新的
     if (_pendingDestroy.contains(id)) {
-      logger.w('FuickAppContextManager: registerContext($id) — old context is in _pendingDestroy, destroying it now.');
+      logger.w(
+          'FuickAppContextManager: registerContext($id) — old context is in _pendingDestroy, destroying it now.');
       destroyContext(id);
     }
     if (_contexts.containsKey(id)) {
@@ -57,8 +59,9 @@ class FuickAppContextManager {
           'FuickAppContextManager: Retained context $id. RefCount: ${_refCounts[id]}, '
           'pendingDestroy: $_pendingDestroy');
     } else {
-      logger.w('FuickAppContextManager: retainContext($id) — context not found! '
-          'Available: ${_contexts.keys.toList()}, refCounts: $_refCounts');
+      logger
+          .w('FuickAppContextManager: retainContext($id) — context not found! '
+              'Available: ${_contexts.keys.toList()}, refCounts: $_refCounts');
     }
   }
 
@@ -76,27 +79,31 @@ class FuickAppContextManager {
           _pendingDestroy.add(id);
           logger.w(
               'FuickAppContextManager: Context $id refCount reached 0, marked pending destroy. '
-              'Will dispose in 5s if not retained. All contexts: ${_contexts.keys.toList()}, '
+              'Will dispose in 2s if not retained. All contexts: ${_contexts.keys.toList()}, '
               'All refCounts: $_refCounts');
-          Future.delayed(const Duration(seconds: 5), () {
+          Future.delayed(const Duration(seconds: 2), () {
             // 仍在待销毁列表中，说明没被 registerContext 重新复活
             if (_pendingDestroy.remove(id)) {
-              logger.w('FuickAppContextManager: 5s elapsed, destroying context $id. '
+              logger.w(
+                  'FuickAppContextManager: 5s elapsed, destroying context $id. '
                   'Remaining contexts: ${_contexts.keys.toList()}');
               destroyContext(id);
             } else {
-              logger.d('FuickAppContextManager: 5s elapsed for $id, but it was already removed from _pendingDestroy '
+              logger.d(
+                  'FuickAppContextManager: 5s elapsed for $id, but it was already removed from _pendingDestroy '
                   '(likely re-registered or manually destroyed). No action.');
             }
           });
         }
       } else {
-        logger.w('FuickAppContextManager: releaseContext($id) — refCount already 0! '
+        logger.w(
+            'FuickAppContextManager: releaseContext($id) — refCount already 0! '
             'This may indicate a double-release. refCounts: $_refCounts');
       }
     } else {
-      logger.w('FuickAppContextManager: releaseContext($id) — context not found! '
-          'Available: ${_contexts.keys.toList()}, refCounts: $_refCounts');
+      logger
+          .w('FuickAppContextManager: releaseContext($id) — context not found! '
+              'Available: ${_contexts.keys.toList()}, refCounts: $_refCounts');
     }
   }
 
@@ -151,7 +158,8 @@ class FuickAppContextManager {
 
     if (existing != null && !isPendingDestroy) {
       // 已存在且未待销毁，只追加页面预渲染
-      logger.d('FuickAppContextManager: prewarm($appName) — reusing existing context, appending pages.');
+      logger.d(
+          'FuickAppContextManager: prewarm($appName) — reusing existing context, appending pages.');
       for (final page in pages) {
         existing.prewarmPage(page.path, page.params);
       }
