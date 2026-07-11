@@ -6,6 +6,7 @@ import '../engine/fuick_app_context.dart';
 import '../engine/fuick_app_context_manager.dart';
 import '../fuick_config.dart';
 import '../logger.dart';
+import '../widgets/memory_monitor_overlay.dart';
 import '../widgets/red_box.dart';
 import 'fuick_app_controller.dart';
 import 'fuick_navigation_delegate.dart';
@@ -23,6 +24,11 @@ class FuickAppView extends StatefulWidget {
   final Color loadingBackgroundColor;
   final bool useAotCode;
 
+  /// 是否在右上角叠加 QuickJS 内存监控浮层。
+  /// 开启后每 500ms 拉取一次 runtime 内存快照(malloc/used/jsFuncCode/atom/obj 等),
+  /// 便于调试 JS 堆与引擎占用的变化。生产环境应保持 false。
+  final bool showMemoryMonitor;
+
   const FuickAppView({
     super.key,
     required this.appName,
@@ -34,6 +40,7 @@ class FuickAppView extends StatefulWidget {
     this.pageTransition = FuickPageTransition.cupertino,
     this.loadingBackgroundColor = const Color(0xFFFFFFFF),
     this.useAotCode = true,
+    this.showMemoryMonitor = false,
   });
 
   @override
@@ -181,8 +188,7 @@ class _FuickAppViewState extends State<FuickAppView> {
           child: Navigator(
             key: _navKey,
             observers: [_observer, _routeObserver],
-            onGenerateInitialRoutes:
-                (NavigatorState nav, String initialRoute) {
+            onGenerateInitialRoutes: (NavigatorState nav, String initialRoute) {
               // 初始路由必须用带 transitionDuration 的 PageRoute，
               // 不能用 PageRouteBuilder(transitionDuration: zero)，
               // 否则 Hero flight 拿不到源路由 transition 曲线。
@@ -192,10 +198,9 @@ class _FuickAppViewState extends State<FuickAppView> {
                   builder: (_) => FuickPage(
                     pageId: rootPageId,
                     controller: appContext!.appController,
-                    routeInfo: RouteInfo(widget.initialRoute ?? '/',
-                        widget.initialParams ?? {}),
-                    loadingBackgroundColor:
-                        widget.loadingBackgroundColor,
+                    routeInfo: RouteInfo(
+                        widget.initialRoute ?? '/', widget.initialParams ?? {}),
+                    loadingBackgroundColor: widget.loadingBackgroundColor,
                   ),
                 ),
               ];
@@ -205,9 +210,16 @@ class _FuickAppViewState extends State<FuickAppView> {
       ),
     );
     // debug 模式下叠加红屏错误提示
-    return FuickConfig().debug
-        ? RedBoxOverlay(child: app)
-        : app;
+    Widget result = FuickConfig().debug ? RedBoxOverlay(child: app) : app;
+    if (widget.showMemoryMonitor) {
+      result = Stack(
+        children: [
+          result,
+          MemoryMonitorOverlay(appName: widget.appName),
+        ],
+      );
+    }
+    return result;
   }
 
   @override

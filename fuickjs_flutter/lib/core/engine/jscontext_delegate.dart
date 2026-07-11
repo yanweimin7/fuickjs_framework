@@ -46,6 +46,21 @@ class JsContextDelegate implements IQuickJsContext {
         null,
       ) as int;
 
+  @override
+  Future<JSMemoryUsage> computeMemoryUsage() async {
+    final res = await _worker.sendRequest(
+      contextId,
+      'computeMemoryUsage',
+      null,
+    );
+    return res as JSMemoryUsage;
+  }
+
+  @override
+  Future<void> runGC() async {
+    await _worker.sendRequest(contextId, 'runGC', null);
+  }
+
   Future<void> init() async {
     await _worker.sendRequest(contextId, 'createContext', null);
   }

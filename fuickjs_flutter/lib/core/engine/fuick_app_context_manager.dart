@@ -20,14 +20,14 @@ class FuickAppContextManager {
   /// 获取指定 id 的上下文（待销毁的不返回）
   FuickAppContext? getContext(String id) {
     if (_pendingDestroy.contains(id)) {
-      logger.w(
-          'FuickAppContextManager: getContext($id) — context is in _pendingDestroy, returning null. '
-          'PendingDestroy: $_pendingDestroy, RefCounts: $_refCounts');
+      // logger.w(
+      //     'FuickAppContextManager: getContext($id) — context is in _pendingDestroy, returning null. '
+      //     'PendingDestroy: $_pendingDestroy, RefCounts: $_refCounts');
       return null;
     }
     final ctx = _contexts[id];
-    logger.d('FuickAppContextManager: getContext($id) — found: ${ctx != null}, '
-        'refCount: ${_refCounts[id]}, pendingDestroy: $_pendingDestroy');
+    // logger.d('FuickAppContextManager: getContext($id) — found: ${ctx != null}, '
+    //     'refCount: ${_refCounts[id]}, pendingDestroy: $_pendingDestroy');
     return ctx;
   }
 
@@ -38,8 +38,8 @@ class FuickAppContextManager {
         'currentRefCount: ${_refCounts[id]}');
     // 如果旧的正在待销毁，立即销毁旧的，换成新的
     if (_pendingDestroy.contains(id)) {
-      logger.w(
-          'FuickAppContextManager: registerContext($id) — old context is in _pendingDestroy, destroying it now.');
+      // logger.w(
+      //     'FuickAppContextManager: registerContext($id) — old context is in _pendingDestroy, destroying it now.');
       destroyContext(id);
     }
     if (_contexts.containsKey(id)) {

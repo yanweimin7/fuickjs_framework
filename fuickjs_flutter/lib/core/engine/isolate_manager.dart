@@ -124,6 +124,10 @@ class IsolateHandler {
             result = await ctx!.runJobs();
           } else if (type == 'bytecodeVersion') {
             result = await ctx!.bytecodeVersion;
+          } else if (type == 'computeMemoryUsage') {
+            result = await ctx!.computeMemoryUsage();
+          } else if (type == 'runGC') {
+            await ctx!.runGC();
           } else if (type == 'invoke') {
             final objectName = payload['objectName'] as String?;
             final methodName = payload['methodName'] as String;
