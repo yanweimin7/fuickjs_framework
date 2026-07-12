@@ -194,6 +194,10 @@ export const createHostConfig = (): any => {
     },
     noTimeout: -1,
     isPrimaryRenderer: true,
+    // React 18 (react-reconciler 0.29) reads getCurrentEventPriority;
+    // React 19 (0.33+) reads getCurrentUpdatePriority. Provide both so the
+    // same hostConfig works with either reconciler version.
+    getCurrentEventPriority: () => currentUpdatePriority,
     // React 19: priority API renamed from getCurrentEventPriority
     getCurrentUpdatePriority: () => currentUpdatePriority,
     setCurrentUpdatePriority: (priority: number) => {
