@@ -18,7 +18,7 @@ class CleanService {
   Future<void> cleanExpired(PackageRegistry registry, String env) async {
     await cleanUnreferenced(registry);
     await cleanOtherEnvDirs(env);
-    await cleanOldDownloads(maxAgeDays: 0);
+    await cleanOldDownloads(maxAgeDays: 3);
   }
 
   /// 删除 packages/ 下不在 registry 引用集内的所有目录。

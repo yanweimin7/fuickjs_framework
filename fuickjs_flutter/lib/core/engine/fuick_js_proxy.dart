@@ -10,11 +10,10 @@ class FuickJsProxy {
   }
 
   void destroy(int pageId) {
+    // QuickJS 自带 threshold-based GC(默认 256KB 触发一次 mark-sweep,
+    // 触发后阈值自适应涨到 malloc_size*1.5),destroy 后下一次 malloc
+    // 就会自动回收 React fiber 树与闭包循环引用,无需手动 JS_RunGC。
     ctx.invoke('fuickjs', 'destroy', [pageId]);
-    // destroy 后强制 GC:QuickJS 默认无 malloc_limit,不会自动触发周期检测,
-    // React fiber 树与闭包的循环引用必须靠 JS_RunGC 打破。
-    // fire-and-forget:runGC 在 worker isolate 中按顺序排在 destroy 之后执行。
-    ctx.runGC();
   }
 
   void notifyLifecycle(int pageId, String type) {
