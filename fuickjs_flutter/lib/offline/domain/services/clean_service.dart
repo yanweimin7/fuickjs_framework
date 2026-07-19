@@ -13,10 +13,12 @@ class CleanService {
   CleanService(this._repository);
 
   /// 启动兜底 GC：收敛到 registry 引用集（active ∪ staged ∪ history）。
+  /// download dir 全清：preparePackage 已保证成功后立即删 zip，这里兜底任何
+  /// 历史遗留/异常中断留下的 zip 文件。`.tmp` 在下载中，不动。
   Future<void> cleanExpired(PackageRegistry registry, String env) async {
     await cleanUnreferenced(registry);
     await cleanOtherEnvDirs(env);
-    await cleanOldDownloads();
+    await cleanOldDownloads(maxAgeDays: 0);
   }
 
   /// 删除 packages/ 下不在 registry 引用集内的所有目录。
@@ -77,16 +79,26 @@ class CleanService {
     }
   }
 
-  Future<void> cleanOldDownloads({int maxAgeDays = 10}) async {
+  Future<void> cleanOldDownloads({int maxAgeDays = 0}) async {
     final downloadDir = Directory(_repository.getDownloadDir());
     if (!await downloadDir.exists()) return;
 
     await for (final file in downloadDir.list()) {
       try {
+        // 跳过正在下载的临时文件。
+        if (file.path.endsWith('.tmp')) continue;
+        // 只删 zip，其它文件不动。
+        if (file is! File || !file.path.endsWith('.zip')) continue;
+
+        if (maxAgeDays == 0) {
+          await file.delete();
+          logger(() => 'Cleaned stale download: ${file.path}');
+          continue;
+        }
         final stat = file.statSync();
         final age = DateTime.now().difference(stat.modified);
         if (age.inDays >= maxAgeDays) {
-          await file.delete(recursive: true);
+          await file.delete();
           logger(() => 'Cleaned old download: ${file.path}');
         }
       } catch (e) {

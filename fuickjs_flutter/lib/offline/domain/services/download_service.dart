@@ -106,10 +106,10 @@ class DownloadService {
       return null;
     }
 
-    // 远程下载包成功提升后删 zip 缓存；内置 zip 保留供下次免解 assets。
-    if (!isInternal) {
-      await _safeDelete(File(_zipPath(package)));
-    }
+    // 提升成功后立即删 zip 缓存（无论内置/远程）。
+    // 下次需要时由 preparePackage 入口的 validatePackage 命中复用 staging；
+    // 若 staging 缺失（registry 清空/包被回收）则重新从 assets 提取或从网络下载。
+    await _safeDelete(File(_zipPath(package)));
 
     logger(() => 'Package ready (staged): $id');
     return package.copyWith(
