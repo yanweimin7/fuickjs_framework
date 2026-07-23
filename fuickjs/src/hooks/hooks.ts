@@ -1,6 +1,8 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
 import { PageContext } from '../core/PageContext';
 import * as PageRender from '../core/page_render';
+import * as Router from '../router/router';
+import type { RouteLocation } from '../router/router';
 
 import { NavigatorService } from '../services/NavigatorService';
 import { NativeEvent } from '../runtime/NativeEvent';
@@ -15,10 +17,34 @@ export function usePageId() {
 export function useNavigator() {
   const pageId = usePageId();
   return {
+    /**
+     * 跳转，等待目标页面 pop(result) 后返回。
+     * 守卫拒绝时 resolve 为 null。
+     */
     push: (path: string, params?: unknown, rootNavigator?: boolean, prewarmMs?: number) =>
       NavigatorService.push(path, params, pageId, rootNavigator, prewarmMs),
+    /** @deprecated push 本身已等待返回；保留为别名。 */
+    pushAndWait: (path: string, params?: unknown, rootNavigator?: boolean) =>
+      NavigatorService.pushAndWait(path, params, pageId, rootNavigator),
     pushReplace: (path: string, params?: unknown, rootNavigator?: boolean) =>
       NavigatorService.pushReplace(path, params, pageId, rootNavigator),
+    /** pushReplace 语义化别名 */
+    replace: (path: string, params?: unknown, rootNavigator?: boolean) =>
+      NavigatorService.replace(path, params, pageId, rootNavigator),
+    /** 重定向（替换当前路由，不可返回） */
+    redirect: (path: string, params?: unknown, rootNavigator?: boolean) =>
+      NavigatorService.redirect(path, params, pageId, rootNavigator),
+    /** 通过命名路由跳转 */
+    pushByName: (name: string, params?: unknown, rootNavigator?: boolean, prewarmMs?: number) =>
+      NavigatorService.pushByName(name, params, pageId, rootNavigator, prewarmMs),
+    pop: (result?: unknown) => NavigatorService.pop(pageId, false, result),
+    /** 弹出到指定路由（按 path 匹配） */
+    popTo: (name: string) => NavigatorService.popTo(name, pageId),
+    /** 弹出所有路由回到根页面 */
+    popAll: () => NavigatorService.popAll(pageId),
+    prewarm: (path: string, params?: unknown, prewarmMs?: number) =>
+      NavigatorService.prewarm(path, params, pageId, prewarmMs),
+    cancelPrewarm: (path: string) => NavigatorService.cancelPrewarm(path),
     showBottomSheet: (
       component: React.ReactNode,
       options?: { minHeight?: number; maxHeight?: number; backgroundColor?: string },
@@ -26,10 +52,26 @@ export function useNavigator() {
     ) => NavigatorService.showBottomSheet(component, options, pageId, rootNavigator),
     showDialog: (component: React.ReactNode, params?: unknown, rootNavigator?: boolean) =>
       NavigatorService.showDialog(component, params, pageId, rootNavigator),
-    pop: (result?: unknown) => {
-      return NavigatorService.pop(pageId, false, result);
-    },
   };
+}
+
+/**
+ * 获取当前页面的路由位置信息（path / params / name / meta）。
+ *
+ * 在守卫通过后、组件渲染前记录，因此组件首次渲染时即可读取。
+ * 若页面未通过守卫（渲染了 fallback），返回 null。
+ *
+ * @example
+ * ```tsx
+ * const route = useRoute();
+ * if (route) {
+ *   console.log(route.path, route.params, route.meta);
+ * }
+ * ```
+ */
+export function useRoute(): RouteLocation | null {
+  const pageId = usePageId();
+  return Router.getLocation(pageId);
 }
 
 export function useVisible(callback: () => void) {

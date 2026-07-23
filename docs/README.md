@@ -3,12 +3,14 @@
 ## 项目结构
 
 ### JS 框架层 (`fuickjs/`)
+
 - `src/widgets`: 映射到 Flutter 组件的 React 组件。
 - `src/services`: 用于 JS-Native 通信的原生桥接服务。
 - `src/ex`: 浏览器标准 API 补丁 (fetch, storage 等)。
 - `src/renderer.ts`: 核心 React 渲染器 (Reconciler) 与渲染逻辑。
 
 ### Flutter 框架层 (`fuickjs_flutter/`)
+
 - `lib/fuickjs_flutter.dart`: **公开 API 入口**，宿主与扩展包统一从此导入。
 - `lib/core/widgets/parsers`: 将 JS DSL 转换为 Flutter Widget 的解析器。
 - `lib/core/service`: 桥接服务的原生实现。
@@ -23,6 +25,7 @@
 - [FlutterProps 命名属性机制](./flutter-props.md)
 - [原生服务 & 浏览器 API](./services.md)
 - [多语言 (i18n)](./i18n.md)
+- [路由系统 (Router)](./router.md)
 - [Community 扩展包](./community.md)
 - [fuickjs_dart — Dart 动态渲染方案](./fuickjs_dart.md)
 - [Bundle 动态下发（签名验签/回滚/图片透明加载）](./bundle-delivery.md)
@@ -42,19 +45,20 @@
 `Fuick.expose` 将 JS 侧对象实例挂载到全局，使 Flutter 侧可通过 `ctx.invoke` 主动调用。
 
 ```typescript
-import { Fuick } from 'fuickjs';
+import { Fuick } from "fuickjs";
 
 const MyManager = {
   doSomething(data: any) {
-    console.log('Native called JS with:', data);
+    console.log("Native called JS with:", data);
     return { success: true };
-  }
+  },
 };
 
-Fuick.expose('MyManager', MyManager);
+Fuick.expose("MyManager", MyManager);
 ```
 
 **Native 侧调用 (Dart)**
+
 ```dart
 final result = await ctx.invoke('MyManager', 'doSomething', [{'key': 'value'}]);
 ```
@@ -66,20 +70,22 @@ final result = await ctx.invoke('MyManager', 'doSomething', [{'key': 'value'}]);
 `NativeEvent` 是标准的发布/订阅系统，用于 JS 与 Native 之间的异步事件通信。默认已通过 `Fuick.expose('NativeEvent', ...)` 暴露给原生侧。
 
 **JS 侧**
+
 ```typescript
-import { NativeEvent } from 'fuickjs';
+import { NativeEvent } from "fuickjs";
 
 // 监听原生事件
-const unlisten = NativeEvent.on('onDeviceRotation', (data) => {
-  console.log('设备旋转:', data);
+const unlisten = NativeEvent.on("onDeviceRotation", (data) => {
+  console.log("设备旋转:", data);
 });
 unlisten(); // 组件卸载时取消
 
 // 向原生发送事件
-NativeEvent.emit('jsReady', { version: '1.0.0' });
+NativeEvent.emit("jsReady", { version: "1.0.0" });
 ```
 
 **Native 侧 (Dart)**
+
 ```dart
 final eventService = controller.getService<NativeEventService>();
 
@@ -97,30 +103,48 @@ unbind?.call(); // 不需要时取消
 
 ### 3. Router（路由系统）
 
-轻量级路由注册，管理路径到 React 页面的映射。
+轻量级路由系统，支持路径参数、命名路由、守卫、重定向与 404 兜底。详见 [路由系统](./router.md)。
 
 ```typescript
 import { Router } from 'fuickjs';
 import HomePage from './pages/HomePage';
 import DetailPage from './pages/DetailPage';
 
+// 旧 API（仍支持）
 Router.register('/', () => <HomePage />);
-Router.register('/detail', (params) => <DetailPage id={params.id} />);
+
+// 声明式配置（推荐）
+Router.config({
+  routes: [
+    { path: '/detail/:id', name: 'detail', component: (p) => <DetailPage id={p.id} /> },
+    { path: '/profile', component: () => <ProfilePage />, meta: { requiresAuth: true } },
+    { path: '/old', redirect: '/' },
+    { path: '*', component: () => <NotFoundPage /> },
+  ],
+  guards: [authGuard],
+});
+
+// 跳转
+const nav = useNavigator();
+nav.push('/detail/123');
+nav.pushByName('detail', { id: 123 });
+const result = await nav.pushAndWait('/picker');
 ```
 
 ---
 
 ### 4. Hooks（React 钩子）
 
-| Hook | 说明 |
-|---|---|
-| `usePageId()` | 获取当前页面唯一 ID |
-| `useNavigator()` | 获取导航对象，含 `push` / `pop` / `showModal` / `showDialog` |
-| `useVisible(cb)` | 页面进入前台时触发 |
-| `useInvisible(cb)` | 页面进入后台时触发 |
-| `usePageConfig(config)` | 配置页面级渲染参数（`incrementalMode` / `dslCacheEnabled`） |
-| `useTranslation()` | 多语言翻译，返回 `{ t, locale, setLocale, locales }`，语言切换自动重渲染（详见 [i18n](./i18n.md)） |
-| `useLocale()` | 返回 `[locale, setLocale]` |
+| Hook                    | 说明                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usePageId()`           | 获取当前页面唯一 ID                                                                                                                             |
+| `useNavigator()`        | 获取导航对象，含 `push` / `pushAndWait` / `pushByName` / `replace` / `redirect` / `pop` / `popTo` / `popAll` / `showDialog` / `showBottomSheet` |
+| `useRoute()`            | 获取当前路由位置信息（path / params / name / meta），详见 [路由系统](./router.md)                                                               |
+| `useVisible(cb)`        | 页面进入前台时触发                                                                                                                              |
+| `useInvisible(cb)`      | 页面进入后台时触发                                                                                                                              |
+| `usePageConfig(config)` | 配置页面级渲染参数（`incrementalMode` / `dslCacheEnabled`）                                                                                     |
+| `useTranslation()`      | 多语言翻译，返回 `{ t, locale, setLocale, locales }`，语言切换自动重渲染（详见 [i18n](./i18n.md)）                                              |
+| `useLocale()`           | 返回 `[locale, setLocale]`                                                                                                                      |
 
 ```typescript
 import { useNavigator, useVisible, usePageConfig } from 'fuickjs';
@@ -163,6 +187,7 @@ function Home() {
 React 组件树被转换为 JSON DSL 发送给 Flutter，Flutter 根据 DSL 构建真实 Widget 树。
 
 **缓存失效规则**
+
 - 节点 props 变更 → 该节点 DSL 标记 dirty
 - 子节点增删 → 该节点及父节点缓存失效
 - 失效信号递归向上传播；透明节点（如 `FlutterProps`）自动穿透，确保最近实体 Widget 重新生成 DSL
@@ -176,16 +201,19 @@ React 组件树被转换为 JSON DSL 发送给 Flutter，Flutter 根据 DSL 构�
 线上 JS Bundle 压缩后，错误堆栈行列号指向压缩代码。工具位于 `fuickjs_framework/tools/resolve-sourcemap.mjs`。
 
 **安装依赖（首次）**
+
 ```bash
 cd fuickjs_framework/tools && npm install
 ```
 
 **还原单个行列号**
+
 ```bash
 node resolve-sourcemap.mjs ../../fuickjs_demo/js/dist/bundle.js.map 35194 1
 ```
 
 **还原完整 stack trace**
+
 ```bash
 # 从文件
 node resolve-sourcemap.mjs <mapFile> --stack ~/stack.txt
@@ -194,9 +222,10 @@ node resolve-sourcemap.mjs <mapFile> --text "at parseUserData (bundle.js:35194:1
 ```
 
 **构建时开启 sourcemap**（`fuickjs_demo/js/esbuild.js`）
+
 ```js
 const commonOptions = {
-  sourcemap: true,  // prod 也要开，.map 文件不打包进 App，保存到构建服务器
+  sourcemap: true, // prod 也要开，.map 文件不打包进 App，保存到构建服务器
   minify: isProd,
 };
 ```
@@ -270,6 +299,7 @@ final r = await ctx.eval('globalThis.result'); // 5
 ```
 
 要点：
+
 - 模块按上下文（`JSContext`）隔离，不同上下文注册的同名模块互不影响。
 - 必须先 `registerModule` 再 `evalModule`，否则 `import` 找不到模块。
 - 模块源码缓冲区在底层会以零结尾方式存储，满足 QuickJS `JS_Eval` 的零结尾约定。
