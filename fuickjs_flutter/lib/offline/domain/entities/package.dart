@@ -28,10 +28,16 @@ class Package {
   final String name;
   final String version;
 
-  /// 整包 SHA-256（新主完整性哈希）。
+  /// 整包 SHA-256（主完整性哈希，必填）。
+  ///
+  /// P0-2 加固：删除 MD5 兑底。bundles.json 里的 package 记录必须含 sha256，
+  /// 否则会抛异常。这避免了攻击者注入无 sha256 的 remote package 后，
+  /// 绕过 SHA-256 走 MD5 的历史错误路径。
   final String? sha256;
 
-  /// 兼容旧字段（历史上为 MD5）。新流程优先使用 [sha256]。
+  /// 历史字段：MD5。不再作为完整性计算（仅作为调试信息保留）。
+  /// 若 sha256 缺失，本字段不作为兑底，直接抛异常。
+  @Deprecated('MD5 no longer used for integrity. Provide sha256 instead.')
   final String shasum;
 
   final String? url;
@@ -56,8 +62,19 @@ class Package {
     this.state = PackageState.active,
   });
 
-  /// 完整性哈希：优先 sha256，回退 shasum。
-  String get integrity => (sha256 != null && sha256!.isNotEmpty) ? sha256! : shasum;
+  /// 完整性哈希：仅 sha256。不提供兑底。
+  ///
+  /// 缺失 sha256 是配置错误：要么宿主配置不完整，要么被攻击者伪造了一个不含
+  /// sha256 的 remote package。两种情况都不应静默装上。
+  String get integrity {
+    if (sha256 == null || sha256!.isEmpty) {
+      throw StateError(
+        'Package "$name@$version" has no sha256. P0-2: SHA-256 is mandatory, '
+        'MD5 (shasum) fallback has been removed. Reject this package.',
+      );
+    }
+    return sha256!;
+  }
 
   /// 全局唯一身份标识 / 目录名：`<name>-<version>-<hash>`（日志与路径均可区分 bundle）。
   String get versionShasumName => '$name-$version-$integrity';

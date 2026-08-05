@@ -61,7 +61,11 @@ OfflineConfig testConfig() => OfflineConfig(
       logger: (_, __) {},
       debug: false,
       appVersionGetter: () => '99.0.0',
+      signaturePublicKeysB64: const {'test-key': _pubKeyB64},
     );
+
+// P0-1: 任意非空 32 字节 Ed25519 公钥即可（仅用于让 BundleVerifier 通过构造检查）。
+const _pubKeyB64 = 'BpbpV8DqQE0NGgiXalTMOpBApQaDObu8byjy7Pftrps=';
 
 void main() {
   group('DownloadService', () {
@@ -73,7 +77,7 @@ void main() {
       downloadService = DownloadService(
         repository,
         config: testConfig(),
-        verifier: BundleVerifier(),
+        verifier: BundleVerifier(publicKeysB64: const {'test-key': _pubKeyB64}),
       );
     });
 

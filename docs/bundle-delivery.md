@@ -119,9 +119,9 @@ bundle zip 解压后的目录布局（解压根即 `<root>`）：
 - **公钥内置 App，私钥后端签名服务持有**，App 永不接触私钥。
 - `BundleVerifier` 只遍历 `manifest.files` 做逐代码文件 hash 校验，**不枚举/不校验图片**。
 - 图片防篡改由**整包 SHA-256**（来自 HTTPS 下发的版本元数据）兜底。
-- `keyId` 支持密钥轮换：App 可内置多把公钥，按 `keyId` 选择。
+- `keyId` 强匹配：manifest 必须显式声明 keyId，且必须命中 `OfflineConfig.signaturePublicKeysB64` 中某一把公钥；**无回退到首把 key 的兼容路径**。
 
-验签流程（下载分支）：
+### 6.1 验签流水线（下载分支）
 
 ```
 download zip → sha256(zip) == meta.sha256 ?            // 整包层
@@ -132,6 +132,59 @@ download zip → sha256(zip) == meta.sha256 ?            // 整包层
   → minAppVersion 满足当前 App 版本 ?
   → 原子 rename staging → packages/<name>/<version-hash>  // 提升为 staged
 ```
+
+### 6.2 三道运行时验签闸
+
+bundle 落地到本地后，端上还有**三道独立闸**持续保护（不只是下载时）：
+
+| 闸                                      | 触发时机                                | 实现                                                                    | 阻塞主 isolate? | 失败行为                                        |
+| --------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------- | --------------- | ----------------------------------------------- |
+| **闸 1 · 启动后台验签**                 | `Offline.init()` 完成后 fire-and-forget | `PackageService._runBackgroundVerify` 提交到子 isolate 的 4 worker pool | **否**          | 失败 → 删包 + 从 in-memory 状态移除 + log       |
+| **闸 2 · on-open 验签**                 | `Offline.promoteAndGetRoot` 返回 dir 前 | `PackageService.verifyOnOpen` 调用子 isolate 单包 verifyDir             | 是（await）     | 失败 → 删包 + 兜底回退 builtin（**JS 不执行**） |
+| **闸 3 · latest.json 验签（暂未启用）** | 远端同步拉版本列表时                    | `RemotePackagesVerifier.verifySignedBytes`                              | 否（同步链路）  | 失败 → 回落内置包                               |
+
+> **闸 3 当前未启用**：`Offline._fetchRemotePackages` 直接信任 host 的 `offlinePackagesGetter` 返回值（由 host 自行保证 latest.json 可信：HTTPS / 内置证书 / 后端鉴权等任选）。`RemotePackagesVerifier` class + 单元测试 + `sign-latest.js` Node 工具保留，未来需要时只需取消 `offline.dart` 中相关代码注释即可启用。
+
+#### 时序图
+
+```
+T0  app 启动
+T1  Offline.init() 开始
+    ├── BundleVerifyIsolate.create()       // 启动后台 isolate（一次性 ~30-50ms）
+    ├── PackageService.init()              // 立即返回（< 10ms）
+    │   ├── 读 registry
+    │   ├── flag-level 校验（毫秒级）
+    │   ├── persist
+    │   └── _startBackgroundVerify()       // fire-and-forget
+    │       └──→ 后台 isolate 跑 verifyDir × N
+    └── [init 完成]                         // 约 30-50ms 后
+
+T2  用户点击 bundle（假设后台验签还在跑）
+    Offline.promoteAndGetRoot(name)
+      ├── promoteStaged / getActive / _ensureBuiltinActive
+      ├── await verifyOnOpen(pkg, dir)     // 闸 2：终态闸
+      │     └─→ 后台 isolate 跑 verifyDir
+      │           ↓
+      │     ok  → 返回 dir → 引擎加载 JS
+      │     fail → deletePackage + 兜底 builtin
+      └── 返回
+
+T3  后台验签完成（晚于 T2 也无所谓）
+      → 清理 in-memory 状态中已被 on-open 拦截的坏包（幂等 delete）
+```
+
+### 6.3 安全语义
+
+- **JS 在 on-open verify 通过前不执行**：`await verifyOnOpen` 是同步语义，引擎拿到 dir 后才读取 JS；与"加载后异步检测"（race condition）有本质区别。
+- **删除幂等**：闸 1 和闸 2 可同时对同一包触发 `deletePackage`；`LocalPackageRepository.deletePackage` 对不存在的目录是 no-op。
+- **后台验签与 on-open 不冗余**：后台验签清理 in-memory 状态（避免下次 `getActivePackage` 返回坏包）；on-open 是最终防御（用户真要打开时再确认）。两条路径都失败也能兜底 builtin。
+- **所有 `_registry` 修改操作通过 `_withRegistryLock` 互斥锁串行化**（`init`/`_runBackgroundVerify`/`applyReady`/`promoteStaged`/`reuseLocalAsStaged`/`deactivatePackages`/`verifyOnOpen`）。这解决了"后台验签 snapshot 写回覆盖 sync 修改"等竞态。读操作不参与锁（Dart 单线程，list 引用赋值原子）。
+
+### 6.4 启动性能
+
+- `Offline.init()` 自身：约 30-50ms（isolate 启动） + 10ms（registry 解析） = 约 50ms 内返回
+- 后台验签：与 UI 渲染、引擎 init 并行，用户感知不到
+- `promoteAndGetRoot` 首次：on-open 验签 ~100-200ms（与 loading skeleton 并行展示）
 
 ## 7. 包状态机与目录布局
 
@@ -448,14 +501,52 @@ Flutter ImageParser 现有 file:// 分支直接处理 ✅（零改动）
 
 ## 17. 实施状态（P0–P4 已完成）
 
-- **P0–P3（Flutter offline 模块）**：`Package`/`PackageRegistry`/`BundleManifest`、`BundleVerifier`（Ed25519 + 逐代码文件 SHA-256）、`FileStorage`（staging/registry/`assets/js`/内置 zip）、`PackageRepository`、`DownloadService`（整包 SHA-256 + `.tmp` rename + staging 解压 + 验签 + minAppVersion + 原子提升）、`PackageService`（状态机 + `reuseLocalAsStaged` + staged 生效前校验线上最新/内置豁免）、`SyncService`（minAppVersion）、`CleanService`（引用集 GC + 低磁盘驱逐）、`Offline` 编排（sync 时先查 retained 再下载；`promoteAndGetRoot`/懒解压内置）。
+### 17.1 验签层（详细）
+
+- **`BundleVerifier`**（[bundle_verifier.dart](../fuickjs_flutter/lib/offline/domain/services/bundle_verifier.dart)）
+  - Ed25519 验 `manifest.sig`（`pointycastle` Ed25519 实现）
+  - 严格 keyId 匹配（无回退到首把 key 的兼容路径）
+  - 逐代码文件 SHA-256 比对（仅 manifest.files 中列出的代码，不含图片）
+  - 错误返回明确 reason（`manifest.json missing` / `signature mismatch` / `hash mismatch` 等）
+
+- **`BundleVerifyIsolate`**（[bundle_verify_isolate.dart](../fuickjs_flutter/lib/offline/domain/services/bundle_verify_isolate.dart)）
+  - 后台 isolate + 4 worker pool
+  - 异步工厂 `create(publicKeysB64)`，一次性握手（SendPort 交换）
+  - `verify(dir) → Future<VerifyResult>` API
+  - dispose 用 microtask 延迟 reject pending（避开与 response handler 的同步竞态）
+  - dispose 后到达的 response 直接丢弃（`_disposed` 守卫）
+
+- **`PackageService._reverifyOrDrop`**
+  - 启动期调用，对 active + staged 全量跑 verifyDir
+  - **fire-and-forget**：不阻塞 `init()`，后台 isolate 跑完后更新 in-memory 状态
+  - 失败 → `deletePackage` + 从 in-memory 状态移除
+  - 通过 `backgroundVerifyDone` getter 暴露给测试 await
+
+- **`PackageService.verifyOnOpen`**
+  - 打开 bundle 前的终态闸
+  - 失败 → `deletePackage` + 返回 null（调用方兜底 builtin）
+  - 关键：**JS 在 await 返回前不执行**（与"加载后异步检测"区分）
+
+- **`Offline.promoteAndGetRoot`**
+  - 在返回 dir 给引擎前调 `verifyOnOpen`
+  - 失败 → 兜底 `_ensureBuiltinActive` + 重新 verify
+  - 引擎拿到的 dir 一定经过完整验签
+
+- **`RemotePackagesVerifier`**（[remote_packages_verifier.dart](../fuickjs_flutter/lib/offline/domain/services/remote_packages_verifier.dart)）
+  - 验 `latest.json` 的 Ed25519 签名（canonical-JSON）
+  - 失败 → 回落内置包（不破坏冷启动）
+  - **当前未启用**：`Offline._fetchRemotePackages` 不调用此 class；class 保留供未来启用
+
+### 17.2 其他模块
+
+- **P0–P3（Flutter offline 模块）**：`Package`/`PackageRegistry`/`BundleManifest`、`BundleVerifier`（Ed25519 + 逐代码文件 SHA-256）、`FileStorage`（staging/registry/`assets/js`/内置 zip）、`PackageRepository`、`DownloadService`（整包 SHA-256 + `.tmp` rename + staging 解压 + 验签 + minAppVersion + 原子提升）、`PackageService`（状态机 + `reuseLocalAsStaged` + staged 生效前校验线上最新/内置豁免）、`SyncService`（minAppVersion）、`CleanService`（引用集 GC + 低磁盘驱逐）、`Offline` 编排（sync 时先查 retained 再下载；`promoteAndGetRoot`/懒解压内置/三重验签闸）。
 - **引擎集成**：`FuickAppContext._loadSingleBundle`（fs 走 `evalBinaryFileFromPath` 零拷贝 + assets 回退 `rootBundle`）、`__FUICK_BUNDLE__` 注入。
 - **P4（JS/TS）**：`node.ts toDsl()` 透明改写 Image 相对路径。
-- **构建工具**：`fuickjs_demo/js/tools/bundle/{gen-keys.js,pack-bundle.js}` + npm `bundle:keys`/`bundle:pack`。
-- **测试**：`test/offline/` 全绿（含 Node 打包 → Dart 验签的跨语言一致性 fixture）。
+- **构建工具**：`fuickjs_demo/js/tools/bundle/{gen-keys.js,pack-bundle.js,sign-latest.js}` + npm `bundle:keys`/`bundle:pack`。
+- **测试**：`test/offline/` 全绿（含 Node 打包 → Dart 验签的跨语言一致性 fixture，含 isolate 生命周期、并发验签、on-open 失败兜底）。
 - **待接入**：在 App 启动处调用 `Offline.init(OfflineConfig(...))` 并配置 `signaturePublicKeysB64`/`appVersionGetter`，在 `assets/js` 放置 `bundles.json` 与内置 `<name>.zip`。
 - **Demo 已接入**：见 §18。
-- **P5（可选）代码加密**：`manifest.encryption` hook 已预留，未启用。
+- **P5（可选）代码加密**：已删除（仅签名+启动期+on-open 验签已足够，详见 commit log）。
 
 ## 18. Demo App 接入示例
 
@@ -471,7 +562,7 @@ await DemoOfflineBootstrap.init();
 
 配置要点：
 
-- `signaturePublicKeysB64`：从 `assets/js/bundle_signing_pub.b64` 读取，map key 为 `demo-key`（与 zip 内 `manifest.keyId` 一致；多公钥时在代码里配完整公钥表）。
+- `signaturePublicKeysB64`：从 demo app 的 `offline_bootstrap.dart` 内 `signingPubB64` 常量读取，map key 为 `demo-key`（与 zip 内 `manifest.keyId` 一致；多公钥时在代码里配完整公钥表）。**不再从 `assets/js/bundle_signing_pub.b64` 读取**（v2 改造，避免 assets 里多一个无意义文件）。
 - `appVersionGetter`：与 `pubspec.yaml` version 对齐（当前 `1.0.0`）。
 - `offlinePackagesGetter`：Demo 返回 `null`（仅内置包）；联调时改为请求 CDN 元数据接口。
 
@@ -479,12 +570,14 @@ await DemoOfflineBootstrap.init();
 
 ```
 app/assets/js/
-├── bundles.json              # { packages: [...] } — UI + offline 共用
-├── bundle_signing_pub.b64    # Ed25519 公钥（可入库）
+├── bundles.json                       # { packages: [...] } — UI + offline 共用
 ├── bundle.zip / taro-demo.zip / ...   # 各 bundle 内置 zip（验签 + 懒解压）
-├── bundle.js / bundle.qjc    # 开发兜底（zip 缺失时回退 .js / 字节码版本不匹配时 .stale 隔离后回退）
+├── bundle.js / bundle.qjc             # 开发兜底（zip 缺失时回退 .js / 字节码版本不匹配时 .stale 隔离后回退）
 └── ...
 ```
+
+公钥位置：写在 `app/lib/offline_bootstrap.dart` 的 `signingPubB64` 常量（base64 32 字节）。
+源文件在 `fuickjs_demo/js/tools/bundle/bundle_signing_pub.b64`（JS 端工具使用，不再拷贝到 app/assets）。
 
 `bundles.json` 每个 package 含 offline 字段（`name`/`version`/`sha256`/`minAppVersion`）与 UI 字段（`label`/`initialRoute`）。
 
@@ -494,7 +587,7 @@ app/assets/js/
 cd fuickjs_demo/js
 npm run build              # 编译 JS → app/assets/js/*.js
 npm run bundle:keys        # 首次生成 Ed25519 密钥（私钥不入库）
-npm run bundle:pack:all    # 批量打 zip + 刷新 bundles.json sha256 + 复制公钥
+npm run bundle:pack:all    # 批量打 zip + 刷新 bundles.json sha256
 ```
 
 `pack-all.js` 会对 5 个 demo bundle 打 zip（优先 `.qjc`；若 `.qjc` 落后于 `.js` 则仅打 `.js`），`bundle` 包会附带 `js/assets/images/` 资源。

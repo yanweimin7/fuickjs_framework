@@ -50,13 +50,26 @@ class IsolateHandler {
                 ctx,
                 null,
                 allowedServices: [
+                  // worker isolate 白名单:
+                  // - Timer/Console/FileSystem 是真正能在 worker 跑的底层 service,
+                  //   注册 sync method 后 JS 端 dartCallNative 零开销直调。
+                  // - FileSystem 的 sync API (readFileSync/writeFileSync) 必须留在
+                  //   worker 直跑,否则会绕主 isolate 拖慢 I/O。
+                  // - 业务 service (UI/Network/Navigation 等) 不在白名单,
+                  //   它们的 async method 在 worker isolate 上没注册,
+                  //   必须通过 fallbackAsync 转发到主 isolate 跑。
                   TimerService,
                   ConsoleService,
+                  FileSystemService,
                 ],
-                // worker isolate 只允许 dartCallNative 命中 Timer/Console
-                // 其他 service 一律走 dartCallNativeAsync,经 fallbackAsync 转发到主 isolate。
-                // 绝不允许 dartCallNative 静默 fallthrough 到主 isolate ——
-                // 那会让 JS 端把 Promise 当对象用,触发 viewInsets == undefined 这类 bug。
+                // 智能转发: sync 路径(dartCallNative)未命中 sync handler 时,
+                // 自动转 async 路径 —— 先查本 isolate async handler(白名单内
+                // service 的 async method),再走 fallbackAsync 转发到主 isolate。
+                // 整个 sync 调用会被 QuickJS 阻塞等结果,这是兼容"bundle JS 端
+                // 混用 sync/async"必须付出的代价。
+                allowSyncToAsyncFallback: true,
+                // dartCallNativeAsync 路径的兜底: 任何在 worker isolate 没注册
+                // 的 service 方法都转发到主 isolate 跑。
                 fallbackAsync: (method, args) async {
                   final responsePort = ReceivePort();
                   mainSendPort.send({

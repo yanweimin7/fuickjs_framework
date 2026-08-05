@@ -32,10 +32,22 @@ void main() {
       expect(r.manifest!.name, 'test_bundle');
     });
 
-    test('valid bundle passes without public key (hash only)', () async {
-      final verifier = BundleVerifier();
+    test('P0-1: BundleVerifier rejects empty public key set', () {
+      expect(
+        () => BundleVerifier(publicKeysB64: const {}),
+        throwsArgumentError,
+      );
+    });
+
+    test('P0-1: manifest.sig missing → verification fails', () async {
+      // 删除 manifest.sig → 验签必失败（不再有"无密钥跳过签"路径）。
+      final sig = File(p.join(dir, 'manifest.sig'));
+      if (await sig.exists()) await sig.delete();
+
+      final verifier = BundleVerifier(publicKeysB64: {_keyId: _pubKeyB64});
       final r = await verifier.verifyDir(dir);
-      expect(r.ok, true, reason: r.reason);
+      expect(r.ok, false);
+      expect(r.reason, contains('manifest.sig missing'));
     });
 
     test('tampered CODE file fails verification', () async {

@@ -10,7 +10,7 @@ class OfflineConfig {
   final String Function()? appVersionGetter;
 
   /// 内置签名公钥，keyId → base64(Ed25519 公钥 32 字节)。可多把用于轮换。
-  /// 为空表示不做签名校验（仅 SHA-256 完整性）。
+  /// P0-1/P0-6 改为必填：传空会被构造校验拦截，不再支持"无密钥跳过签"模式。
   final Map<String, String> signaturePublicKeysB64;
 
   /// history 保留版本数（用于回滚）。
@@ -21,10 +21,10 @@ class OfflineConfig {
     required this.offlinePackagesGetter,
     required this.logger,
     required this.debug,
-    this.uaGetter,
     required this.offlineConfigGetter,
+    this.uaGetter,
     this.appVersionGetter,
-    this.signaturePublicKeysB64 = const {},
+    required this.signaturePublicKeysB64,
     this.retainVersions = 3,
   });
 

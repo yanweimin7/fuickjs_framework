@@ -286,13 +286,76 @@ void main() {
       }
     });
 
-    test('error includes worker-isolate hint when allowedServices is set', () {
+    test('error for unknown method (no handler, main isolate strict)', () {
+      // 主 isolate 上未注册任何方法,允许 allowedServices 白名单(仅影响
+      // 哪些 service 实例被加进来),主 isolate 默认 allowSyncToAsyncFallback=false
+      // 仍抛"no handler registered",不再有"Worker isolate"死字符串。
       binder.init(ctx, null, allowedServices: [_TestSyncService]);
       try {
         ctx.callNative('Anything', null);
         fail('expected throw');
       } on StateError catch (e) {
-        expect(e.message, contains('Worker isolate'));
+        expect(e.message, contains('"Anything"'));
+        expect(e.message, contains('no handler registered'));
+      }
+    });
+
+    test('worker isolate: allowSyncToAsyncFallback falls back to async handler',
+        () async {
+      // 模拟 worker isolate 场景: 业务 service(只能注册 async)被 JS 端错用
+      // sync 调用,允许 sync→async 智能转发,不再硬崩。
+      svc.registerAsyncMethod('renderUI', (args) async => 'rendered');
+      binder.init(
+        ctx,
+        null,
+        allowSyncToAsyncFallback: true,
+      );
+      // 不抛错,返回 async handler 的结果(Future,会 await 完成)。
+      final result = await ctx.callNative('X.renderUI', null);
+      expect(result, 'rendered');
+    });
+
+    test('worker isolate: sync→fallbackAsync when no local handler at all',
+        () async {
+      // 业务 service 不在本 isolate(白名单过滤掉了),sync 路径命中时
+      // 走 fallbackAsync 转发到主 isolate。允许 sync→async 转发。
+      binder.init(
+        ctx,
+        null,
+        allowSyncToAsyncFallback: true,
+        fallbackAsync: (method, args) async => 'forwarded:$method',
+      );
+      final result = await ctx.callNative('Unknown.method', null);
+      expect(result, 'forwarded:Unknown.method');
+    });
+
+    test(
+        'worker isolate: still throws if no local handler AND no fallbackAsync',
+        () {
+      // 兜底都没有 → 抛错(动态从实际注册列表生成文案,不再写死)。
+      binder.init(ctx, null, allowSyncToAsyncFallback: true);
+      try {
+        ctx.callNative('Anything', null);
+        fail('expected throw');
+      } on StateError catch (e) {
+        expect(e.message, contains('"Anything"'));
+        expect(e.message, contains('no handler registered'));
+        // 错误信息动态从实际注册列表生成。
+        expect(e.message, contains('Registered sync handlers:'));
+      }
+    });
+
+    test('main isolate strict policy preserved: sync hitting async throws', () {
+      // 主 isolate 默认 allowSyncToAsyncFallback=false,保留历史严格策略
+      // —— 业务 service 错用 sync 调用必须立即报错让用户改代码。
+      svc.registerAsyncMethod('renderUI', (_) async => true);
+      binder.init(ctx, null);
+      try {
+        ctx.callNative('X.renderUI', null);
+        fail('expected throw');
+      } on StateError catch (e) {
+        expect(e.message, contains('"X.renderUI"'));
+        expect(e.message, contains('registered as async'));
       }
     });
   });

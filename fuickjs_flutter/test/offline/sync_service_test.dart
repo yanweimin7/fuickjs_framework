@@ -11,8 +11,9 @@ void main() {
       syncService = SyncService();
     });
 
-    Package pkg(String name, String version, String shasum, {String? url}) {
-      return Package(name: name, version: version, shasum: shasum, url: url);
+    Package pkg(String name, String version, String hash, {String? url}) {
+      // P0-2: 必填 sha256，旧 shasum 字段已废弃，测试统一改用 sha256。
+      return Package(name: name, version: version, sha256: hash, url: url);
     }
 
     SyncResult run({
@@ -112,21 +113,27 @@ void main() {
       });
 
       group('internal package priority', () {
-        test('should prefer internal package when version and shasum match', () {
+        test('should prefer internal package when version and shasum match',
+            () {
           final result = run(
-            remote: [pkg('pkg1', '1.0.0', 'same123', url: 'https://remote.com/pkg1.zip')],
-            internal: [pkg('pkg1', '1.0.0', 'same123', url: 'assets://internal/pkg1.zip')],
+            remote: [
+              pkg('pkg1', '1.0.0', 'same123',
+                  url: 'https://remote.com/pkg1.zip')
+            ],
+            internal: [
+              pkg('pkg1', '1.0.0', 'same123', url: 'assets://internal/pkg1.zip')
+            ],
             active: [],
           );
 
           expect(result.added.length, 1);
-          // Internal replaces remote when version AND shasum match
-          expect(result.added.first.shasum, 'same123');
+          // Internal replaces remote when version AND hash match
+          expect(result.added.first.sha256, 'same123');
           // Verify it's the internal package (has internal url)
           expect(result.added.first.url, 'assets://internal/pkg1.zip');
         });
 
-        test('should use remote when internal shasum differs', () {
+        test('should use remote when internal hash differs', () {
           final result = run(
             remote: [pkg('pkg1', '1.0.0', 'remote123')],
             internal: [pkg('pkg1', '1.0.0', 'internal123')],
@@ -134,8 +141,8 @@ void main() {
           );
 
           expect(result.added.length, 1);
-          // Different shasum means use remote
-          expect(result.added.first.shasum, 'remote123');
+          // Different hash means use remote
+          expect(result.added.first.sha256, 'remote123');
         });
 
         test('should use remote when internal version differs', () {
@@ -146,10 +153,11 @@ void main() {
           );
 
           expect(result.added.length, 1);
-          expect(result.added.first.shasum, 'remote123');
+          expect(result.added.first.sha256, 'remote123');
         });
 
-        test('should ignore internal-only packages (remote list is complete)', () {
+        test('should ignore internal-only packages (remote list is complete)',
+            () {
           final result = run(
             remote: [],
             internal: [pkg('pkg1', '1.0.0', 'internal123')],
@@ -168,28 +176,31 @@ void main() {
               pkg('pkg2', '2.0.0', 'remote2'),
             ],
             internal: [
-              pkg('pkg1', '1.0.0', 'same1'), // matches remote (version+shasum), should use internal
+              pkg('pkg1', '1.0.0',
+                  'same1'), // matches remote (version+hash), should use internal
             ],
             active: [],
           );
 
           expect(result.added.length, 2);
-          // pkg1 should use internal version (same shasum, so internal is used)
+          // pkg1 should use internal version (same hash, so internal is used)
           final pkg1 = result.added.firstWhere((p) => p.name == 'pkg1');
-          expect(pkg1.shasum, 'same1');
+          expect(pkg1.sha256, 'same1');
           // pkg2 should use remote version
           final pkg2 = result.added.firstWhere((p) => p.name == 'pkg2');
-          expect(pkg2.shasum, 'remote2');
+          expect(pkg2.sha256, 'remote2');
         });
 
-        test('should update when internal version available for active remote package', () {
+        test(
+            'should update when internal version available for active remote package',
+            () {
           final result = run(
             remote: [pkg('pkg1', '1.0.0', 'same1')],
             internal: [pkg('pkg1', '1.0.0', 'same1')],
             active: [pkg('pkg1', '1.0.0', 'old1')],
           );
 
-          // Same version+shasum as remote, so internal is used, different from active
+          // Same version+hash as remote, so internal is used, different from active
           expect(result.updated.length, 1);
         });
       });
@@ -242,7 +253,7 @@ void main() {
         final p = Package(
           name: 'pkg1',
           version: '1.0.0',
-          shasum: 'abc',
+          sha256: 'abc',
           minAppVersion: '5.0.0',
         );
         final result = run(remote: [p], appVersion: '3.0.0');
@@ -253,13 +264,12 @@ void main() {
         final p = Package(
           name: 'pkg1',
           version: '1.0.0',
-          shasum: 'abc',
+          sha256: 'abc',
           minAppVersion: '3.0.0',
         );
         final result = run(remote: [p], appVersion: '3.0.0');
         expect(result.added.length, 1);
       });
     });
-
   });
 }

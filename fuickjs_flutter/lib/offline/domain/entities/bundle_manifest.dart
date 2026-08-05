@@ -18,21 +18,6 @@ class ManifestFile {
   }
 }
 
-/// 加密信息（预留 hook，本期不启用；仅可能作用于代码，图片永不加密）。
-class ManifestEncryption {
-  final String algorithm;
-  final Map<String, dynamic> params;
-
-  const ManifestEncryption({required this.algorithm, this.params = const {}});
-
-  factory ManifestEncryption.fromJson(Map<String, dynamic> json) {
-    return ManifestEncryption(
-      algorithm: (json['algorithm'] as String?) ?? '',
-      params: (json['params'] as Map<String, dynamic>?) ?? const {},
-    );
-  }
-}
-
 /// bundle 的 manifest.json —— 只声明代码文件（图片不入 manifest）。
 class BundleManifest {
   final String name;
@@ -42,7 +27,6 @@ class BundleManifest {
   final String entry;
   final String codeForm; // qjc | js
   final List<ManifestFile> files;
-  final ManifestEncryption? encryption;
 
   const BundleManifest({
     required this.name,
@@ -52,7 +36,6 @@ class BundleManifest {
     required this.entry,
     required this.codeForm,
     required this.files,
-    this.encryption,
   });
 
   factory BundleManifest.fromJson(Map<String, dynamic> json) {
@@ -72,7 +55,6 @@ class BundleManifest {
     final files = rawFiles
         .map((e) => ManifestFile.fromJson(e as Map<String, dynamic>))
         .toList();
-    final enc = json['encryption'];
     return BundleManifest(
       name: name,
       version: version,
@@ -81,9 +63,6 @@ class BundleManifest {
       entry: entry,
       codeForm: (json['codeForm'] as String?) ?? 'qjc',
       files: files,
-      encryption: enc is Map<String, dynamic>
-          ? ManifestEncryption.fromJson(enc)
-          : null,
     );
   }
 }

@@ -7,12 +7,12 @@ void main() {
       const pkg = Package(
         name: 'test-package',
         version: '1.0.0',
-        shasum: 'abc123',
+        sha256: 'deadbeef',
       );
 
       expect(pkg.name, 'test-package');
       expect(pkg.version, '1.0.0');
-      expect(pkg.shasum, 'abc123');
+      expect(pkg.sha256, 'deadbeef');
       expect(pkg.url, isNull);
       expect(pkg.mustBeUpdated, false);
       expect(pkg.timestamp, isNull);
@@ -22,7 +22,7 @@ void main() {
       const pkg = Package(
         name: 'test-package',
         version: '1.0.0',
-        shasum: 'abc123',
+        sha256: 'deadbeef',
         url: 'https://example.com/package.zip',
         mustBeUpdated: true,
         timestamp: 1234567890,
@@ -33,11 +33,11 @@ void main() {
       expect(pkg.timestamp, 1234567890);
     });
 
-    test('versionShasumName should return name-version-shasum', () {
+    test('versionShasumName should return name-version-sha256', () {
       const pkg = Package(
         name: 'test-package',
         version: '1.0.0',
-        shasum: 'abc123',
+        sha256: 'abc123',
       );
 
       expect(pkg.versionShasumName, 'test-package-1.0.0-abc123');
@@ -47,13 +47,13 @@ void main() {
       const pkg1 = Package(
         name: 'test-package',
         version: '1.0.0',
-        shasum: 'abc123',
+        sha256: 'abc123',
       );
 
       const pkg2 = Package(
         name: 'test-package',
         version: '1.0.0',
-        shasum: 'abc123',
+        sha256: 'abc123',
       );
 
       expect(pkg1.isSameVersion(pkg2), true);
@@ -63,13 +63,13 @@ void main() {
       const pkg1 = Package(
         name: 'test-package',
         version: '1.0.0',
-        shasum: 'abc123',
+        sha256: 'abc123',
       );
 
       const pkg2 = Package(
         name: 'test-package',
         version: '2.0.0',
-        shasum: 'def456',
+        sha256: 'def456',
       );
 
       expect(pkg1.isSameVersion(pkg2), false);
@@ -79,24 +79,24 @@ void main() {
       const pkg1 = Package(
         name: 'package-a',
         version: '1.0.0',
-        shasum: 'abc123',
+        sha256: 'abc123',
       );
 
       const pkg2 = Package(
         name: 'package-b',
         version: '1.0.0',
-        shasum: 'abc123',
+        sha256: 'abc123',
       );
 
       expect(pkg1.isSameVersion(pkg2), false);
     });
 
     group('fromJson', () {
-      test('should create package from JSON', () {
+      test('should create package from JSON with sha256', () {
         final json = {
           'name': 'test-package',
           'version': '1.0.0',
-          'shasum': 'abc123',
+          'sha256': 'deadbeef',
           'url': 'https://example.com/package.zip',
           'mustBeUpdated': true,
           'timeStamp': 1234567890,
@@ -106,7 +106,7 @@ void main() {
 
         expect(pkg.name, 'test-package');
         expect(pkg.version, '1.0.0');
-        expect(pkg.shasum, 'abc123');
+        expect(pkg.sha256, 'deadbeef');
         expect(pkg.url, 'https://example.com/package.zip');
         expect(pkg.mustBeUpdated, true);
         expect(pkg.timestamp, 1234567890);
@@ -116,15 +116,23 @@ void main() {
         expect(() => Package.fromJson(<String, dynamic>{}), throwsArgumentError);
       });
 
-      test('integrity prefers sha256 over shasum', () {
+      test('integrity returns sha256', () {
         final pkg = Package.fromJson({
           'name': 'p',
           'version': '1.0.0',
           'sha256': 'deadbeef',
-          'shasum': 'legacy',
         });
         expect(pkg.integrity, 'deadbeef');
         expect(pkg.versionShasumName, 'p-1.0.0-deadbeef');
+      });
+
+      test('P0-2: integrity throws when sha256 missing (no MD5 fallback)', () {
+        final pkg = Package.fromJson({
+          'name': 'p',
+          'version': '1.0.0',
+          'shasum': 'legacy-md5',
+        });
+        expect(() => pkg.integrity, throwsStateError);
       });
     });
 
@@ -133,7 +141,7 @@ void main() {
         const pkg = Package(
           name: 'test-package',
           version: '1.0.0',
-          shasum: 'abc123',
+          sha256: 'abc',
           url: 'https://example.com/package.zip',
           mustBeUpdated: true,
           timestamp: 1234567890,
@@ -143,7 +151,7 @@ void main() {
 
         expect(json['name'], 'test-package');
         expect(json['version'], '1.0.0');
-        expect(json['shasum'], 'abc123');
+        expect(json['sha256'], 'abc');
         expect(json['url'], 'https://example.com/package.zip');
         expect(json['mustBeUpdated'], true);
         expect(json['timeStamp'], 1234567890);
@@ -155,7 +163,7 @@ void main() {
         const original = Package(
           name: 'test-package',
           version: '1.0.0',
-          shasum: 'abc123',
+          sha256: 'abc',
         );
 
         final copied = original.copyWith(
@@ -165,23 +173,23 @@ void main() {
 
         expect(copied.name, 'test-package');
         expect(copied.version, '2.0.0');
-        expect(copied.shasum, 'abc123');
+        expect(copied.sha256, 'abc');
         expect(copied.url, 'https://example.com/new.zip');
       });
     });
 
     group('equality', () {
-      test('should be equal for same name, version, shasum', () {
+      test('should be equal for same name, version, sha256', () {
         const pkg1 = Package(
           name: 'test-package',
           version: '1.0.0',
-          shasum: 'abc123',
+          sha256: 'abc',
         );
 
         const pkg2 = Package(
           name: 'test-package',
           version: '1.0.0',
-          shasum: 'abc123',
+          sha256: 'abc',
         );
 
         expect(pkg1, equals(pkg2));
@@ -192,13 +200,13 @@ void main() {
         const pkg1 = Package(
           name: 'test-package',
           version: '1.0.0',
-          shasum: 'abc123',
+          sha256: 'abc',
         );
 
         const pkg2 = Package(
           name: 'test-package',
           version: '2.0.0',
-          shasum: 'abc123',
+          sha256: 'abc',
         );
 
         expect(pkg1, isNot(equals(pkg2)));
