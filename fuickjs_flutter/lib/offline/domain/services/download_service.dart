@@ -35,9 +35,33 @@ class DownloadService {
     _isInternalChecker = checker;
   }
 
+  /// 同包 in-flight 去重。key: versionShasumName。
+  final Map<String, Future<Package?>> _prepareInflight = {};
+
   /// 下载/取出 → 整包 SHA-256 → 解压 staging → 验签 → minAppVersion → 原子提升。
   /// 成功返回处于 staged 状态的 Package；失败返回 null。
-  Future<Package?> preparePackage(Package package) async {
+  ///
+  /// 并发安全：首启时页面加载（_ensureBuiltinActive）与后台 sync（_syncAndClean）
+  /// 会对同一内置包并发调用本方法。若不合并，两条流程会在同一 staging 目录上
+  /// 交错 _resetDir/_unzip/promoteStaging，导致提升后的包目录仍是半写状态，
+  /// 引擎 fopen 会读到截断的 bundle.js（SyntaxError，第二次加载才正常）。
+  /// 同包并发调用共享同一个 in-flight Future，第二个调用直接 join 其结果。
+  Future<Package?> preparePackage(Package package) {
+    final id = package.versionShasumName;
+    final existing = _prepareInflight[id];
+    if (existing != null) {
+      logger(() => 'preparePackage in-flight, joining: $id');
+      return existing;
+    }
+    final future = _doPreparePackage(package);
+    _prepareInflight[id] = future;
+    future.then((_) {}, onError: (_) {}).whenComplete(() {
+      _prepareInflight.remove(id);
+    });
+    return future;
+  }
+
+  Future<Package?> _doPreparePackage(Package package) async {
     final id = package.versionShasumName;
     // 已提升过（flag 存在）→ 直接复用。
     if (await _repository.validatePackage(package)) {
@@ -95,23 +119,16 @@ class DownloadService {
       return null;
     }
 
-    // 原子提升 staging → packages。
-    final pkgDir = _repository.getPackageDir(package);
-    try {
-      await _repository.promoteStaging(package);
-      logger(() => 'Promoted staging → packages: $id → $pkgDir');
-    } catch (e) {
-      logger(() => 'promote failed $id: $e');
-      await _safeDeleteDir(stagingDir);
-      return null;
-    }
-
-    // 提升成功后立即删 zip 缓存（无论内置/远程）。
-    // 下次需要时由 preparePackage 入口的 validatePackage 命中复用 staging；
-    // 若 staging 缺失（registry 清空/包被回收）则重新从 assets 提取或从网络下载。
+    // staging 就绪。提升（rename staging→packages + flag）由 PackageService.applyReady
+    // 在 registry 锁内完成，确保"落地"与"入册"原子化——否则 promoteStaging 与
+    // applyReady 之间存在"已落地未入册"窗口，cleanUnreferenced 会误删刚 promote 的目录。
+    //
+    // 验签通过后立即删 zip 缓存（staging 已是最终内容）。
+    // 下次需要时由 preparePackage 入口的 validatePackage 命中复用（flag 存在）；
+    // 若 flag 缺失（registry 清空/包被回收）则重新从 assets 提取或从网络下载。
     await _safeDelete(File(_zipPath(package)));
 
-    logger(() => 'Package ready (staged): $id');
+    logger(() => 'Package ready (staging): $id');
     return package.copyWith(
       state: PackageState.staged,
       minAppVersion: minAppVersion,

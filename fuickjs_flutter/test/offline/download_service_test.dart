@@ -54,6 +54,17 @@ class MockPackageRepository implements PackageRepository {
   Future<void> promoteStaging(Package package) async {}
 }
 
+class _CountingRepository extends MockPackageRepository {
+  _CountingRepository({required this.onValidate});
+  final void Function() onValidate;
+
+  @override
+  Future<bool> validatePackage(Package package) async {
+    onValidate();
+    return super.validatePackage(package);
+  }
+}
+
 OfflineConfig testConfig() => OfflineConfig(
       envGetter: () => 'test',
       offlinePackagesGetter: () async => null,
@@ -106,6 +117,30 @@ void main() {
 
     test('isDownloading returns false for unknown url', () {
       expect(downloadService.isDownloading('unknown'), false);
+    });
+
+    test('concurrent preparePackage for same package is deduplicated', () async {
+      var validateCalls = 0;
+      final countingRepo =
+          _CountingRepository(onValidate: () => validateCalls++);
+      final svc = DownloadService(
+        countingRepo,
+        config: testConfig(),
+        verifier:
+            BundleVerifier(publicKeysB64: const {'test-key': _pubKeyB64}),
+      );
+      svc.setInternalChecker((p) => false);
+
+      final pkgA = pkg('test', '1.0.0', 'aaa');
+      final pkgB = pkg('test', '1.0.0', 'aaa');
+      final results = await Future.wait([
+        svc.preparePackage(pkgA),
+        svc.preparePackage(pkgB),
+      ]);
+      expect(results[0], isNull);
+      expect(results[1], isNull);
+      // 第二个并发调用 join 了 in-flight，不应重复跑完整流程。
+      expect(validateCalls, 1);
     });
   });
 }

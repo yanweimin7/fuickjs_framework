@@ -29,6 +29,7 @@
 - [Community 扩展包](./community.md)
 - [fuickjs_dart — Dart 动态渲染方案](./fuickjs_dart.md)
 - [Bundle 动态下发（签名验签/回滚/图片透明加载）](./bundle-delivery.md)
+- [页面级分包加载（主包 + 按需 chunk）](./page-split-loading.md)
 - [二进制协议 v2（varint + 字符串表）](./binary-protocol-v2.md)
 - [框架审计报告](./audit-report.md)
 

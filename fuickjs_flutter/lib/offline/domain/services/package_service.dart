@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:synchronized/synchronized.dart';
+
 import '../../util/logger.dart';
 import '../entities/package.dart';
 import '../repositories/package_repository.dart';
@@ -21,11 +23,12 @@ class PackageService {
   /// 为什么要锁：_runBackgroundVerify 在开始时快照 _registry，在结束时
   /// 用 `_registry = snapshot.copyWith(...)` 写回。如果不锁，期间发生的
   /// applyReady / promoteStaged / verifyOnOpen 都会被快照覆盖。
-  ///
-  /// 实现：链式 Completer，每次进入"修改 + 持久化"段就等前一个完成。
   /// 读操作（getter）不参与，因为 Dart 单线程下读到的要么是旧要么是新的，
   /// 不会读到中间态。
-  Future<void> _registryLock = Future<void>.value();
+  ///
+  /// 用 synchronized 库的 Lock 替代手写链式 Completer：避免 finally 漏写
+  /// 导致整条锁链死锁、支持超时、语义更清晰。
+  final Lock _registryLock = Lock();
 
   PackageService(
     this._repository, {
@@ -39,17 +42,8 @@ class PackageService {
 
   /// 在锁内执行 action,确保所有 _registry 修改 + 持久化串行化。
   /// 任何已修改 _registry 的方法都应通过此 helper 包装。
-  Future<T> _withRegistryLock<T>(Future<T> Function() action) async {
-    final prev = _registryLock;
-    final completer = Completer<void>();
-    _registryLock = completer.future;
-    try {
-      await prev; // 等前一个修改 _registry 的操作完成
-      return await action();
-    } finally {
-      completer.complete();
-    }
-  }
+  Future<T> _withRegistryLock<T>(Future<T> Function() action) =>
+      _registryLock.synchronized(action);
 
   PackageRegistry _registry = const PackageRegistry();
   List<Package> _remotePackages = [];
@@ -265,7 +259,25 @@ class PackageService {
     var staged = List<Package>.from(_registry.staged);
     var history = List<Package>.from(_registry.history);
     var historyChanged = false;
+    final promoted = <Package>[];
     for (final pkg in readyPackages) {
+      // 提升到 packages 目录（rename staging→packages + flag）。
+      // 必须在 registry 锁内：与下面的 registry 写入原子化，消除"已落地未入册"
+      // 窗口——否则 cleanUnreferenced 会扫到 packages/ 下不在 registry.retained
+      // 的新目录并误删（见 docs/bundle-delivery.md 竞态1）。
+      //
+      // 仅当包尚未提升（flag 不存在）时才 promote：
+      // - preparePackage 返回的包：staging 就绪、packages/ 无 flag → promote
+      // - reuseLocalAsStaged 复用的包：已在 packages/ 有 flag → 跳过
+      if (!await _repository.validatePackage(pkg)) {
+        try {
+          await _repository.promoteStaging(pkg);
+        } catch (e) {
+          logger(
+              () => 'promoteStaging failed for ${pkg.versionShasumName}: $e');
+          continue; // 提升失败 → 不入 registry，下次 preparePackage 重试
+        }
+      }
       final old = staged.where((p) => p.name == pkg.name).firstOrNull;
       if (old != null && !old.isSameVersion(pkg)) {
         await _repository.deletePackage(old); // 从未 active → 直接删
@@ -278,13 +290,14 @@ class PackageService {
       }
       staged.removeWhere((p) => p.name == pkg.name);
       staged.add(pkg.copyWith(state: PackageState.staged));
+      promoted.add(pkg);
     }
     _registry = _registry.copyWith(
       staged: staged,
       history: historyChanged ? history : _registry.history,
     );
     await _persist();
-    for (final p in readyPackages) {
+    for (final p in promoted) {
       logger(() => 'Staged: ${p.versionShasumName}');
     }
   }
