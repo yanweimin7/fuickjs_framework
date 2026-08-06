@@ -39,6 +39,9 @@ export interface RouterConfig {
   guards?: Guard[];
   /** 404 兜底组件（等价于 routes 中放一条 path:'*'） */
   notFound?: ComponentFactory;
+  /** 未匹配到任何 JS 路由时，交给 Native 侧处理（宿主路由，如 go_router）。
+   *  适用于混合开发：JS 直接 push 原生页面路径。默认 true；显式 false 可关闭。 */
+  nativeFallback?: boolean;
 }
 
 /** 当前路由位置快照 */
@@ -63,6 +66,7 @@ const routes: RouteConfig[] = [];
 const routesByName: Map<string, RouteConfig> = new Map();
 let globalGuards: Guard[] = [];
 let notFoundFactory: ComponentFactory | null = null;
+let nativeFallbackEnabled = true;
 
 /** pageId → 当前 RouteLocation，用于守卫的 from 参数与 useRoute hook */
 const pageLocations: Map<number, RouteLocation> = new Map();
@@ -253,6 +257,14 @@ export function config(options: RouterConfig): void {
       routes.push({ path: '*', component: options.notFound });
     }
   }
+  if (options.nativeFallback !== undefined) {
+    nativeFallbackEnabled = options.nativeFallback === true;
+  }
+}
+
+/** 是否开启 native fallback（未匹配路径交给 Native 侧处理） */
+export function isNativeFallbackEnabled(): boolean {
+  return nativeFallbackEnabled;
 }
 
 /**
@@ -295,6 +307,7 @@ export function _reset(): void {
   routesByName.clear();
   globalGuards = [];
   notFoundFactory = null;
+  nativeFallbackEnabled = true;
   pageLocations.clear();
   // 重新注册框架内部路由
   routes.push({
@@ -315,4 +328,5 @@ export const Router = {
   recordLocation,
   getLocation,
   clearLocation,
+  isNativeFallbackEnabled,
 };

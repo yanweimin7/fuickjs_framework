@@ -229,6 +229,32 @@ Router.config({
 
 未配置 notFound 且未匹配任何路由时，显示框架默认 404 UI（"Route xxx not found"）。
 
+## Native Fallback（混合开发）
+
+混合开发场景下，JS 可能需要直接打开原生页面（如宿主 go_router 中注册的路由）。
+`nativeFallback` **默认开启**：未匹配到任何 JS 路由的路径不再报错，而是交给 Native 侧处理：
+
+```typescript
+// 默认已开启，无需配置
+const res = await navigator.push('/native_page', { data: 'hello' });
+console.log(res); // 原生页面 pop 时携带的返回结果
+```
+
+如需关闭：
+
+```typescript
+Router.config({
+  routes: [...],
+  nativeFallback: false,
+});
+```
+
+注意事项：
+
+- 仅对 `navigator.push` / `pushReplace` 生效；`pushByName` 找不到命名路由仍按原逻辑返回 null
+- 透传时强制走根 Navigator（`rootNavigator: true`），因为原生页面位于宿主路由栈
+- `notFound` 优先级更高：配置了 `notFound` 时未匹配路径渲染 404 页，不会走 nativeFallback
+
 ## useRoute hook
 
 获取当前页面的路由位置信息：
@@ -248,6 +274,13 @@ if (route) {
 ## 类型定义
 
 ```typescript
+interface RouterConfig {
+  routes: RouteConfig[];
+  guards?: Guard[];
+  notFound?: ComponentFactory;
+  nativeFallback?: boolean; // 未匹配路径交给 Native 侧处理（默认 true，混合开发）
+}
+
 interface RouteConfig {
   path: string; // 路径模式，支持 :param；'*' 为 404
   component?: ComponentFactory;

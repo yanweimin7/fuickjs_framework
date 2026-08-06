@@ -50,6 +50,11 @@ export class NavigatorService {
     const from = pageId != null ? Router.getLocation(pageId) : null;
     const to = Router.resolve(path, params);
     if (!to) {
+      // 未匹配 JS 路由：开启 nativeFallback 时交给 Native 侧（宿主路由）处理
+      if (Router.isNativeFallbackEnabled()) {
+        console.log(`[Navigator] No JS route for ${path}, delegating to native`);
+        return NavigatorService.pushRaw(path, params, pageId, true, prewarmMs);
+      }
       console.warn(`[Navigator] No route matched for ${path}`);
       return null;
     }
@@ -85,6 +90,16 @@ export class NavigatorService {
     const from = pageId != null ? Router.getLocation(pageId) : null;
     const to = Router.resolve(path, params);
     if (!to) {
+      // 未匹配 JS 路由：开启 nativeFallback 时交给 Native 侧（宿主路由）处理
+      if (Router.isNativeFallbackEnabled()) {
+        console.log(`[Navigator] No JS route for ${path}, delegating to native`);
+        return dartCallNativeAsync('Navigator.pushReplace', {
+          path,
+          params,
+          pageId,
+          rootNavigator: true,
+        });
+      }
       console.warn(`[Navigator] No route matched for ${path}`);
       return null;
     }
