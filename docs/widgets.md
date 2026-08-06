@@ -21,7 +21,13 @@ FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件
 
 - **Button**: 原生按钮。Props: `text`, `onTap`, `disabled`, `loading`, `backgroundColor`, `textColor`, `fontSize`, `borderRadius`, `elevation`, `outlined`（OutlinedButton 变体）, `borderColor`, `borderWidth`, `minWidth`, `minHeight`, `paddingH`, `paddingV`。
 - **InkWell**: 水波纹点击效果，可包裹任何组件使其具备交互能力。
-- **GestureDetector**: 万能手势检测，支持 `onTap`, `onLongPress`, `onDoubleTap` 等。
+- **GestureDetector**: 万能手势检测。基础手势：`onTap`, `onLongPress`, `onDoubleTap`。扩展手势（2026-08 新增）：
+  - 缩放：`onScaleStart(e)` / `onScaleUpdate(e)` / `onScaleEnd(e)` —— `e: { scale, focalX, focalY, pointerCount }`（scale 由 native 计算）
+  - 水平拖动：`onHorizontalDragStart(e)` / `onHorizontalDragUpdate(e)` / `onHorizontalDragEnd(e)` / `onHorizontalDragCancel(e)` —— `e: { dx, dy, x, y }`（`velocityX/velocityY` 见下）
+  - 垂直拖动：`onVerticalDrag*` 同上，垂直方向
+  - 自由拖拽（pan）：`onPanStart(e)` / `onPanUpdate(e)` / `onPanEnd(e)` / `onPanCancel(e)` —— `e: { dx, dy, x, y }`
+  - 长按拖动：`onLongPressStart(e)` / `onLongPressMoveUpdate(e)` / `onLongPressEnd(e)` / `onLongPressCancel(e)` —— `e: { dx, dy, x, y }`（`x/y` 为自起点累计位移）
+  - 回调参数类型 `PointArgs` 为 `{ dx, dy, x, y }`；缩放回调用 `ScaleArgs`；开始/结束回调无 velocity 字段（native 侧已裁剪），需要速度请自行基于 update 增量计算。
 - **TextField**: 文本输入框。Props: `text`（受控值）, `hintText`/`hint`, `onChanged`, `onSubmitted`, `onFocus`, `onBlur`, `maxLines`, `maxLength`, `enabled`, `obscureText`, `keyboardType`（text/multiline/number/phone/datetime/emailAddress/url/visiblePassword）, `textInputAction`（done/go/next/search/send/none）, `autofocus`, `textAlign`（left/center/right/justify/start/end）, `readOnly`, `border`（`'none'` 或 `'outline'`）。Ref 命令: `setText(text)`, `clear()`, `focus()`, `unfocus()`, `setSelection(start, end)`, `selectAll()`。
 - **Checkbox**: 复选框组件。
 - **Switch**: 开关组件。
@@ -47,9 +53,13 @@ FuickJS 通过 DSL 映射，将 React 组件实时转换为 Flutter 原生组件
 
 ## 4. 滚动列表
 
-- **ListView**: 高性能线性列表，支持 `itemBuilder` 按需渲染（Lazy Loading）。
-- **GridView**: 网格列表，支持固定列数或最大宽度配置。
-- **SingleChildScrollView**: 滚动单个子组件，适用于表单等长页面。
+- **ListView**: 高性能线性列表，支持 `itemBuilder` 按需渲染（Lazy Loading）。Props: `itemCount`, `itemBuilder(index)`, `itemExtent`（固定 item 高度，滚动命令可精确定位）, `onScroll(e: { pixels, maxScrollExtent })`, `onScrollEndReached`（滑到底触发）。Ref 命令（通过 `useRef<ListView>(null)` 获取）：
+  - `scrollToIndex(index, { offset? = 0, animated? = true, duration? = 200 })` —— 有 `itemExtent` 时精确定位；否则按 `maxScrollExtent / (count - 1) * index` 估算
+  - `scrollToTop({ animated? = true, duration? })`
+  - `scrollToBottom({ animated? = true, duration? })`
+  - `jumpTo(pixels)` / `animateTo(pixels, durationMs)`
+- **GridView**: 网格列表，支持固定列数或最大宽度配置。Props 同 ListView 的滚动命令；`itemExtent` 映射为 `SliverGridDelegate` 的 `mainAxisExtent`（网格行高固定，`scrollToIndex` 按 `row = index ~/ crossAxisCount` 定位）。
+- **SingleChildScrollView**: 滚动单个子组件，适用于表单等长页面。Ref 命令: `scrollToTop()`, `scrollToBottom()`。
 - **CustomScrollView / Sliver系列**: 支持高级滚动效果（如吸顶 Header、混合列表等）。包含 `SliverAppBar`, `SliverList`, `SliverGrid`, `SliverToBoxAdapter`。
 - **PageView**: 页面滑动切换组件。
 - **NestedScrollView**: 嵌套滚动视图，用于协调外部 Sliver 头部与内部可滚动 body。通过 `FlutterProps propsKey="headerSliverBuilder"` 传入 Sliver 列表，`FlutterProps propsKey="body"` 传入主体组件。支持 `scrollDirection`, `reverse`, `physics`。
@@ -112,6 +122,32 @@ function ItemRow({
 ```
 
 ## 5. 动画组件
+
+### 程序化动画（useAnimation Hook）
+
+**`useAnimation(spec)`** 返回控制句柄，命令式驱动动画，与 Transition 系列互补（2026-08 新增）：
+
+```tsx
+const { id, value, transform, start, stop, reverse, reset, setValue, setTo, onComplete } =
+  useAnimation({
+    from: 0,          // 起始值
+    to: 300,          // 目标值
+    duration: 800,    // 毫秒
+    curve: "easeInOut", // ease/easeIn/easeOut/linear/decelerate/linear
+    loop: false,      // 循环播放
+    reverse: false,   // 反向播放（配合 loop 可做往返）
+    autoStart: false, // 挂载后自动播放
+  });
+```
+
+- `value`：当前动画值（在 from~to 之间实时插值），可直接用于 `width/height/opacity` 等数值 prop
+- `transform`：便捷变换对象 `{ scale, scaleX, scaleY, rotate, translateX, translateY }`（rotate 单位度），可直接传给 `Transform` 组件的同名 props
+- 控制方法：`start()`, `stop()`, `reverse()`, `reset()`, `setValue(v)`（立即跳值，无动画）, `setTo(v)`（从当前值动画到目标值）
+- `onComplete(fn)`：动画结束后回调（`loop` 时每次循环结束都会触发）
+- 支持绑定动画引用的组件：`Opacity`（`opacity` prop 传 `anim` 对象）, `Transform`（`scale/scaleX/scaleY/rotate/translateX/translateY` 传 `anim` 对象）, `SizedBox`（`width/height`）, `Container`（`width/height`）
+- 内部基于 `AnimationService` 注册表实现，同一页面内多个动画 id 唯一；页面销毁自动清理
+
+### 隐式动画组件
 
 - **AnimatedContainer**: 属性变更时自动执行补间动画的容器。支持 `onTap`/`onLongPress` 手势，以及 `constraints` 约束（与 Container 行为对齐）。
 - **AnimatedOpacity**: 自动淡入淡出。

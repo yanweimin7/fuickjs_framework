@@ -42,7 +42,18 @@ class GridViewParser extends WidgetParser {
 
     // gridDelegate 从 JS 侧作为嵌套对象传入，优先读取 props['gridDelegate']
     final dynamic gridDelegateProp = props['gridDelegate'] ?? props;
-    final gridDelegate = WidgetUtils.gridDelegate(gridDelegateProp);
+    final double? itemExtent = asDoubleOrNull(props['itemExtent']);
+    var gridDelegate = WidgetUtils.gridDelegate(gridDelegateProp);
+    // itemExtent → 合并进 delegate 的 mainAxisExtent（scrollToIndex 精确滚动依赖）
+    if (itemExtent != null && itemExtent > 0 && gridDelegate is SliverGridDelegateWithFixedCrossAxisCount) {
+      gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: gridDelegate.crossAxisCount,
+        mainAxisSpacing: gridDelegate.mainAxisSpacing,
+        crossAxisSpacing: gridDelegate.crossAxisSpacing,
+        mainAxisExtent: itemExtent,
+        childAspectRatio: gridDelegate.childAspectRatio,
+      );
+    }
 
     Widget gridView = WidgetUtils.wrapPadding(
       props,
@@ -55,6 +66,7 @@ class GridViewParser extends WidgetParser {
         physics: WidgetUtils.scrollPhysics(physicsProp),
         padding: WidgetUtils.edgeInsets(paddingProp),
         scrollDirection: WidgetUtils.axis(scrollDirectionProp),
+        itemExtent: itemExtent,
         itemBuilder: (context, index) {
           final bool hasBuilder = props['hasBuilder'] ?? false;
           if (!hasBuilder || refId == null) return Container();
@@ -140,6 +152,7 @@ class FuickGridView extends StatefulWidget implements FuickDslWidget {
   final ScrollPhysics? physics;
   final EdgeInsetsGeometry? padding;
   final Axis scrollDirection;
+  final double? itemExtent;
   @override
   final dynamic cacheKey;
   final List<Widget>? children;
@@ -156,6 +169,7 @@ class FuickGridView extends StatefulWidget implements FuickDslWidget {
     this.physics,
     this.padding,
     this.scrollDirection = Axis.vertical,
+    this.itemExtent,
     this.cacheKey,
     this.children,
     this.itemBuilder,
@@ -198,8 +212,9 @@ class FuickGridViewState extends State<FuickGridView>
 
   @override
   void onCustomCommand(String method, dynamic args) {
+    if (!_controller.hasClients) return;
+
     if (method == 'animateTo') {
-      if (!_controller.hasClients) return;
       final double offset = args['offset'].asDouble;
       final int duration = args['duration'].asIntOrNull ?? 300;
       final String curveStr = args['curve']?.toString() ?? 'easeInOut';
@@ -210,8 +225,57 @@ class FuickGridViewState extends State<FuickGridView>
         curve: curve,
       );
     } else if (method == 'jumpTo') {
-      if (!_controller.hasClients) return;
       final double offset = args['offset'].asDouble;
+      _controller.jumpTo(offset);
+    } else if (method == 'scrollToIndex') {
+      _scrollToIndex(args);
+    } else if (method == 'scrollToTop') {
+      _scrollTo(0, args);
+    } else if (method == 'scrollToBottom') {
+      _scrollTo(_controller.position.maxScrollExtent, args);
+    }
+  }
+
+  void _scrollTo(double offset, dynamic args) {
+    final duration = args['duration'].asIntOrNull ?? 300;
+    if (duration > 0) {
+      _controller.animateTo(
+        offset,
+        duration: Duration(milliseconds: duration),
+        curve: WidgetUtils.curve(args['curve']?.toString()),
+      );
+    } else {
+      _controller.jumpTo(offset);
+    }
+  }
+
+  /// 滚动到指定 index：有 itemExtent 精确计算；否则按列表估算平均尺寸。
+  void _scrollToIndex(dynamic args) {
+    final index = args['index'].asIntOrNull;
+    if (index == null || index < 0) return;
+    final position = _controller.position;
+    final count = widget.itemCount ?? 0;
+
+    double offset;
+    final extent = widget.itemExtent;
+    if (extent != null && extent > 0) {
+      offset = extent * index;
+    } else if (count > 1) {
+      final avg = position.maxScrollExtent / (count - 1);
+      offset = avg * index;
+    } else {
+      return;
+    }
+
+    offset = offset.clamp(0.0, position.maxScrollExtent);
+    final duration = args['duration'].asIntOrNull ?? 300;
+    if (duration > 0) {
+      _controller.animateTo(
+        offset,
+        duration: Duration(milliseconds: duration),
+        curve: WidgetUtils.curve(args['curve']?.toString()),
+      );
+    } else {
       _controller.jumpTo(offset);
     }
   }

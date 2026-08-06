@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../container/fuick_action.dart';
+import '../fuick_animation.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
 import 'widget_parser.dart';
@@ -28,6 +29,31 @@ class ContainerParser extends WidgetParser {
 
     final Widget child = factory.buildFirstChild(context, children, type);
 
+    // 尺寸动画引用：`<Container width={anim.value} />`
+    if (FuickAnim.isRef(widthProp) || FuickAnim.isRef(heightProp)) {
+      final bool animWidth = FuickAnim.isRef(widthProp);
+      final bool animHeight = FuickAnim.isRef(heightProp);
+      final ref = animWidth ? widthProp : heightProp;
+      final animated = FuickAnim.wrapIfRef(
+        context,
+        ref,
+        builder: (context, animation) => Container(
+          width: animWidth ? animation.value : width,
+          height: animHeight ? animation.value : height,
+          constraints: constraints,
+          alignment: alignment,
+          padding: padding,
+          margin: margin,
+          decoration: decoration,
+          child: child,
+        ),
+      );
+
+      if (animated != null) {
+        return _wrapTap(props, context, animated);
+      }
+    }
+
     final container = Container(
       width: width,
       height: height,
@@ -39,6 +65,11 @@ class ContainerParser extends WidgetParser {
       child: child,
     );
 
+    return _wrapTap(props, context, container);
+  }
+
+  Widget _wrapTap(
+      Map<String, dynamic> props, BuildContext context, Widget child) {
     // 手势支持：onTap / onLongPress
     final dynamic onTapProp = props['onTap'];
     final dynamic onLongPressProp = props['onLongPress'];
@@ -47,10 +78,10 @@ class ContainerParser extends WidgetParser {
         behavior: HitTestBehavior.opaque,
         onTap: onTapProp != null ? () => FuickAction.event(context, onTapProp) : null,
         onLongPress: onLongPressProp != null ? () => FuickAction.event(context, onLongPressProp) : null,
-        child: container,
+        child: child,
       );
     }
 
-    return container;
+    return child;
   }
 }

@@ -1,9 +1,12 @@
 import React, { ReactNode } from 'react';
 import { WidgetProps, BoxDecoration, BoxConstraints } from './types';
+import type { AnimationRef } from '../hooks/useAnimation';
 
 export interface ContainerProps extends WidgetProps {
-  width?: number;
-  height?: number;
+  /** 也支持动画引用：`<Container width={anim.value} />` */
+  width?: number | AnimationRef;
+  /** 也支持动画引用：`<Container height={anim.value} />` */
+  height?: number | AnimationRef;
   constraints?: BoxConstraints;
   color?: string;
   alignment?: 'center' | 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';

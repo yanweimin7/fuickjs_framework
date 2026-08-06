@@ -16,6 +16,14 @@ export class SingleChildScrollView extends BaseWidget<SingleChildScrollViewProps
     this.callNativeCommand('animateTo', { offset, duration, curve });
   }
 
+  public scrollToTop(duration: number = 300, curve: string = 'easeInOut') {
+    this.callNativeCommand('scrollToTop', { duration, curve });
+  }
+
+  public scrollToBottom(duration: number = 300, curve: string = 'easeInOut') {
+    this.callNativeCommand('scrollToBottom', { duration, curve });
+  }
+
   render(): ReactNode {
     return React.createElement('SingleChildScrollView', {
       ...this.props,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/extensions.dart';
+import '../fuick_animation.dart';
 import '../widget_factory.dart';
 import '../widget_utils.dart';
 import 'widget_parser.dart';
@@ -18,13 +19,48 @@ class TransformParser extends WidgetParser {
         ? Offset(asDouble(originMap['dx']), asDouble(originMap['dy']))
         : null;
 
-    if (props.containsKey('rotate')) {
+    final dynamic rotateProp = props['rotate'];
+    if (FuickAnim.isRef(rotateProp)) {
+      // 旋转动画引用：`anim.transform.rotate()`
+      final animated = FuickAnim.wrapIfRef(
+        context,
+        rotateProp,
+        builder: (context, animation) => Transform.rotate(
+          angle: animation.value,
+          alignment: alignment,
+          origin: origin,
+          child: child,
+        ),
+      );
+      if (animated != null) return animated;
+    } else if (props.containsKey('rotate')) {
       return Transform.rotate(
         angle: asDouble(props['rotate']),
         alignment: alignment,
         origin: origin,
         child: child,
       );
+    }
+
+    final dynamic scaleProp = props['scale'];
+    if (FuickAnim.isRef(scaleProp)) {
+      // 缩放动画引用：`anim.transform.scale() / scaleX() / scaleY()`
+      final prop = FuickAnim.propOf(scaleProp as Map);
+      final animated = FuickAnim.wrapIfRef(
+        context,
+        scaleProp,
+        builder: (context, animation) {
+          final double v = animation.value;
+          return Transform.scale(
+            scaleX: prop == 'scaleY' ? 1.0 : v,
+            scaleY: prop == 'scaleX' ? 1.0 : v,
+            alignment: alignment,
+            origin: origin,
+            child: child,
+          );
+        },
+      );
+      if (animated != null) return animated;
     } else if (props.containsKey('scale')) {
       final scale = props['scale'];
       double scaleX = 1.0;
@@ -42,6 +78,24 @@ class TransformParser extends WidgetParser {
         origin: origin,
         child: child,
       );
+    }
+
+    final dynamic translateProp = props['translate'];
+    if (FuickAnim.isRef(translateProp)) {
+      // 平移动画引用：`anim.transform.translateX() / translateY()`
+      final prop = FuickAnim.propOf(translateProp as Map);
+      final animated = FuickAnim.wrapIfRef(
+        context,
+        translateProp,
+        builder: (context, animation) {
+          final double v = animation.value;
+          return Transform.translate(
+            offset: Offset(prop == 'translateY' ? 0 : v, prop == 'translateX' ? 0 : v),
+            child: child,
+          );
+        },
+      );
+      if (animated != null) return animated;
     } else if (props.containsKey('translate')) {
       final translate = props['translate'];
       double x = 0.0;

@@ -1,3 +1,4 @@
+import 'animation_service.dart';
 import 'base_fuick_service.dart';
 import 'clipboard_service.dart';
 import 'console_service.dart';
@@ -43,6 +44,7 @@ class NativeServiceManager {
     registerService(() => SoundService());
     registerService(() => LifecycleService());
     registerService(() => ErrorReportService());
+    registerService(() => AnimationService());
   }
 
   void registerService(ServiceBuilder serviceBuilder) {

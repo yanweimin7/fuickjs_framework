@@ -5,6 +5,7 @@ import '../engine/fuick_js_proxy.dart';
 import '../service/app_service_binder.dart';
 import '../service/base_fuick_service.dart';
 import '../service/fuick_command_bus.dart';
+import '../widgets/fuick_animation.dart';
 import '../widgets/widget_factory.dart';
 import 'fuick_navigation_delegate.dart';
 import 'fuick_page_delegate.dart';
@@ -27,6 +28,9 @@ class FuickAppController {
   final FuickCommandBus commandBus = FuickCommandBus();
   final serviceBinder = AppServiceBinder();
   final ValueNotifier<bool> isBundleLoaded = ValueNotifier<bool>(false);
+
+  /// 程序化动画控制器注册表（useAnimation 驱动）
+  final FuickAnimationRegistry animationRegistry = FuickAnimationRegistry();
 
   /// 预渲染页面（需 bundle 已加载，否则 render 消息排队等 bundle eval 完成后执行）
   void prewarmPage(String path, Map<String, dynamic> params) =>
@@ -115,6 +119,7 @@ class FuickAppController {
     // 先销毁 service（如 Timer、WebSocket），再销毁 context
     // JsContextDelegate.dispose() 通过 isolate 消息队列发送 disposeContext，
     // 天然保证在所有 pending 操作之后执行，无需人为延迟
+    animationRegistry.disposeAll();
     serviceBinder.dispose();
     ctx.dispose();
     isBundleLoaded.dispose();

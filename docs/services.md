@@ -35,6 +35,14 @@
 - `getTheme(pageId): FuickThemeData`: 同步获取当前页面的主题快照（由 Flutter `FuickThemeProvider` 注入）。返回值结构见 [useTheme](#hooks)
 - `getMediaQuery(pageId): FuickMediaQueryData`: 同步获取当前页面的 MediaQuery 快照（屏幕尺寸/暗黑模式/键盘弹起等）。返回值结构见 [useMediaQuery](#hooks)
 
+**AnimationService（程序化动画，2026-08 新增）**
+- 通常不直接调用，通过 `useAnimation` Hook 使用（见 `widgets.md` 动画章节）
+- `start(id, spec?)`: 播放（可覆盖 duration/curve/loop/reverse，from/to 以注册 spec 为准）
+- `stop(id)`, `reverse(id)`, `reset(id)`: 停止 / 反向播放 / 复位到 from 值
+- `setValue(id, value)`: 立即跳转到指定值（无动画）
+- `setTo(id, value)`: 从当前值动画到目标值
+- 动画完成后 Flutter 端通过 `NativeEvent` 推送 `animationComplete` 事件（payload: `{ animId }`），`useAnimation` 内部已订阅并触发 `onComplete` 回调
+
 ### Hooks（在 `fuickjs/hooks` 中）
 
 主题与 MediaQuery 通过 hook 订阅，变化时自动触发组件重渲染（Flutter 端通过 `NativeEvent` 推送 `themeChange` / `mediaQueryChange` 事件）。

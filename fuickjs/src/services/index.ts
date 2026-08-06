@@ -9,5 +9,6 @@ export * from './FileSystemService';
 export { NetworkService } from './NetworkService';
 export { NavigatorService } from './NavigatorService';
 export { UIService } from './UIService';
+export { AnimationService, type AnimationControlSpec } from './AnimationService';
 export { SoundService } from './SoundService';
 export { ErrorReportService } from './ErrorReportService';

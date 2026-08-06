@@ -35,6 +35,7 @@ class ListViewParser extends WidgetParser {
     final bool shrinkWrap = props['shrinkWrap'] ?? true;
     final String? physicsProp = props['physics'] as String?;
     final dynamic paddingProp = props['padding'];
+    final double? itemExtent = asDoubleOrNull(props['itemExtent']);
     final String? scrollDirectionProp =
         props['scrollDirection'] as String? ?? props['orientation'] as String?;
     final onScrollEvent = props['onScroll'];
@@ -53,6 +54,7 @@ class ListViewParser extends WidgetParser {
         physics: WidgetUtils.scrollPhysics(physicsProp),
         padding: WidgetUtils.edgeInsets(paddingProp),
         scrollDirection: WidgetUtils.axis(scrollDirectionProp),
+        itemExtent: itemExtent,
         itemBuilder: hasBuilder
             ? (context, index) {
                 if (refId == null) return Container();
@@ -140,6 +142,7 @@ class FuickListView extends StatefulWidget implements FuickDslWidget {
   final ScrollPhysics? physics;
   final EdgeInsetsGeometry? padding;
   final Axis scrollDirection;
+  final double? itemExtent;
   @override
   final dynamic cacheKey;
   final List<Widget>? children;
@@ -155,6 +158,7 @@ class FuickListView extends StatefulWidget implements FuickDslWidget {
     this.physics,
     this.padding,
     this.scrollDirection = Axis.vertical,
+    this.itemExtent,
     this.cacheKey,
     this.children,
     this.itemBuilder,
@@ -213,6 +217,57 @@ class FuickListViewState extends State<FuickListView>
     } else if (method == 'jumpTo') {
       final offset = asDouble(args['offset']);
       _controller.jumpTo(offset);
+    } else if (method == 'scrollToIndex') {
+      _scrollToIndex(args);
+    } else if (method == 'scrollToTop') {
+      _scrollTo(0, args);
+    } else if (method == 'scrollToBottom') {
+      _scrollTo(_controller.position.maxScrollExtent, args);
+    }
+  }
+
+  void _scrollTo(double offset, dynamic args) {
+    final duration = asIntOrNull(args['duration']) ?? 300;
+    if (duration > 0) {
+      _controller.animateTo(
+        offset,
+        duration: Duration(milliseconds: duration),
+        curve: WidgetUtils.curve(args['curve'] as String?),
+      );
+    } else {
+      _controller.jumpTo(offset);
+    }
+  }
+
+  /// 滚动到指定 index：有 itemExtent 精确计算；否则按列表估算平均尺寸。
+  void _scrollToIndex(dynamic args) {
+    final index = asIntOrNull(args['index']);
+    if (index == null || index < 0) return;
+    final position = _controller.position;
+    final count = widget.itemCount ?? 0;
+
+    double offset;
+    final extent = widget.itemExtent;
+    if (extent != null && extent > 0) {
+      offset = extent * index;
+    } else if (count > 1) {
+      // 估算平均 item 尺寸：maxScrollExtent / (count - 1) * index
+      final avg = position.maxScrollExtent / (count - 1);
+      offset = avg * index;
+    } else {
+      return;
+    }
+
+    offset = offset.clamp(0.0, position.maxScrollExtent);
+    final duration = asIntOrNull(args['duration']) ?? 300;
+    if (duration > 0) {
+      _controller.animateTo(
+        offset,
+        duration: Duration(milliseconds: duration),
+        curve: WidgetUtils.curve(args['curve'] as String?),
+      );
+    } else {
+      _controller.jumpTo(offset);
     }
   }
 
@@ -248,6 +303,7 @@ class FuickListViewState extends State<FuickListView>
         physics: widget.physics,
         padding: widget.padding,
         scrollDirection: widget.scrollDirection,
+        itemExtent: widget.itemExtent,
         itemBuilder: widget.itemBuilder!,
       );
     }
@@ -257,6 +313,7 @@ class FuickListViewState extends State<FuickListView>
       physics: widget.physics,
       padding: widget.padding,
       scrollDirection: widget.scrollDirection,
+      itemExtent: widget.itemExtent,
       children: widget.children ?? [],
     );
   }

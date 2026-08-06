@@ -292,6 +292,29 @@ class _FuickScrollableState extends State<FuickScrollable>
     } else if (method == 'jumpTo') {
       final offset = asDouble(args['offset']);
       _controller.jumpTo(offset);
+    } else if (method == 'scrollToTop') {
+      final duration = asIntOrNull(args['duration']) ?? 300;
+      if (duration > 0) {
+        _controller.animateTo(
+          0,
+          duration: Duration(milliseconds: duration),
+          curve: WidgetUtils.curve(args['curve'] as String?),
+        );
+      } else {
+        _controller.jumpTo(0);
+      }
+    } else if (method == 'scrollToBottom') {
+      final duration = asIntOrNull(args['duration']) ?? 300;
+      final offset = _controller.position.maxScrollExtent;
+      if (duration > 0) {
+        _controller.animateTo(
+          offset,
+          duration: Duration(milliseconds: duration),
+          curve: WidgetUtils.curve(args['curve'] as String?),
+        );
+      } else {
+        _controller.jumpTo(offset);
+      }
     }
   }
 

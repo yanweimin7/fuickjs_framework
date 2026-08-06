@@ -22,11 +22,36 @@ export interface GridViewProps extends WidgetProps {
   startThreshold?: number;
   /** 底部阈值，默认 50 */
   endThreshold?: number;
+  /** 固定 item 高度/宽度（滚动方向上的尺寸）。提供后 scrollToIndex 可精确计算偏移 */
+  itemExtent?: number;
 }
 
 export class GridView extends ScrollableBaseWidget<GridViewProps> {
   public animateTo(offset: number, duration: number = 300, curve: string = 'easeInOut') {
     this.callNativeCommand('animateTo', { offset, duration, curve });
+  }
+
+  public jumpTo(offset: number) {
+    this.callNativeCommand('jumpTo', { offset });
+  }
+
+  /**
+   * 滚动到指定 index 的 item。
+   * 配置了 itemExtent 时精确滚动；否则按列表估算平均尺寸（maxScrollExtent/itemCount）。
+   * @param duration 传 > 0 时带动画（毫秒），否则瞬时跳转
+   */
+  public scrollToIndex(index: number, duration: number = 300, curve: string = 'easeInOut') {
+    this.callNativeCommand('scrollToIndex', { index, duration, curve });
+  }
+
+  /** 滚动到顶部（带动画） */
+  public scrollToTop(duration: number = 300, curve: string = 'easeInOut') {
+    this.callNativeCommand('scrollToTop', { duration, curve });
+  }
+
+  /** 滚动到底部（带动画） */
+  public scrollToBottom(duration: number = 300, curve: string = 'easeInOut') {
+    this.callNativeCommand('scrollToBottom', { duration, curve });
   }
 
   render(): ReactNode {
