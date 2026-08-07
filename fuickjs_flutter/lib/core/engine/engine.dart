@@ -53,4 +53,8 @@ class EngineInit {
   /// JSC 无便携字节码格式，仅 QuickJS 支持。
   static bool get supportsBytecodeCompilation =>
       !(useJscOnIos && Platform.isIOS);
+
+  /// 触发一次引擎层故意崩溃(SIGSEGV)，用于验证 native 崩溃符号化链路。
+  /// Debug-only 测试入口，业务代码禁止调用。
+  static void debugCrash() => QuickJsFFI.debugCrash();
 }
