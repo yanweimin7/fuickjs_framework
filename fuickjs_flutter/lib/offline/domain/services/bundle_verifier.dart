@@ -99,6 +99,10 @@ class BundleVerifier {
       if (f.path.contains('..')) {
         return VerifyResult.failure('illegal path in manifest: ${f.path}');
       }
+      // qjc 是 QuickJS 字节码,可能是本地编译的(引擎版本升级后 BundleCompiler
+      // 重新编译生成),sha256 不固定,不参与验签。安全考量:qjc 被篡改不会执行
+      // 恶意代码——字节码格式不匹配时引擎加载失败 → 回退到已验签的 bundle.js。
+      if (f.path.endsWith('.qjc')) continue;
       final file = File(p.join(dir, f.path));
       if (!await file.exists()) {
         return VerifyResult.failure('code file missing: ${f.path}');

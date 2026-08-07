@@ -112,7 +112,8 @@ class DownloadService {
     // minAppVersion 兼容性（manifest 优先，回退 package）。
     final minAppVersion =
         verify.manifest?.minAppVersion ?? package.minAppVersion;
-    if (!VersionUtils.isAppVersionSatisfied(_config.appVersion, minAppVersion)) {
+    if (!VersionUtils.isAppVersionSatisfied(
+        _config.appVersion, minAppVersion)) {
       logger(() =>
           'minAppVersion not satisfied $id: need $minAppVersion, app ${_config.appVersion}');
       await _safeDeleteDir(stagingDir);

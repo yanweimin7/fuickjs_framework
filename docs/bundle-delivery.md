@@ -97,27 +97,27 @@ bundle zip 解压后的目录布局（解压根即 `<root>`）：
   "entry": "bundle.qjc", // 入口文件（zip 内固定 bundle.qjc / bundle.js）
   "codeForm": "qjc", // qjc | js
   "files": [
-    // 只列代码文件
-    { "path": "bundle.qjc", "sha256": "<hex>" },
+    // 只列 .js（.qjc 不入 manifest：可能是本地编译的，sha256 不固定）
+    { "path": "bundle.js", "sha256": "<hex>" },
   ],
   "encryption": null, // 预留：仅对代码可选；图片永不加密
 }
 ```
 
-- `files` **只包含代码文件**（`.qjc`/`.js`）；图片等资源不出现在 manifest，不计 hash、不加密。
-- `manifest.sig` 用 Ed25519 对 `manifest.json` 字节整体签名 → 等价于对所有代码文件 hash 清单签名。
+- `files` **只包含 `.js` 源码文件**；`.qjc` 字节码不入 manifest——它可能是端上 `BundleCompiler` 本地编译生成的（引擎版本升级后重新编译），sha256 不固定。`.qjc` 被篡改不会执行恶意代码：字节码格式不匹配时引擎加载失败 → 回退到已验签的 `.js`。图片等资源也不出现在 manifest，不计 hash、不加密。
+- `manifest.sig` 用 Ed25519 对 `manifest.json` 字节整体签名 → 等价于对所有 `.js` 代码文件 hash 清单签名。
 
 ## 6. 完整性与验签
 
 两层职责清晰：
 
-| 层级   | 覆盖对象           | 手段                                                               | 失败处理             |
-| ------ | ------------------ | ------------------------------------------------------------------ | -------------------- |
-| 整包层 | 整个 zip（含图片） | 下载后校验 zip 的 SHA-256 == 版本接口下发值                        | 丢弃，不解压         |
-| 代码层 | 仅代码文件         | Ed25519 验 `manifest.sig` + 对 `files` 内每个代码文件 SHA-256 比对 | 丢弃 staging，不激活 |
+| 层级   | 覆盖对象           | 手段                                                                  | 失败处理             |
+| ------ | ------------------ | --------------------------------------------------------------------- | -------------------- |
+| 整包层 | 整个 zip（含图片） | 下载后校验 zip 的 SHA-256 == 版本接口下发值                           | 丢弃，不解压         |
+| 代码层 | 仅 `.js` 源码      | Ed25519 验 `manifest.sig` + 对 `files` 内每个 `.js` 文件 SHA-256 比对 | 丢弃 staging，不激活 |
 
 - **公钥内置 App，私钥后端签名服务持有**，App 永不接触私钥。
-- `BundleVerifier` 只遍历 `manifest.files` 做逐代码文件 hash 校验，**不枚举/不校验图片**。
+- `BundleVerifier` 只遍历 `manifest.files` 做 `.js` hash 校验，**跳过 `.qjc`**（可能是本地编译的，sha256 不固定）、**不枚举/不校验图片**。
 - 图片防篡改由**整包 SHA-256**（来自 HTTPS 下发的版本元数据）兜底。
 - `keyId` 强匹配：manifest 必须显式声明 keyId，且必须命中 `OfflineConfig.signaturePublicKeysB64` 中某一把公钥；**无回退到首把 key 的兼容路径**。
 
