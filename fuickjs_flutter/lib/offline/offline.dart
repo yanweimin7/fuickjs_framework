@@ -78,20 +78,30 @@ class Offline {
 
     await _loadInternalPackages();
 
+    // 启动兜底 GC：cleanUnreferenced 在 _initialized 之前同步执行。
+    // 此时 promoteAndGetRoot 会等 _initialized，不会有用户并发操作 packages/，
+    // 从架构上消除 cleanUnreferenced 与 promoteStaging 的竞态（不再需要锁保护）。
+    try {
+      await cleanService.cleanUnreferenced(packageService.registry);
+    } catch (e) {
+      logger(() => 'Startup cleanUnreferenced failed: $e');
+    }
+
     _initialized = true;
 
-    // 远程同步与清理后台进行，不阻塞启动；首屏用内置/当前 active，新版下次打开切换。
+    // 远程同步 + 下载缓存清理后台进行，不阻塞启动。
     unawaited(_syncAndClean());
   }
 
-  /// 后台：远程同步 + 启动兜底 GC。异常自吞，不影响已就绪的引擎加载。
+  /// 后台：远程同步 + 下载缓存清理。异常自吞，不影响已就绪的引擎加载。
+  ///
+  /// cleanUnreferenced 已在 init 阶段同步完成（无并发），这里不再扫 packages/。
   static Future<void> _syncAndClean() async {
     try {
       await _fetchRemotePackages();
-      await cleanService.cleanExpired(
-        packageService.registry,
-        config.envGetter(),
-      );
+      // 以下两项不涉及 packages/，可安全在后台执行。
+      await cleanService.cleanOtherEnvDirs(config.envGetter());
+      await cleanService.cleanOldDownloads(maxAgeDays: 3);
     } catch (e) {
       logger(() => 'Background sync/clean failed: $e');
     }
