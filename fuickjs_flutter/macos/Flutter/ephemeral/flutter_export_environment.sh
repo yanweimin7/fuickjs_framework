@@ -1,6 +1,6 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
-export "FLUTTER_ROOT=/Users/wey/fvm/versions/3.44.2"
+export "FLUTTER_ROOT=/Users/wey/develop/flutter"
 export "FLUTTER_APPLICATION_PATH=/Users/wey/work/flutter_dynamic/fuickjs_framework/fuickjs_flutter"
 export "FLUTTER_FRAMEWORK_SWIFT_PACKAGE_PATH=/Users/wey/work/flutter_dynamic/fuickjs_framework/fuickjs_flutter/macos/Flutter/ephemeral/Packages/.packages/FlutterFramework"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"

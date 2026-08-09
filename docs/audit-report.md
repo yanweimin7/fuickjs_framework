@@ -17,6 +17,22 @@
 
 ---
 
+## 审计后补充（2026-08）
+
+本审计（2026-04-11）为历史快照。此后在离线包（offline）与 widget 层新增了若干**健壮性加固与能力**，均未推翻原审计结论，仅作为补充记录：
+
+| 类别 | 内容 | 说明 |
+| --- | --- | --- |
+| 健壮性 | 验签 isolate 看门狗 | `BundleVerifyIsolate` 原为"worker 抛错即 `Isolate.exit()` 杀全 isolate + 无超时"，会导致 in-flight `verify()` 永久 hang（软 brick）。改为纵深防御：worker 自愈 / 每条请求 15s 超时 / 崩溃看门狗监听 `addOnExitListener`。详见 `docs/bundle-delivery.md` §17.1 |
+| 健壮性 | `Offline` 初始化守卫 | 移除易被误用的公开 `initialized` 布尔标志，改为 `await whenInitialized`；`promoteAndGetRoot` 等公开方法在 init 未完成前阻塞等待，而非早退返回 null |
+| 健壮性 | `IsolateWorker.ensureInitialized` 失败重试 | 原实现 init 抛错后 `_ready` Completer 永不完成、且因 `_initialized=true` 早设导致后续调用永久 hang 且不可重试；改为失败后 `completeError` + 换新 `_ready` 允许重试 |
+| 能力 | 无障碍（Accessibility） | widget 工厂在唯一汇聚点统一包裹 `Semantics`，业务用 `props.semantics` / `semanticLabel` 透传语义，读屏可用。原审计未评估此维度 |
+| 能力 | 错误可观测性 | 新增可插拔 `ErrorSink` / `ErrorSinks`，JS 错误经 sourcemap 还原后聚合到 Sentry / Bugly / 自建平台（原仅打印日志 + 红屏，错误被丢弃） |
+
+> 上述加固对应代码改动均通过 `dart analyze`；整库分析与 `flutter test` 建议在 CI 环境跑（本地受限）。
+
+---
+
 ## 一、JS 框架核心（`fuickjs_framework/fuickjs/`）
 
 ### 架构概览

@@ -1,6 +1,7 @@
 import '../logger.dart';
 import '../utils/source_map_resolver.dart';
 import 'base_fuick_service.dart';
+import 'error_sink.dart';
 import 'js_error_bus.dart';
 
 /// 专用错误上报服务。
@@ -41,7 +42,7 @@ class ErrorReportService extends BaseFuickService {
 
       // 2. 广播到 JsErrorBus，触发红屏
       final ts = m['timestamp'];
-      JsErrorBus.instance.report(JsErrorInfo(
+      final info = JsErrorInfo(
         message: message,
         stack: resolvedStack,
         source: source,
@@ -49,7 +50,12 @@ class ErrorReportService extends BaseFuickService {
         timestamp: ts is int
             ? ts
             : (ts is num ? ts.toInt() : DateTime.now().millisecondsSinceEpoch),
-      ));
+      );
+      JsErrorBus.instance.report(info);
+
+      // 3. 推送给所有已注册的外部 sink（Sentry / Bugly / 自建聚合）。
+      //    无 sink 时为空操作，不影响既有行为与红屏。
+      ErrorSinks.reportAll(info);
       return null;
     });
   }

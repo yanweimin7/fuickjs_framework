@@ -6,6 +6,15 @@ FuickJS 是一个基于 **React + QuickJS + Flutter** 的跨平台动态化渲�
 
 核心设计理念：**用 React 的开发体验，写 Flutter 的原生性能**。
 
+### 关键能力
+
+- **原生渲染**：React 组件 → JSON DSL → Flutter 原生 Widget 树，无 WebView、无桥接卡顿。
+- **动态下发**：业务代码以 QuickJS 字节码 / JS 源码形式动态下发，Ed25519 验签 + SHA-256 + 状态机 + 回滚（详见 [bundle-delivery.md](./bundle-delivery.md)）。
+- **完整生态**：导航 / 路由守卫 / i18n / 主题 / 媒体 / 网络等 17+ 内置服务，以及 fetch / WebSocket / localStorage 等浏览器 API polyfill。
+- **无障碍（Accessibility）**：widget 工厂在唯一汇聚点统一包裹 `Semantics`，业务用 `props.semantics` / `semanticLabel` 透传语义即可被读屏识别（详见 [widgets.md §7](./widgets.md)）。
+- **错误可观测性**：JS 运行时错误被捕获并经 sourcemap 还原后，可通过可插拔 `ErrorSink` 聚合到 Sentry / Bugly / 自建平台（详见 [services.md](./services.md)）。
+- **高性能增量更新**：IncrementalStrategy 只发送最小变更集；二进制协议 v2（varint + 字符串表）进一步压低传输体积（详见 [binary-protocol-v2.md](./binary-protocol-v2.md)）。
+
 ---
 
 ## 架构图

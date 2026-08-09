@@ -101,11 +101,12 @@ class FuickAppContext {
   }
 
   /// 解析 bundle 包根目录：触发"下次打开"提升与内置懒解压。
+  ///
+  /// Offline.promoteAndGetRoot 内部会 await whenInitialized，init 进行中也会
+  /// 等待而非静默回退内置；仅在 init 从未成功过时才返回 null（走内置 assets）。
   Future<String?> _resolveBundleRoot() async {
     try {
-      if (Offline.initialized) {
-        return await Offline.promoteAndGetRoot(appName);
-      }
+      return await Offline.promoteAndGetRoot(appName);
     } catch (e) {
       logger.e('resolve bundle root failed: $e');
     }

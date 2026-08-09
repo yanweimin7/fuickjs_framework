@@ -138,6 +138,30 @@
 **NativeEventService**
 - 双向事件总线，详见 [README.md §2 NativeEvent](./README.md#2-nativeevent双向事件总线)
 
+**ErrorReportService（错误上报与可观测性）**
+- 框架已能捕获 JS 运行时错误，并用 sourcemap 还原堆栈（见 [README.md §6 Sourcemap 错误还原](./README.md#6-sourcemap-错误还原)），但默认只 `logger` 打印 + 触发红屏广播，**错误在设备上被丢弃，不会回收到后端**。
+- 为打通"可观测性最后一公里"，框架提供**可插拔的错误上报出口**：宿主实现 `ErrorSink` 接口并在启动时注册，即可把线上 JS 错误聚合到 Sentry / Bugly / 自建平台。
+
+```dart
+// 1. 实现出口（以 Sentry 为例）
+class SentryErrorSink implements ErrorSink {
+  @override
+  void report(JsErrorInfo info) {
+    Sentry.captureException(info.message, stackTrace: info.stack);
+  }
+}
+
+// 2. 启动时注册一处即可
+void main() {
+  ErrorSinks.register(SentryErrorSink());
+}
+```
+
+- `ErrorSink.report(JsErrorInfo)`：单条错误出口；`JsErrorInfo` 含 `message` / `stack`（已 sourcemap 还原）/ `source` / `detail` / `timestamp`。
+- `ErrorSinks` 全局注册表：`register` / `unregister` / `registered`（只读快照）；`ErrorReportService` 在还原后调用 `ErrorSinks.reportAll(info)`，把**同一份错误同时推送所有已注册出口**。
+- **隔离性**：任一 sink 抛错被 `reportAll` 吞掉，不影响其余 sink 与红屏流程；`report` 应是非阻塞的（内部自行异步上报）。
+- 类型从 `package:fuickjs_flutter/fuickjs_flutter.dart` 导出：`ErrorSink` / `ErrorSinks` / `JsErrorInfo`。
+
 ---
 
 ## 二、浏览器 API 补丁

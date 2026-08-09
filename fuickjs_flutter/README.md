@@ -5,11 +5,13 @@ FuickJS 框架的 Flutter 端：基于 React Reconciler + QuickJS + Flutter 的�
 本包提供：
 
 - **DSL 渲染**：React 组件树 → Flutter Widget 树（JS 侧 reconciler，Flutter 侧 widget factory）
-- **Widget 工厂**：95+ 内置 widget parser，可注册自定义 parser
-- **Native 服务**：18 个内置服务（Navigator/Toast/Dialog/Storage/Network/FileSystem/WebSocket/...），可注册自定义服务
+- **Widget 工厂**：99 个内置 widget parser，可注册自定义 parser
+- **Native 服务**：17 个内置服务（Navigator/Toast/Dialog/Storage/Network/FileSystem/WebSocket/...），可注册自定义服务
 - **引擎管理**：QuickJS / JSC 双引擎切换，Isolate 工作线程
 - **Bundle 动态下发**：内置 zip（Ed25519 验签 + SHA-256）+ 远程增量更新 + 状态机 + 回滚
 - **离线缓存**：staged → active → history 状态机，懒解压
+- **无障碍（Accessibility）**：widget 工厂统一包裹 `Semantics`，业务用 `semantics` / `semanticLabel` 透传语义，读屏可用（见 `docs/widgets.md` §7）
+- **错误可观测性**：JS 错误经 sourcemap 还原后通过可插拔 `ErrorSink` 聚合到 Sentry / Bugly / 自建平台（见 `docs/services.md`）
 - **i18n / Hooks / 浏览器 Polyfill**：JS 侧完整生态
 
 ## 集成

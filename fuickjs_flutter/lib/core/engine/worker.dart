@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:easy_isolate/easy_isolate.dart';
+import 'package:meta/meta.dart';
 
 import 'isolate_manager.dart';
 import 'jscontext_delegate.dart';
@@ -18,14 +19,28 @@ class IsolateWorker {
       );
   static IsolateWorker? _instance;
 
-  IsolateWorker._(this._isolateEntry);
+  IsolateWorker._(this._isolateEntry, [Worker? worker])
+      : _worker = worker ?? Worker();
+
+  /// 测试用构造：注入自定义 [Worker]（如 init 必然/首次失败的假实现），
+  /// 以便回归验证 [ensureInitialized] 在 init 失败后的重试 / 不 hang 行为，
+  /// 无需真正 spawn isolate。
+  @visibleForTesting
+  factory IsolateWorker.forTest(
+    FutureOr<void> Function(dynamic, SendPort, SendErrorFunction) isolateEntry, {
+    Worker? worker,
+  }) =>
+      IsolateWorker._(isolateEntry, worker);
 
   final FutureOr<void> Function(dynamic, SendPort, SendErrorFunction)
       _isolateEntry;
 
-  final Worker _worker = Worker();
-  final Completer<void> _ready = Completer<void>();
+  final Worker _worker;
+  // 非 final：init 失败时需要换一个新的 Completer 以允许后续重试。
+  Completer<void> _ready = Completer<void>();
   bool _initialized = false;
+  // 并发 join 守卫：避免两个调用方同时通过 _initialized 判断而重复 init。
+  bool _initializing = false;
 
   final Map<String, JsContextDelegate> _delegates = {};
   final Map<String, Completer<dynamic>> _pendingRequests = {};
@@ -33,9 +48,21 @@ class IsolateWorker {
 
   Future<void> ensureInitialized() async {
     if (_initialized) return _ready.future;
-    _initialized = true;
-    await _worker.init(_mainHandler, _isolateEntry);
-    _ready.complete();
+    if (_initializing) return _ready.future; // 合并进行中的 init
+    _initializing = true;
+    try {
+      await _worker.init(_mainHandler, _isolateEntry);
+      _initialized = true; // 仅成功后才置位
+      _ready.complete();
+    } catch (e) {
+      // init 失败：重置状态允许未来重试；旧的 _ready 以 error 完成，避免并发
+      // join 者（已在 await 旧 _ready.future）永久 hang；本调用方通过 rethrow 报错。
+      _initializing = false;
+      final old = _ready;
+      _ready = Completer<void>();
+      old.completeError(e);
+      rethrow;
+    }
   }
 
   void registerDelegate(JsContextDelegate delegate) {

@@ -179,6 +179,61 @@ const { id, value, transform, start, stop, reverse, reset, setValue, setTo, onCo
 
 ---
 
+## 7. 无障碍（Accessibility）
+
+FuickJS 在 Flutter 侧 **widget factory 的唯一汇聚点**统一包裹 `Semantics`，因此**全部组件**自动获得无障碍语义能力，无需逐个组件单独适配。业务侧只需在 DSL 的 `props` 里透传语义属性即可被读屏（VoiceOver / TalkBack）识别。
+
+### 7.1 两种写法
+
+**完整写法** —— 传 `props.semantics` 对象，支持全部语义字段：
+
+```tsx
+<Button
+  text="提交订单"
+  semantics={{ label: '提交订单', hint: '双击提交', button: true }}
+  onTap={submit}
+/>
+```
+
+**简写** —— 仅需要标签时，直接用 `props.semanticLabel`：
+
+```tsx
+<Image src="images/logo.png" semanticLabel="公司 Logo" />
+```
+
+> 只在**显式传入** `semantics`（非空对象）或 `semanticLabel` 时才包裹 `Semantics`；不传则原样返回，**存量 UI 零影响**。
+
+### 7.2 支持的语义字段
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `label` | string | 读屏朗读的主标签（最常用） |
+| `hint` | string | 操作提示（如"双击提交"） |
+| `value` | string | 当前值（如滑块当前数值） |
+| `increasedValue` / `decreasedValue` | string | 增减后的提示值 |
+| `onTapHint` / `onLongPressHint` | string | 点按 / 长按的语义提示 |
+| `button` / `link` / `header` / `image` | bool | 标记节点语义角色 |
+| `textField` / `readOnly` | bool | 标记可输入 / 只读 |
+| `liveRegion` | bool | 内容变化时自动播报 |
+| `hidden` | bool | 对读屏隐藏该节点 |
+| `scopesRoute` / `namesRoute` | bool | 路由作用域 / 命名路由 |
+| `enabled` | bool | 是否可交互 |
+| `obscured` / `multiline` | bool | 密码遮罩 / 多行文本 |
+| `selected` | bool | 是否被选中 |
+| `toggled` | `'on' \| 'off' \| bool` | 开关态（三态） |
+| `checked` | bool | 勾选态（如 Checkbox） |
+
+> 字段与 Flutter `Semantics` 具名参数一一对应，跨 Flutter 版本兼容。完整实现见 `fuickjs_flutter/lib/core/widgets/widget_factory.dart` 的 `_applySemantics`。
+
+### 7.3 最佳实践
+
+- **交互组件必标 `label`**：`Button` / `Image`(可点) / `GestureDetector` 包裹区等，至少给一个 `label`，否则读屏用户无法感知用途。
+- **列表项标 `value`**：`ListView` 的 `itemBuilder` 里，给每行 `semantics.value` 描述数据，避免只读坐标。
+- **装饰性节点标 `hidden: true`**：纯分割线、背景图等对读屏无意义，隐藏减少干扰。
+- 无障碍是**能力**不是**自动生效**：框架只负责把语义透传到 Flutter，业务需对关键交互组件补 `semantics` 字段才会被读屏识别。
+
+---
+
 ## 如何添加新组件
 
 1.  **JS 侧定义**:

@@ -120,5 +120,28 @@ void main() {
       expect(r.reason, contains('manifest parse failed'));
       await isolate.dispose();
     });
+
+    test('verify never hangs: saturated pool + short timeout always completes',
+        () async {
+      // 回归测试：修复前 worker 崩溃会令所有 in-flight verify 永久 hang（软 brick）。
+      // 这里用 4-worker 池 + 1ms 超时 + 20 个并发请求制造"来不及处理"的局面，
+      // 断言每个 Future 都必然以 VerifyResult 完成（不抛、不 hang）。
+      final isolate = await BundleVerifyIsolate.create({fakeKeyId: fakePubB64});
+      final dirs = <String>[];
+      for (var i = 0; i < 20; i++) {
+        dirs.add(await makeValidDir('d$i'));
+      }
+      final futures = dirs
+          .map((d) => isolate.verify(d, timeout: const Duration(milliseconds: 1)))
+          .toList();
+      // 若超时机制失效，部分 Future 会永久挂起 → 此 await 永不返回。
+      final results = await Future.wait(futures);
+      expect(results.length, 20);
+      for (final r in results) {
+        expect(r, isA<VerifyResult>());
+        expect(r.ok, false); // 无 sig 本就失败；超时也是 failure
+      }
+      await isolate.dispose();
+    });
   });
 }

@@ -1,5 +1,15 @@
 # FuickJS Framework 官方文档
 
+> 文档总入口。本目录（`docs/`）收录框架的设计、使用与内部方案文档；包级说明见 [`fuickjs_flutter/README.md`](../fuickjs_flutter/README.md)。
+
+## 目录
+
+- [项目结构](#项目结构)
+- [文档总览（按主题分类）](#文档总览)
+- [推荐阅读路线](#推荐阅读路线)
+- [核心特性速览（5 分钟上手）](#核心特性速览)
+- [开发规范](#开发规范)
+
 ## 项目结构
 
 ### JS 框架层 (`fuickjs/`)
@@ -18,20 +28,60 @@
 - `lib/offline`: Bundle 动态下发（Ed25519 验签 + SHA-256 + 状态机 + 回滚）。
 - `lib/core/fuick_config.dart`: 全局配置（debug/logLevel/hotReload/devPage）。
 
-## 文档索引
+## 文档总览
 
-- [技术介绍（原理、架构、功能、使用示例）](./introduction.md)
-- [UI 组件 (Widgets)](./widgets.md)
-- [FlutterProps 命名属性机制](./flutter-props.md)
-- [原生服务 & 浏览器 API](./services.md)
-- [多语言 (i18n)](./i18n.md)
-- [路由系统 (Router)](./router.md)
-- [Community 扩展包](./community.md)
-- [fuickjs_dart — Dart 动态渲染方案](./fuickjs_dart.md)
-- [Bundle 动态下发（签名验签/回滚/图片透明加载）](./bundle-delivery.md)
-- [页面级分包加载（主包 + 按需 chunk）](./page-split-loading.md)
-- [二进制协议 v2（varint + 字符串表）](./binary-protocol-v2.md)
-- [框架审计报告](./audit-report.md)
+按主题分为六类，每类给出一句话定位，便于按角色取用。
+
+### 一、入门与概念
+
+| 文档 | 定位 |
+| --- | --- |
+| [技术介绍 introduction.md](./introduction.md) | 原理、架构、功能全景与使用示例，**新手必读** |
+
+### 二、开发指南（业务侧怎么写）
+
+| 文档 | 定位 |
+| --- | --- |
+| [UI 组件 widgets.md](./widgets.md) | 已支持的全部 Flutter 组件清单与用法 |
+| [FlutterProps flutter-props.md](./flutter-props.md) | React children → Flutter 命名属性（`flex`/`margin` 等）映射机制 |
+| [原生服务 & 浏览器 API services.md](./services.md) | JS↔Native 桥接能力（storage/network/toast…） |
+| [多语言 i18n.md](./i18n.md) | 文案在 DSL 生成前解析，Flutter 侧无感知 |
+| [路由系统 router.md](./router.md) | 路径参数、命名路由、守卫、重定向、404 |
+| [Community 扩展包 community.md](./community.md) | 官方可选扩展的接入方式（npm + flutter 双端） |
+
+### 三、引擎与底层（框架侧怎么跑）
+
+| 文档 | 定位 |
+| --- | --- |
+| [fuickjs_dart fuickjs_dart.md](./fuickjs_dart.md) | 纯 Dart 动态渲染方案（无 JS 引擎路径） |
+| [二进制协议 v2 binary-protocol-v2.md](./binary-protocol-v2.md) | JS↔Dart 经 FFI 传输 DSL 的序列化层（varint + 字符串表） |
+
+### 四、动态下发（Bundle 怎么更新）
+
+| 文档 | 定位 |
+| --- | --- |
+| [Bundle 动态下发 bundle-delivery.md](./bundle-delivery.md) | Ed25519 验签 + SHA-256 + 状态机 + 回滚 + 图片透明加载 |
+
+### 五、质量与审计
+
+| 文档 | 定位 |
+| --- | --- |
+| [框架审计报告 audit-report.md](./audit-report.md) | 安全/健壮性专项审计结论 |
+
+### 六、包级文档
+
+| 文档 | 定位 |
+| --- | --- |
+| [fuickjs_flutter/README.md](../fuickjs_flutter/README.md) | Flutter 端包说明（公开 API 入口） |
+| [fuickjs_flutter/CHANGELOG.md](../fuickjs_flutter/CHANGELOG.md) | 版本记录 |
+
+> **待补文档**：`page-split-loading.md`（页面级分包加载：主包 + 按需 chunk）原计划收录，但对应文档尚未产出，索引中暂时移除该死链。
+
+## 推荐阅读路线
+
+- **业务 / 新手开发**：`introduction` → `widgets` → `services` → `router` → `i18n`
+- **宿主集成 / 原生扩展**：`services` → `community` → `bundle-delivery` → `fuickjs_flutter/README`
+- **引擎 / 框架贡献者**：`fuickjs_dart` → `binary-protocol-v2` → `audit-report`
 
 ## 开发规范
 
@@ -39,7 +89,7 @@
 
 ---
 
-## 核心特性
+## 核心特性速览（5 分钟上手）
 
 ### 1. Fuick.expose（暴露 JS 对象给 Native）
 

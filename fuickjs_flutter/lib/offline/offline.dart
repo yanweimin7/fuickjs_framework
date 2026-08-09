@@ -31,10 +31,30 @@ class Offline {
   static late BundleVerifyIsolate verifyIsolate;
 
   static bool _initialized = false;
-  static bool get initialized => _initialized;
 
-  static Future<void> init(OfflineConfig cfg) async {
-    if (_initialized) return;
+  /// init 进行中的 Future，供并发调用方 join（避免重复 init），也供
+  /// promoteAndGetRoot / getActivePackageRoot / refresh 在 _initialized 尚未
+  /// 置位时等待而非直接返回 null（line 82 注释本意即"会等 _initialized"）。
+  ///
+  /// 若 init 从未被调用则为 null；whenInitialized 会降级为已完成的 Future。
+  static Future<void>? _initFuture;
+
+  /// 等待初始化完成。init 进行中则 join 同一 Future；init 从未调用则返回
+  /// 已完成的 Future（调用方仍需检查 _initialized 判断 init 是否成功过）。
+  static Future<void> get whenInitialized => _initFuture ?? Future.value();
+
+  static Future<void> init(OfflineConfig cfg) {
+    if (_initialized) return Future.value();
+    if (_initFuture != null) return _initFuture!; // 并发调用 join 同一 init
+    final f = _initBody(cfg);
+    _initFuture = f;
+    f.catchError((_) {
+      _initFuture = null; // init 失败允许重试
+    });
+    return f;
+  }
+
+  static Future<void> _initBody(OfflineConfig cfg) async {
     config = cfg;
 
     // P0-6 启动期硬约束：未配置公钥直接拒绝（避免后续 BundleVerifier 构造失败）。
@@ -201,6 +221,7 @@ class Offline {
   }
 
   static Future<void> refresh() async {
+    await whenInitialized;
     if (!_initialized) return;
     await _fetchRemotePackages();
   }
@@ -209,6 +230,7 @@ class Offline {
 
   /// 当前 active 包根目录（不触发提升）；无则 null。
   static Future<String?> getActivePackageRoot(String name) async {
+    await whenInitialized;
     if (!_initialized) return null;
     final active = packageService.getActivePackage(name);
     if (active == null) return null;
@@ -221,6 +243,7 @@ class Offline {
   /// 失败 → 删包 + 兜底内置。调用方在拿到 dir 后**直接加载 JS**，安全依赖于此
   /// 验签已通过（await 是同步语义，JS 不会先于验签跑起来）。
   static Future<String?> promoteAndGetRoot(String name) async {
+    await whenInitialized;
     if (!_initialized) return null;
 
     var active = await packageService.promoteStaged(name);

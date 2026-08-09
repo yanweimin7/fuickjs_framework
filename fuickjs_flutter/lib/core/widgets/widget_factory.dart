@@ -407,12 +407,139 @@ class WidgetFactory {
   ) {
     final parser = _parsers[type];
     if (parser != null) {
-      return parser.parse(context, props, children, this);
+      return _applySemantics(parser.parse(context, props, children, this), props);
     }
     // 未知 type 不应让整棵 widget 树崩溃，与 build() 顶层的容错策略保持一致。
     logger.w(
         '[WidgetFactory] Unknown widget type: $type, falling back to SizedBox.shrink()');
     return const SizedBox.shrink();
+  }
+
+  /// 无障碍（Accessibility）包裹。
+  ///
+  /// 在唯一汇聚点 [buildInternal] 调用，使全部 widget parser 自动获得无障碍语义，
+  /// 无需逐个 parser 改动。业务侧通过 DSL 透传语义属性：
+  ///
+  /// ```jsonc
+  /// { "type": "Button", "props": {
+  ///     "semantics": { "label": "提交订单", "hint": "双击提交", "button": true }
+  ///     // 或用简写： "semanticLabel": "提交订单"
+  /// } }
+  /// ```
+  ///
+  /// 仅在显式传入 `semantics`(非空 map) 或 `semanticLabel` 时包裹 [Semantics]，
+  /// 不传则原样返回，避免给存量 UI 的每棵子树都强加语义节点。
+  ///
+  /// 支持的语义字段：label / hint / value / increasedValue / decreasedValue /
+  /// onTapHint / onLongPressHint / button / link / header / image / textField /
+  /// readOnly / liveRegion / hidden / scopesRoute / namesRoute / enabled /
+  /// obscured / multiline / selected / toggled('on'|'off'|bool) / checked。
+  /// 使用默认 [Semantics] 具名参数构造，跨 Flutter 版本兼容最佳。
+  Widget _applySemantics(Widget widget, Map<String, dynamic> props) {
+    final semantics = props['semantics'];
+    final Map<String, dynamic> semMap;
+    if (semantics is Map) {
+      semMap = Map<String, dynamic>.from(semantics);
+    } else if (props.containsKey('semanticLabel')) {
+      semMap = <String, dynamic>{'label': props['semanticLabel']};
+    } else {
+      return widget;
+    }
+
+    final label = _strSem(semMap['label']);
+    final hint = _strSem(semMap['hint']);
+    final value = _strSem(semMap['value']);
+    final increasedValue = _strSem(semMap['increasedValue']);
+    final decreasedValue = _strSem(semMap['decreasedValue']);
+    final onTapHint = _strSem(semMap['onTapHint']);
+    final onLongPressHint = _strSem(semMap['onLongPressHint']);
+
+    final button = _boolSem(semMap, 'button');
+    final link = _boolSem(semMap, 'link');
+    final header = _boolSem(semMap, 'header');
+    final image = _boolSem(semMap, 'image');
+    final textField = _boolSem(semMap, 'textField');
+    final readOnly = _boolSem(semMap, 'readOnly');
+    final liveRegion = _boolSem(semMap, 'liveRegion');
+    final hidden = _boolSem(semMap, 'hidden');
+    final scopesRoute = _boolSem(semMap, 'scopesRoute');
+    final namesRoute = _boolSem(semMap, 'namesRoute');
+    final enabled = _boolSem(semMap, 'enabled');
+    final obscured = _boolSem(semMap, 'obscured');
+    final multiline = _boolSem(semMap, 'multiline');
+    final selected = _boolSem(semMap, 'selected');
+
+    bool? toggled;
+    final tg = semMap['toggled'];
+    if (tg == true || tg == 'on') {
+      toggled = true;
+    } else if (tg == false || tg == 'off') {
+      toggled = false;
+    }
+
+    bool? checked;
+    final ck = semMap['checked'];
+    if (ck is bool) checked = ck;
+
+    final hasAny = label != null ||
+        hint != null ||
+        value != null ||
+        increasedValue != null ||
+        decreasedValue != null ||
+        onTapHint != null ||
+        onLongPressHint != null ||
+        button != null ||
+        link != null ||
+        header != null ||
+        image != null ||
+        textField != null ||
+        readOnly != null ||
+        liveRegion != null ||
+        hidden != null ||
+        scopesRoute != null ||
+        namesRoute != null ||
+        enabled != null ||
+        obscured != null ||
+        multiline != null ||
+        selected != null ||
+        toggled != null ||
+        checked != null;
+    if (!hasAny) return widget;
+
+    return Semantics(
+      label: label,
+      hint: hint,
+      value: value,
+      increasedValue: increasedValue,
+      decreasedValue: decreasedValue,
+      onTapHint: onTapHint,
+      onLongPressHint: onLongPressHint,
+      button: button,
+      link: link,
+      header: header,
+      image: image,
+      textField: textField,
+      readOnly: readOnly,
+      liveRegion: liveRegion,
+      hidden: hidden,
+      scopesRoute: scopesRoute,
+      namesRoute: namesRoute,
+      enabled: enabled,
+      obscured: obscured,
+      multiline: multiline,
+      selected: selected,
+      toggled: toggled,
+      checked: checked,
+      child: widget,
+    );
+  }
+
+  static String? _strSem(dynamic v) => v?.toString();
+
+  static bool? _boolSem(Map<String, dynamic> m, String key) {
+    final v = m[key];
+    if (v is! bool) return null;
+    return v;
   }
 
   List<Widget> buildChildren(BuildContext context, dynamic children) {

@@ -37,6 +37,7 @@ export 'core/service/websocket_service.dart' show WebSocketService;
 export 'core/service/console_service.dart' show ConsoleService;
 export 'core/service/sound_service.dart' show SoundService;
 export 'core/service/error_report_service.dart' show ErrorReportService;
+export 'core/service/error_sink.dart' show ErrorSink, ErrorSinks;
 export 'core/service/js_error_bus.dart' show JsErrorBus, JsErrorInfo;
 export 'core/widgets/red_box.dart' show RedBoxOverlay;
 

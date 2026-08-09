@@ -38,7 +38,7 @@ FuickJS 的业务逻辑以 QuickJS 代码（`.qjc` 字节码 / `.js` 源码）+ 
 | 路径写死 `assets/h5`                                             | 面向 H5，不是 QuickJS                       | 切到 **`assets/js`** 并接通引擎                 |
 | 下载写最终路径 + `exists` 短路                                   | 半包可能被当完整包                          | 下载到 `.tmp` 再 rename                         |
 | `CleanService` 用空 `Package` 反推路径 + 读全局 `Offline.config` | 脆弱、难测                                  | 目录布局收敛到 `FileStorage`，依赖注入          |
-| `Offline` `late` 静态单例无守卫                                  | init 前调用 / 中途失败抛错                  | 增加 `initialized` 守卫与安全访问               |
+| `Offline` `late` 静态单例无守卫                                  | init 前调用 / 中途失败抛错                  | 改为 `await whenInitialized`（init 未完成前调用方阻塞等待，而非早退返回 null）；移除易被误用的公开 `initialized` 布尔标志 |
 | `DownloadRepository` 接口未实现                                  | 死抽象                                      | 移除或落地                                      |
 
 ## 3. 总体架构
@@ -180,7 +180,7 @@ T3  后台验签完成（晚于 T2 也无所谓）
 - **后台验签与 on-open 不冗余**：后台验签清理 in-memory 状态（避免下次 `getActivePackage` 返回坏包）；on-open 是最终防御（用户真要打开时再确认）。两条路径都失败也能兜底 builtin。
 - **所有 `_registry` 修改操作通过 `_withRegistryLock` 互斥锁串行化**（`init`/`_runBackgroundVerify`/`applyReady`/`promoteStaged`/`reuseLocalAsStaged`/`deactivatePackages`/`verifyOnOpen`）。这解决了"后台验签 snapshot 写回覆盖 sync 修改"等竞态。读操作不参与锁（Dart 单线程，list 引用赋值原子）。
 - **`preparePackage` 同包 in-flight 去重 + `promoteStaging` 锁内化**：首启时页面加载（`_ensureBuiltinActive`）与后台 sync（`_syncAndClean`）会对同一内置包并发调用 `preparePackage`。若各自跑完整流程，会在同一 staging 目录上交错 `_resetDir`/`_unzip`，导致 staging 半写。实现：`DownloadService._prepareInflight`（key: `versionShasumName`），并发调用共享同一个 in-flight Future 直接 join 结果。staging 写入（`_resetDir`/`_unzip`）在锁外，此去重是 staging 目录并发安全的唯一防线。`promoteStaging`（rename staging→packages + flag）已从 `preparePackage` 移到 `PackageService._doApplyReady` 的 `_withRegistryLock` 锁内执行，与 registry 入册原子化——消除"已落地未入册"窗口。
-- **`cleanUnreferenced` 串行化到 init 阶段**：`CleanService.cleanUnreferenced` 扫描 packages/ 删不在 `registry.retained` 的孤儿目录。`readdir` 是流式扫描——扫描期间 `applyReady` 的 `promoteStaging` 刚 rename 的新目录会被后续读到，若此时 `retainedDirs` 用的是旧快照（不含新目录），会误删——引擎读到正在被删除的 `bundle.js`（SyntaxError），第二次打开自愈。**根治方案**：`cleanUnreferenced` 挪到 `Offline.init` 的 `_initialized = true` 之前同步执行。此时 `promoteAndGetRoot` 会等 `_initialized`，架构上不可能并发，不需要锁保护。之后 `_syncAndClean` 只做远程同步 + 下载缓存清理（不涉及 packages/）。
+- **`cleanUnreferenced` 串行化到 init 阶段**：`CleanService.cleanUnreferenced` 扫描 packages/ 删不在 `registry.retained` 的孤儿目录。`readdir` 是流式扫描——扫描期间 `applyReady` 的 `promoteStaging` 刚 rename 的新目录会被后续读到，若此时 `retainedDirs` 用的是旧快照（不含新目录），会误删——引擎读到正在被删除的 `bundle.js`（SyntaxError），第二次打开自愈。**根治方案**：`cleanUnreferenced` 挪到 `Offline.init` 完成（`_initialized = true`）之前同步执行。此时 `promoteAndGetRoot` 会 `await whenInitialized`（init 未完成前阻塞等待，而非早退返回 null），架构上不可能并发，不需要锁保护。之后 `_syncAndClean` 只做远程同步 + 下载缓存清理（不涉及 packages/）。
 
 ### 6.4 启动性能
 
@@ -465,7 +465,7 @@ Flutter ImageParser 现有 file:// 分支直接处理 ✅（零改动）
 - `offline/domain/services/package_service.dart` — 状态机、`applyReady/promoteStaged/reuseLocalAsStaged`。
 - `offline/domain/services/sync_service.dart` — minAppVersion → added/updated/removed。
 - `offline/domain/services/clean_service.dart` — 保留 active+staged+history；目录布局收敛、去全局耦合。
-- `offline/offline.dart` — 编排 + `initialized` 守卫；公开 `getActivePackageRoot/promoteAndGetRoot`。
+- `offline/offline.dart` — 编排 + `whenInitialized`（await 守卫，init 未完成前调用方阻塞等待而非早退）；公开 `getActivePackageRoot/promoteAndGetRoot`。
 - `core/engine/bundle_preloader.dart` — `prewarm/consume` 支持 `packageRoot`，回退 `assets/js`；`invalidate`。
 - `core/engine/fuick_app_context.dart` — promote 取 root、注入 `__FUICK_BUNDLE__`。
 
@@ -512,11 +512,14 @@ Flutter ImageParser 现有 file:// 分支直接处理 ✅（零改动）
   - 错误返回明确 reason（`manifest.json missing` / `signature mismatch` / `hash mismatch` 等）
 
 - **`BundleVerifyIsolate`**（[bundle_verify_isolate.dart](../fuickjs_flutter/lib/offline/domain/services/bundle_verify_isolate.dart)）
-  - 后台 isolate + 4 worker pool
+  - 后台 isolate + 4 worker pool（idle completer + queue 公平分摊请求）
   - 异步工厂 `create(publicKeysB64)`，一次性握手（SendPort 交换）
-  - `verify(dir) → Future<VerifyResult>` API
-  - dispose 用 microtask 延迟 reject pending（避开与 response handler 的同步竞态）
-  - dispose 后到达的 response 直接丢弃（`_disposed` 守卫）
+  - `verify(dir, {Duration? timeout}) → Future<VerifyResult>` API，默认超时 **15s**（可入参覆盖）
+  - **健壮性（纵深防御三层，已加固）**：旧实现任一 worker 抛未捕获异常就 `Isolate.exit()` 杀掉整个 isolate，导致所有 in-flight `verify()` 的 Future 永不完成、调用方永久 hang（软 brick），且无任何超时。现改为：
+    1. **worker 自愈**：单包验签异常（`verifyDir` 抛错/坏包/缺文件）只判该包 `failure`，**不杀 isolate**，其他请求继续正常验签（`worker()` 内 try/catch 包裹，循环不退出）。
+    2. **每条请求自带超时**：`verify()` 为每次请求挂一个 `Timer`，无响应即在超时后以 `VerifyResult.failure('verify timeout ...')` 完成，调用方据此拒绝该 bundle 并回退内置，绝不 hang。
+    3. **崩溃看门狗**：主侧 `Isolate.addOnExitListener` 监听 isolate 意外退出（OOM / 不可捕获崩溃）；触发时把所有仍 pending 的 verify 以 `failure('verify isolate crashed unexpectedly')` 完成，并置 `_crashed`，后续 `verify` 立即以 failure 完成（不再发往死 isolate）。
+  - **dispose 语义**：`dispose()` 走**抛错**语义（`completeError(StateError)`）而非 failure —— 调用方把 dispose 期间的中断视为"验签设施不可用、跳过"，**不会误判包被篡改而删除一个正常包**。dispose 体内对 `_pending` 的 reject 用 microtask 延迟一拍，避开与 response handler 的同步竞态（同 Completer 重复操作会 `Bad state`）；dispose 后到达的 response 由 `_disposed` 守卫直接丢弃。
 
 - **`PackageService._reverifyOrDrop`**
   - 启动期调用，对 active + staged 全量跑 verifyDir
