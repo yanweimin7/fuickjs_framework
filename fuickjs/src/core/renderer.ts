@@ -104,6 +104,24 @@ export function createRenderer(): Renderer {
     return root;
   }
 
+  // ConcurrentRoot 下裸 updateContainer 只是调度更新（经 Scheduler 异步 commit）。
+  // 卸载页面时必须同步 flush，否则 finalize 会在真正 unmount 前执行，
+  // destroyingPages 过早解除，新 update 可能与延迟卸载交错。
+  // 与 update() 首帧渲染同一套 React 19 兼容写法。
+  function flushSyncUnmount(root: unknown) {
+    if ((reconciler as any).flushSyncFromReconciler) {
+      (reconciler as any).flushSyncFromReconciler(() => {
+        reconciler.updateContainer(null, root as Parameters<typeof reconciler.updateContainer>[1], null, null);
+      });
+    } else if ((reconciler as any).flushSync) {
+      (reconciler as any).flushSync(() => {
+        reconciler.updateContainer(null, root as Parameters<typeof reconciler.updateContainer>[1], null, null);
+      });
+    } else {
+      reconciler.updateContainer(null, root as Parameters<typeof reconciler.updateContainer>[1], null, null);
+    }
+  }
+
   // Track rendered pages to avoid flushSync after first render
   const renderedPages = new Set<number>();
 
@@ -178,6 +196,10 @@ export function createRenderer(): Renderer {
         const maxRetries = 100; // Prevent infinite loop
 
         const finalize = () => {
+          // 列表项 sub-root 必须在主树 unmount 完成后再清理（performDestroy 可能
+          // 微任务重试）。若提前清理，重试期间 Flutter 的 getItemDSL 会重建出
+          // 永远无人回收的 sub-root（定时器/effect 泄漏）。
+          listItemManager.disposePageItems(pageId);
           // 销毁容器内部状态（事件回调/onVisible 等），切断闭包持引。
           containers[pageId]?.dispose();
           delete roots[pageId];
@@ -188,7 +210,9 @@ export function createRenderer(): Renderer {
 
         const performDestroy = () => {
           try {
-            reconciler.updateContainer(null, root, null, null);
+            // 同步 flush 卸载：返回即代表 unmount 已 commit（effect cleanup 已执行），
+            // finalize 里的清理不会跑在真实卸载之前。渲染进行中抛 #327 由下方重试兜底。
+            flushSyncUnmount(root);
             perfLog(`[Renderer] destroy() succeeded for pageId=${pageId}, retries=${retryCount}`);
             finalize();
           } catch (e: unknown) {
@@ -214,7 +238,7 @@ export function createRenderer(): Renderer {
               // so that useEffect cleanup (clearInterval etc.) can execute.
               try {
                 console.warn(`[Renderer] Best-effort unmount for pageId=${pageId} after fatal error`);
-                reconciler.updateContainer(null, root, null, null);
+                flushSyncUnmount(root);
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
               } catch (_e) {
                 // Best effort — if this also fails, nothing more we can do
@@ -225,12 +249,11 @@ export function createRenderer(): Renderer {
           }
         };
         performDestroy();
-        // 同时清理该页面所有列表项的 sub-root
-        listItemManager.disposePageItems(pageId);
       } else {
         // Even if no root, check if we have a temporary container to cleanup
         if (containers[pageId]) {
           console.warn(`[Renderer] destroy() pageId=${pageId} has no root but has orphaned container, cleaning up.`);
+          listItemManager.disposePageItems(pageId);
           containers[pageId]?.dispose();
           delete containers[pageId];
           renderedPages.delete(pageId);
@@ -242,6 +265,12 @@ export function createRenderer(): Renderer {
 
     dispatchEvent,
     getItemDSL(pageId: number, refId: string, index: number) {
+      // destroy 重试期间容器仍在，但 sub-root 即将/已被清理；
+      // 此时若响应 getItemDSL 会重建出永远无人回收的 sub-root。
+      if (destroyingPages.has(pageId)) {
+        console.warn(`[Renderer] getItemDSL() ignored: pageId=${pageId} is destroying.`);
+        return null;
+      }
       const container = containers[pageId];
       if (!container) return null;
 

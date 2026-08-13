@@ -23,10 +23,17 @@ export class ItemContainer extends PageContainer {
    * 标记初始渲染完成。
    * 由 ListItemManager.getItemDSL() 在 flushSync 后调用。
    * 之后的 commit() 调用将发送增量补丁到 Flutter。
+   *
+   * 必须同时置 isFirstRender = false：ItemContainer 重写了 commit()，
+   * 不会走 PageContainer.commit 里清除 isFirstRender 的逻辑。若不清除，
+   * 后续 Node.applyProps 会永远跳过 registerCallbacksRecursive，导致
+   * 「函数引用变化但节点自身无 DSL 变化」的更新不重注册回调，
+   * 事件 handler 持续引用首帧的旧闭包（stale closure）。
    */
   public markInitialRenderDone(): void {
     this.initialRenderDone = true;
     this.diffStrategy.rendered = true;
+    this.isFirstRender = false;
   }
 
   /**

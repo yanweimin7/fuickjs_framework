@@ -1,5 +1,6 @@
 import React from 'react';
 import { PageContainer } from './PageContainer';
+import { isTransparentType } from './constants';
 
 export const TEXT_TYPE = 'Text';
 
@@ -87,7 +88,7 @@ export class Node {
   }
 
   private _isTransparent(): boolean {
-    return this.type === 'FlutterProps' || this.type === 'flutter-props';
+    return isTransparentType(this.type);
   }
 
   /**
@@ -176,7 +177,16 @@ export class Node {
     return this.container?.getCallback(this.id, key);
   }
 
-  toDsl(): unknown {
+  toDsl(depth: number = 0): unknown {
+    // 与 elementToDsl 的 MAX_ELEMENT_DEPTH 保持一致的栈保护：
+    // QuickJS 栈空间有限，超深 Widget 树递归可能栈溢出。
+    if (depth > PageContainer.MAX_ELEMENT_DEPTH) {
+      console.warn(
+        `[Node] toDsl depth exceeded ${PageContainer.MAX_ELEMENT_DEPTH} at node id=${this.id} type=${this.type}; truncating`,
+      );
+      return null;
+    }
+
     const dslCacheEnabled = this.container ? this.container.dslCacheEnabled : true;
 
     // 如果自身缓存有效且子树无变化，直接返回缓存
@@ -207,10 +217,10 @@ export class Node {
     // Children are handled separately
     const children: unknown[] = [];
     for (const child of this.children) {
-      if (child.type === 'FlutterProps' || child.type === 'flutter-props') {
+      if (isTransparentType(child.type)) {
         const propsKey = child.props?.propsKey as string;
         if (propsKey) {
-          const propChildren = child.children.map((c) => c.toDsl()).filter((c) => c !== null);
+          const propChildren = child.children.map((c) => c.toDsl(depth + 2)).filter((c) => c !== null);
 
           if (propChildren.length > 0) {
             const newValue = propChildren.length === 1 ? propChildren[0] : propChildren;
@@ -226,7 +236,7 @@ export class Node {
           }
         }
       } else {
-        const dslChild = child.toDsl();
+        const dslChild = child.toDsl(depth + 1);
         if (dslChild) {
           children.push(dslChild);
         }

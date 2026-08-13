@@ -3,39 +3,56 @@ import { PageContainer } from './PageContainer';
 import { Node } from './node';
 import { perfLog } from '../utils/log';
 
-function deepEqual(objA: unknown, objB: unknown): boolean {
-  if (objA === objB) return true;
-  if (!objA || !objB || typeof objA !== 'object' || typeof objB !== 'object') return false;
+interface DeepEqualOptions {
+  /**
+   * 把任意两个函数视为相等。用于判断"DSL 是否变化"：事件在 DSL 中序列化为
+   * { nodeId, eventKey } 协议对象而非函数体，因此回调引用变化不影响 DSL 输出。
+   */
+  treatFunctionsAsEqual?: boolean;
+}
 
-  // Handle React elements - perform deep comparison
-  if (React.isValidElement(objA) || React.isValidElement(objB)) {
+/**
+ * 递归深比较。React Element 一律视为不等（引用变化即重渲染，不做昂贵的元素树比较）。
+ */
+function deepEqual(valA: unknown, valB: unknown, options?: DeepEqualOptions): boolean {
+  if (valA === valB) return true;
+
+  if (options?.treatFunctionsAsEqual && typeof valA === 'function' && typeof valB === 'function') {
+    return true;
+  }
+
+  if (!valA || !valB || typeof valA !== 'object' || typeof valB !== 'object') return false;
+
+  if (React.isValidElement(valA) || React.isValidElement(valB)) {
     return false;
   }
 
-  const recordA = objA as Record<string, unknown>;
-  const recordB = objB as Record<string, unknown>;
+  if (Array.isArray(valA) !== Array.isArray(valB)) return false;
+  if (Array.isArray(valA) && Array.isArray(valB)) {
+    if (valA.length !== valB.length) return false;
+    for (let i = 0; i < valA.length; i++) {
+      if (!deepEqual(valA[i], valB[i], options)) return false;
+    }
+    return true;
+  }
+
+  const recordA = valA as Record<string, unknown>;
+  const recordB = valB as Record<string, unknown>;
 
   const keysA = Object.keys(recordA);
   const keysB = Object.keys(recordB);
-
   if (keysA.length !== keysB.length) return false;
 
   for (const key of keysA) {
     if (!Object.prototype.hasOwnProperty.call(recordB, key)) return false;
-
-    const valA = recordA[key];
-    const valB = recordB[key];
-
-    // Recursively check for deep equality
-    if (valA && valB && typeof valA === 'object' && typeof valB === 'object') {
-      if (!deepEqual(valA, valB)) return false;
-    } else if (valA !== valB) {
-      return false;
-    }
+    if (!deepEqual(recordA[key], recordB[key], options)) return false;
   }
 
   return true;
 }
+
+/** 用 deepEqual 判断"序列化成 DSL 后是否等价"时的选项。 */
+const DSL_EQUAL_OPTIONS: DeepEqualOptions = { treatFunctionsAsEqual: true };
 
 /**
  * 对比新旧属性，计算出更新 Payload 以及是否影响 DSL 布局。
@@ -99,9 +116,9 @@ function diffProps(
           hasChanges = true;
 
           // 如果内容变了，进一步检查是否仅仅是内部的函数引用变了？
-          // isDslEqual 会忽略函数引用的差异。
-          // 如果 isDslEqual 返回 false，说明有非函数的实质性数据变化，需要更新 UI。
-          if (!isDslEqual(oldVal, newVal)) {
+          // treatFunctionsAsEqual 会忽略函数引用的差异，
+          // 返回 false 说明有非函数的实质性数据变化，需要更新 UI。
+          if (!deepEqual(oldVal, newVal, DSL_EQUAL_OPTIONS)) {
             hasDslChanges = true;
           }
         }
@@ -126,45 +143,6 @@ function diffProps(
   }
 
   return hasChanges ? { payload: updatePayload, hasDslChanges } : null;
-}
-
-function isDslEqual(valA: unknown, valB: unknown): boolean {
-  if (valA === valB) return true;
-
-  // Treat functions as equal for DSL purposes (eventKey doesn't change if function ref changes)
-  if (typeof valA === 'function' && typeof valB === 'function') return true;
-
-  if (!valA || !valB || typeof valA !== 'object' || typeof valB !== 'object') return false;
-
-  // React Element check
-  if (React.isValidElement(valA) || React.isValidElement(valB)) {
-    return false;
-  }
-
-  // Array check
-  if (Array.isArray(valA) !== Array.isArray(valB)) return false;
-  if (Array.isArray(valA) && Array.isArray(valB)) {
-    if (valA.length !== valB.length) return false;
-    for (let i = 0; i < valA.length; i++) {
-      if (!isDslEqual(valA[i], valB[i])) return false;
-    }
-    return true;
-  }
-
-  const recordA = valA as Record<string, unknown>;
-  const recordB = valB as Record<string, unknown>;
-
-  // Object check
-  const keysA = Object.keys(recordA);
-  const keysB = Object.keys(recordB);
-  if (keysA.length !== keysB.length) return false;
-
-  for (const key of keysA) {
-    if (!Object.prototype.hasOwnProperty.call(recordB, key)) return false;
-    if (!isDslEqual(recordA[key], recordB[key])) return false;
-  }
-
-  return true;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -300,6 +278,12 @@ export const createHostConfig = (): any => {
       container.removeChildFromContainer(child);
     },
     insertInContainerBefore: (container: PageContainer, child: Node, _beforeChild: Node) => {
+      // 单 root 容器无法表达"插入到某个兄弟节点之前"的语义，这里退化为 append
+      // （appendChildToContainer 内部会对覆盖已有 root 的情况告警）。
+      console.warn(
+        `[HostConfig] insertInContainerBefore is not supported by the single-root container ` +
+          `(page ${container.pageId}); falling back to append. Portals / multiple root children will misbehave.`,
+      );
       container.appendChildToContainer(child);
     },
     resetTextContent: (_instance: Node) => {},

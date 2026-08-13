@@ -3,6 +3,7 @@ import { PageContainer } from './PageContainer';
 import { ItemContainer } from './ItemContainer';
 import { createHostConfig } from './hostConfig';
 import { ErrorHandler } from './ErrorHandler';
+import { logDebug } from '../utils/log';
 
 interface ItemEntry {
   container: ItemContainer;
@@ -36,6 +37,25 @@ export class ListItemManager {
 
   private itemKey(pageId: number, refId: string, index: number): string {
     return `${pageId}:${refId}:${index}`;
+  }
+
+  /**
+   * 同步 flush 卸载 sub-root。ConcurrentRoot 下裸 updateContainer(null) 只是
+   * 调度卸载（异步 commit），items.delete 后可能永远没人触发 useEffect cleanup；
+   * 与 getItemDSL 的渲染路径一样用 flushSync 保证返回即已 unmount。
+   */
+  private flushSyncUnmount(root: unknown): void {
+    if (this.reconciler.flushSyncFromReconciler) {
+      this.reconciler.flushSyncFromReconciler(() => {
+        this.reconciler.updateContainer(null, root, null, null);
+      });
+    } else if (this.reconciler.flushSync) {
+      this.reconciler.flushSync(() => {
+        this.reconciler.updateContainer(null, root, null, null);
+      });
+    } else {
+      this.reconciler.updateContainer(null, root, null, null);
+    }
   }
 
   /**
@@ -74,7 +94,7 @@ export class ListItemManager {
       );
       entry = { container, root };
       this.items.set(key, entry);
-      console.log(`[ListItemManager] Created sub-root for key=${key}`);
+      logDebug(`[ListItemManager] Created sub-root for key=${key}`);
     }
 
     try {
@@ -103,9 +123,11 @@ export class ListItemManager {
       console.error(`[ListItemManager] Error rendering item key=${key}:`, e);
       ErrorHandler.notify(e, 'render', { pageId, refId, index });
 
-      // 回退到无生命周期的 elementToDsl 方式
+      // 回退到无生命周期的 elementToDsl 方式。
+      // 走 elementToDslForItem 以便按 itemKey 回收合成回调（与无状态路径一致），
+      // 避免回退渲染注册的合成 eventCallbacks 无人清理。
       console.warn(`[ListItemManager] Falling back to elementToDsl for key=${key}`);
-      return mainContainer.elementToDsl(element);
+      return mainContainer.elementToDslForItem(key, element);
     }
   }
 
@@ -120,10 +142,10 @@ export class ListItemManager {
       return;
     }
 
-    console.log(`[ListItemManager] Disposing item key=${key}`);
+    logDebug(`[ListItemManager] Disposing item key=${key}`);
     try {
-      // updateContainer(null, ...) 触发组件 unmount → useEffect cleanup
-      this.reconciler.updateContainer(null, entry.root, null, null);
+      // 同步 unmount → useEffect cleanup 在返回前执行
+      this.flushSyncUnmount(entry.root);
     } catch (e) {
       console.error(`[ListItemManager] Error disposing item key=${key}:`, e);
     }
@@ -146,12 +168,12 @@ export class ListItemManager {
     }
 
     if (keysToDispose.length > 0) {
-      console.log(`[ListItemManager] Disposing ${keysToDispose.length} items for pageId=${pageId}`);
+      logDebug(`[ListItemManager] Disposing ${keysToDispose.length} items for pageId=${pageId}`);
       for (const key of keysToDispose) {
         const entry = this.items.get(key);
         if (entry) {
           try {
-            this.reconciler.updateContainer(null, entry.root, null, null);
+            this.flushSyncUnmount(entry.root);
           } catch (e) {
             console.error(`[ListItemManager] Error disposing item key=${key}:`, e);
           }

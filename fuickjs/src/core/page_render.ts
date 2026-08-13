@@ -7,6 +7,7 @@ import { PageContext } from './PageContext';
 import { ErrorBoundary } from './ErrorBoundary';
 import { LifecycleService } from '../services/LifecycleService';
 import { markStart, report } from '../utils/perf-timing';
+import { logDebug, perfLog } from '../utils/log';
 
 let renderer: Renderer | null = null;
 let globalErrorFallback: ((error: Error) => React.ReactNode) | null = null;
@@ -22,8 +23,11 @@ LifecycleService.setNotifier((pageId, type) => {
 
 // 同 pageId 在途渲染状态：rendering=true 表示当前微任务正在 reconciler.update。
 // 若期间有新 render() 进入，仅记录 pending 参数，等当前 update 完成后再合并执行。
+// token 标识本次渲染归属：destroy() 删除 renderState（或新一轮渲染替换 state）后，
+// 在途 doRenderAsync 在 await 恢复时校验 token 不匹配即放弃，避免复活已销毁页面。
 type PendingRender = { path: string; params: unknown };
-const renderState: Record<number, { rendering: boolean; pending?: PendingRender }> = {};
+type RenderToken = object;
+const renderState: Record<number, { rendering: boolean; token: RenderToken; pending?: PendingRender }> = {};
 
 export function setGlobalErrorFallback(fallback: (error: Error) => React.ReactNode) {
   globalErrorFallback = fallback;
@@ -136,11 +140,14 @@ function wrapWithProviders(pageId: number, app: React.ReactNode): React.ReactNod
 // 核心渲染（异步：守卫可能 await）
 // ============================================================
 
-async function doRenderAsync(pageId: number, path: string, params: unknown) {
+async function doRenderAsync(pageId: number, path: string, params: unknown, token: RenderToken) {
   markStart(pageId);
   const t0 = Date.now();
   const r = ensureRenderer();
   const t1 = Date.now();
+
+  // 本次渲染是否已被取消（destroy 删除 renderState，或被新一轮渲染替换）。
+  const isCancelled = () => renderState[pageId]?.token !== token;
 
   const to = Router.resolve(path, params);
   const t2 = Date.now();
@@ -162,6 +169,12 @@ async function doRenderAsync(pageId: number, path: string, params: unknown) {
     guardResult = false;
   }
 
+  // await 期间页面可能已被 destroy，继续 update 会重建容器复活页面。
+  if (isCancelled()) {
+    console.warn(`[page_render] render cancelled for pageId=${pageId}, path=${path} (page destroyed or superseded)`);
+    return;
+  }
+
   // 3. 守卫拒绝
   if (guardResult === false) {
     console.warn(`[Router] Guard rejected navigation to ${path}`);
@@ -172,7 +185,7 @@ async function doRenderAsync(pageId: number, path: string, params: unknown) {
   // 4. 守卫重定向：通知 Flutter 替换当前路由，本页渲染 loading 占位
   if (isGuardRedirect(guardResult)) {
     const target = extractRedirectTarget(guardResult);
-    console.log(`[Router] Guard redirecting ${path} → ${target.path}`);
+    logDebug(`[Router] Guard redirecting ${path} → ${target.path}`);
     void dartCallNativeAsync('Navigator.pushReplace', {
       path: target.path,
       params: target.params ?? {},
@@ -186,13 +199,22 @@ async function doRenderAsync(pageId: number, path: string, params: unknown) {
   Router.recordLocation(pageId, to);
   const t3 = Date.now();
   const factory = to.matched.component!;
-  const app = factory(to.params);
+  // factory 在 React render 之外同步执行，抛错不会被 ErrorBoundary 捕获；
+  // 不包裹会变成 unhandled rejection，这里兜底渲染错误 UI。
+  let app: React.ReactNode;
+  try {
+    app = factory(to.params);
+  } catch (e) {
+    console.error(`[page_render] Page component factory threw for ${path}:`, e);
+    const fallbackUI = globalErrorFallback || defaultErrorFallback;
+    app = fallbackUI(e instanceof Error ? e : new Error(String(e)));
+  }
   const t4 = Date.now();
 
   r.update(wrapWithProviders(pageId, app), pageId);
   const t5 = Date.now();
 
-  console.log(
+  perfLog(
     `[Perf] page=${pageId} path=${path} total=${t5 - t0}ms |` +
       ` ensureRenderer=${t1 - t0}ms |` +
       ` router.resolve=${t2 - t1}ms |` +
@@ -212,18 +234,47 @@ export function render(pageId: number, path: string, params: unknown) {
     return;
   }
 
-  renderState[pageId] = { rendering: true };
-  void doRenderAsync(pageId, path, params).finally(() => {
-    // 处理在途累积的最新一笔；丢弃中间被覆盖的旧 pending（最新即正确）。
-    const next = renderState[pageId]?.pending;
-    if (next) {
-      renderState[pageId] = { rendering: false };
-      // 异步调度避免同步重入导致 reconciler 仍在 commit 阶段。
-      Promise.resolve().then(() => render(pageId, next.path, next.params));
-    } else {
-      delete renderState[pageId];
-    }
-  });
+  const token: RenderToken = {};
+  renderState[pageId] = { rendering: true, token };
+  void doRenderAsync(pageId, path, params, token)
+    .catch((e) => {
+      console.error(`[page_render] doRenderAsync failed for pageId=${pageId}, path=${path}:`, e);
+    })
+    .finally(() => {
+      // 仅当 state 仍属于本次渲染时才收尾：destroy() 或后续新渲染可能已替换/删除 state，
+      // 此时不能误删他人的状态。
+      const current = renderState[pageId];
+      if (!current || current.token !== token) return;
+      // 处理在途累积的最新一笔；丢弃中间被覆盖的旧 pending（最新即正确）。
+      const next = current.pending;
+      if (next) {
+        renderState[pageId] = { rendering: false, token };
+        // 异步调度避免同步重入导致 reconciler 仍在 commit 阶段。
+        // 执行前必须再校验 token：微任务等待期间 destroy() 可能已删除 state
+        // （或被新一轮渲染替换），此时直接调 render 会复活已销毁的页面。
+        //
+        // 场景（纯 JS 语义）：
+        //   1) render(A) 在途，撞上 render(B) → B 进 pending
+        //   2) A 的 .finally 调度微任务 M：render(B)
+        //   3) ★ 若 M 执行前 Flutter 调 destroy(pageId)，state 被删
+        //   4) M 执行时入口只看 `state && state.rendering`，undefined 直接放行
+        //      → ensureRoot 重建 container/root，JS 侧复活 Flutter 已不认的页面
+        //
+        // 在当前 QuickJS 引擎下，runJobs 是 do-while 排空到底的同步循环，
+        // .finally 与微任务 M 必然同一次 drain 连续执行，Flutter destroy 插不进
+        // 两者之间，所以最危险的第 3 步实际不可达。校验仍保留，是为了：
+        //   - 不依赖引擎 drain 实现细节（JSC 后端模型不同；日后若改成"每次 N 个 job"
+        //     或 drain 中同步桥接重入，窗口立刻变成可达）
+        //   - 把正确性放在 JS 语义层，三行成本换掉一个隐式依赖
+        Promise.resolve().then(() => {
+          if (renderState[pageId]?.token === token) {
+            render(pageId, next.path, next.params);
+          }
+        });
+      } else {
+        delete renderState[pageId];
+      }
+    });
 }
 
 export function destroy(pageId: number) {

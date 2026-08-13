@@ -2,6 +2,7 @@ import { Node } from '../core/node';
 import { PageContainer } from '../core/PageContainer';
 import { UIService } from '../services/UIService';
 import { MutationOp } from './types';
+import { isTransparentType } from '../core/constants';
 import { perfLog } from '../utils/log';
 
 export class IncrementalStrategy {
@@ -44,12 +45,12 @@ export class IncrementalStrategy {
       return;
     }
 
-    if (child.type === 'FlutterProps' || child.type === 'flutter-props') {
+    if (isTransparentType(child.type)) {
       this.recordHostUpdateFromFlutterProps(child);
       return;
     }
 
-    if (parent.type === 'FlutterProps' || parent.type === 'flutter-props') {
+    if (isTransparentType(parent.type)) {
       this.recordHostUpdateFromFlutterProps(parent);
       return;
     }
@@ -73,12 +74,12 @@ export class IncrementalStrategy {
       return;
     }
 
-    if (child.type === 'FlutterProps' || child.type === 'flutter-props') {
+    if (isTransparentType(child.type)) {
       this.recordHostUpdateFromFlutterProps(child);
       return;
     }
 
-    if (parent.type === 'FlutterProps' || parent.type === 'flutter-props') {
+    if (isTransparentType(parent.type)) {
       this.recordHostUpdateFromFlutterProps(parent);
       return;
     }
@@ -92,7 +93,7 @@ export class IncrementalStrategy {
   private getFlutterPropsAncestor(node: Node): Node | null {
     let current: Node | null = node;
     while (current) {
-      if (current.type === 'FlutterProps' || current.type === 'flutter-props') {
+      if (isTransparentType(current.type)) {
         return current;
       }
       current = current.parent || null;
@@ -229,7 +230,7 @@ Flutter 端的 FuickNode 只有在被标记为 isBoundary 时才会有对应的 
     let hasMultiple = false;
 
     for (const child of host.children) {
-      if (child.type !== 'FlutterProps' && child.type !== 'flutter-props') continue;
+      if (!isTransparentType(child.type)) continue;
       if ((child.props?.propsKey as string) !== propsKey) continue;
 
       const childrenDsl = child.children.map((c) => c.toDsl()).filter((c) => c !== null);

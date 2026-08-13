@@ -1,5 +1,6 @@
 import React from 'react';
 import { Node, TEXT_TYPE } from './node';
+import { isTransparentType } from './constants';
 import { IncrementalStrategy } from '../strategies/IncrementalStrategy';
 import { DiffStrategy } from '../strategies/DiffStrategy';
 import { NativeEvent } from '../runtime/NativeEvent';
@@ -322,6 +323,16 @@ export class PageContainer {
   }
 
   appendChildToContainer(child: Node) {
+    // 正常根替换时 React 会先走 removeChildFromContainer 把 root 置 null；
+    // 走到这里 root 仍非空说明业务在容器级挂了多个子节点（如根组件顶层返回数组、
+    // createPortal 到本容器），单 root 架构无法表达，只会保留最后一个。
+    if (this.root && this.root !== child) {
+      console.warn(
+        `[PageContainer] Multiple container-level children are not supported on page ${this.pageId}: ` +
+          `replacing root id=${this.root.id} type=${this.root.type} with id=${child.id} type=${child.type}. ` +
+          `Previous sibling will not be rendered.`,
+      );
+    }
     this.root = child;
     this.markChanged(child);
     this.diffStrategy.rendered = false;
@@ -383,8 +394,9 @@ export class PageContainer {
 
     try {
       const element = (itemBuilder as (index: number) => React.ReactNode)(index);
-      const dsl = this.elementToDsl(element);
-      return dsl;
+      // 走 elementToDslForItem 以便按 itemKey 回收合成回调，避免直接调用本方法时
+      // 合成 eventCallbacks 随重渲染无界增长。itemKey 与 renderer 的无状态路径一致。
+      return this.elementToDslForItem(`${this.pageId}:${refId}:${index}`, element);
     } catch (e) {
       console.error(`[PageContainer] Error in itemBuilder for refId ${refId} at index ${index}:`, e);
       return null;
@@ -435,6 +447,13 @@ export class PageContainer {
         // Handle React.memo and React.forwardRef (can be nested)
         while (typeof type === 'object' && type !== null && (type as { type: unknown }).type) {
           type = (type as { type: unknown }).type;
+        }
+
+        // React.Fragment 无宿主对应物：直接展开 children 继续处理。
+        // 否则 Symbol 类型会掉进 primitive 分支被 String() 成 "Symbol(react.fragment)" 非法 DSL。
+        if (type === React.Fragment) {
+          currentElement = (originalProps.children as React.ReactNode) ?? null;
+          continue;
         }
 
         if (typeof type === 'function') {
@@ -510,7 +529,7 @@ export class PageContainer {
 
   private processDslChild(processedProps: Record<string, unknown>, dslChildren: unknown[], childDsl: unknown) {
     const child = childDsl as Record<string, unknown>;
-    if (child.type === 'FlutterProps' || child.type === 'flutter-props') {
+    if (isTransparentType(child.type)) {
       const propsKey = (child.props as Record<string, unknown>)?.propsKey as string;
       if (propsKey) {
         const propChildren = (child.children as unknown[]) || [];

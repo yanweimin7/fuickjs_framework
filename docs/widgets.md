@@ -176,6 +176,10 @@ const { id, value, transform, start, stop, reverse, reset, setValue, setTo, onCo
 - **RepaintBoundary**: 性能优化组件，通过隔离重绘区域提升渲染效率。
 - **KeepAlive**: 在 PageView 或 Tab 中保持页面状态，避免重复触发生命周期。
 - **Drawer**: 侧边抽屉导航组件，需通过 `Scaffold` 的 `drawer` / `endDrawer` prop 引用。支持 `backgroundColor`, `elevation`, `width`。
+- **NavigationLink**: 声明式导航链接组件，带预热（prewarm）优化。Props: `url`（目标路由）, `params?`（路由参数）, `rootNavigator?`, `prewarmMs?`（默认 50ms，onTapDown 触发预热）, `hitSlop?`（点击热区 padding，默认 8）。用法：`<NavigationLink url="/detail" params={{ id: 1 }}><Text text="进入详情" /></NavigationLink>`。
+  - 预热流程：`onTapDown` 触发 `NavigatorService.prewarm()` 提前渲染目标页面 DSL → `onTap` 调用 `push()` 时命中缓存，降低页面打开延迟。
+  - `onTapCancel`（手指移出热区）自动取消预热。
+- **LazyView**: 延迟加载视图。Props: `load?: boolean`（是否加载）, `fallback?: ReactNode`（未加载时占位，默认 `SizedBox(0,0)`）, `builder: () => ReactNode`（仅在 load=true 时执行）。`builder` 模式实现真正的延迟加载——只有 `load=true` 时才创建子组件，避免未展示组件的 DSL 生成开销。详见 [introduction.md §组件延迟加载](./introduction.md#组件延迟加载)。
 
 ---
 

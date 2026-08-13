@@ -2,6 +2,8 @@
 
 `fuickjs_community/` 提供官方维护的可选扩展，按需引入，不强制纳入核心框架。每个包独立发布到 npm（`@fuickjs-community/xxx`），Flutter 侧实现放在包内的 `flutter/` 目录。
 
+> **状态说明**：Community 扩展包作为**独立仓库**维护，不在此 monorepo 中。以下文档描述各包的 API 设计与接入方式，实际 npm 包和 Flutter 实现请参照各自仓库的 README。
+
 ---
 
 ## 快速集成步骤（通用）

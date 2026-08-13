@@ -249,3 +249,34 @@ FuickAppView(
 5. **二进制协议 v2（varint + 字符串表）**：整数用 zigzag/LEB128 变长编码（小整数 1 字节），重复的键名/字符串走流式字符串表回引。相比 v1 定长编码体积约降到 28%，相比 JSON 体积约 40%；编解码往返耗时比 JSON 快 2.5~3.3×、比 v1 快 1.14~1.47×（节点越多优势越大，5 轮实测波动 <5%）。默认开启，可用 `QuickJsFFI.setBinaryCodecV2(false)` 回退到 v1。详见 [binary-protocol-v2.md](./binary-protocol-v2.md)
 6. **LazyView builder 模式**：heavy 组件延迟到 ready=true 时才创建
 7. **回调引用稳定**：函数引用变化只更新 JS 侧回调映射，不触发 Flutter UI 重建
+
+---
+
+## 全局配置 (FuickConfig)
+
+宿主在 `main()` 中通过 `FuickConfig()` 单例设置全局配置，控制框架运行时行为。所有字段均带默认值，可不显式配置。
+
+```dart
+import 'package:fuickjs_flutter/fuickjs_flutter.dart';
+
+void main() {
+  FuickConfig()
+    ..debug = false       // 关闭 debug 模式（自动收紧日志 + 关闭热重载/调试页）
+    ..verboseCommandLog = true;  // 开启 JS↔Native 调用栈日志
+
+  runApp(MyApp());
+}
+```
+
+### 配置项
+
+| 字段                        | 类型      | 默认值                               | 说明                                                                 |
+| --------------------------- | --------- | ------------------------------------ | -------------------------------------------------------------------- |
+| `debug`                     | `bool`    | `kDebugMode`                         | 设为 `false` 后自动将 `logLevel` 收紧为 `warning`，关闭热重载和调试页 |
+| `logLevel`                  | `Level`   | debug 时 `debug`，release 时 `warning` | 日志级别，控制台输出过滤                                              |
+| `enableHotReload`           | `bool`    | `kDebugMode`                         | 是否启用 JS 热重载（开发期使用）                                      |
+| `enableDevPage`             | `bool`    | `kDebugMode`                         | 是否注册调试控制台入口 `DevFuickAppPage`                              |
+| `enablePerformanceOverlay`  | `bool`    | `false`                              | 是否在 `FuickAppView` 上方叠加 Flutter Performance Overlay            |
+| `verboseCommandLog`         | `bool`    | `false`                              | 是否在 debug 模式下输出 JS↔Native 完整调用栈                          |
+
+> **注意**：设置 `debug = false` 会**自动**将 `logLevel` 设为 `warning`、`enableHotReload` 和 `enableDevPage` 设为 `false`。如果需要细粒度控制，请在设置 `debug` 之后再逐个覆盖对应字段。

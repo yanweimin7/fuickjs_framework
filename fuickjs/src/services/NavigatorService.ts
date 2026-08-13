@@ -4,6 +4,7 @@ import * as Router from '../router/router';
 import type { GuardResult, RouteConfig } from '../router/router';
 import { isGuardRedirect, extractRedirectTarget } from '../router/router';
 import { getRuntimeConfig } from '../runtime/runtime';
+import { logDebug } from '../utils/log';
 
 /** 安全执行守卫链，异常视为拒绝 */
 async function runGuardsSafely(to: Router.RouteLocation, from: Router.RouteLocation | null): Promise<GuardResult> {
@@ -52,7 +53,7 @@ export class NavigatorService {
     if (!to) {
       // 未匹配 JS 路由：开启 nativeFallback 时交给 Native 侧（宿主路由）处理
       if (Router.isNativeFallbackEnabled()) {
-        console.log(`[Navigator] No JS route for ${path}, delegating to native`);
+        logDebug(`[Navigator] No JS route for ${path}, delegating to native`);
         return NavigatorService.pushRaw(path, params, pageId, true, prewarmMs);
       }
       console.warn(`[Navigator] No route matched for ${path}`);
@@ -92,7 +93,7 @@ export class NavigatorService {
     if (!to) {
       // 未匹配 JS 路由：开启 nativeFallback 时交给 Native 侧（宿主路由）处理
       if (Router.isNativeFallbackEnabled()) {
-        console.log(`[Navigator] No JS route for ${path}, delegating to native`);
+        logDebug(`[Navigator] No JS route for ${path}, delegating to native`);
         return dartCallNativeAsync('Navigator.pushReplace', {
           path,
           params,

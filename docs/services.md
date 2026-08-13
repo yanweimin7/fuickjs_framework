@@ -16,6 +16,14 @@
 - `showModal(path, params?, options?: { minHeight?, maxHeight? })`: 弹半屏 BottomSheet
 - `showDialog(pathOrComponent, params?)`: 弹对话框（支持路径或 React 组件）
 
+> **ComponentStore 机制**：`showDialog` 和 `showBottomSheet` 支持直接传入 React 组件（而非路由路径）。框架内部通过 `ComponentStore` 单例实现跨页面传递：
+> 1. 调用 `showDialog(<MyDialog />, params)` 时，NavigatorService 将 React 组件注册到 ComponentStore，得到唯一 ID
+> 2. 将 `componentId` 作为路由参数传递给内置的 `/_generic_dialog` 页面
+> 3. `GenericPage` 组件从 ComponentStore 取出组件并渲染
+> 4. 页面销毁时自动清理（`useEffect` 返回 clean-up 调用 `remove`）
+> 
+> `ComponentStore` 位置：`fuickjs/src/store/ComponentStore.ts`，提供 `register(component): string` / `get(id): ReactNode` / `remove(id)` 三个方法。
+
 ### 2. 界面与交互
 
 **Dialog（对话框）**
@@ -80,13 +88,19 @@
 > 主题切换由 Flutter 端 `MaterialApp.theme` / 暗黑模式切换驱动；屏幕旋转、键盘弹起也会触发 `mediaQueryChange`。
 
 **PickerService（选择器）**
-- `showPicker({ range, value?, title?, cancelText?, confirmText? })`: 单列选择
-- `showMultiPicker({ range: string[][], value?: number[], ... })`: 多列联动选择
-- `showDatePicker({ value?: 'YYYY-MM-DD', start?, end? })`: 日期选择
+- `show(options)`: 单列选择器（调用 `Dialog.showPicker`，Flutter 侧由 `DialogService` 统一处理）
+- `showMulti(options)`: 多列联动选择器
+- `showDate(options?)`: 日期选择器（Flutter 原生 `showDatePicker`）
+- `showTime(options?)`: 时间选择器（Flutter 原生 `showTimePicker`，2026-08 新增）
+- JS 侧实现：`fuickjs/src/services/PickerService.ts`
+- Flutter 侧实现：`DialogService._showPicker` / `_showDatePicker` / `_showTimePicker`（`lib/core/service/dialog_service.dart`）
 
-**MediaService（多媒体）**
-- `chooseImage(count?, sourceType?: ('album' | 'camera')[])`: 选图，返回 `{ tempFilePaths, tempFiles }`
+**MediaService（多媒体，⚠️ 通过 Community 扩展包提供）**
+- 图片/视频选择能力不在核心框架中，需安装 Community 扩展包 `@fuickjs-community/media`
+- `chooseImage(count?, sourceType?)`: 选图，返回 `{ tempFilePaths, tempFiles }`
 - `chooseVideo(sourceType?)`: 选视频，返回 `{ tempFilePath, size, type }`
+- `previewImage(urls, current?)`: 预览图片
+- 详见 [Community 扩展包文档](./community.md#media--图片视频选择)
 
 **SoundService（声音/触觉，仅 Flutter 侧）**
 - `Sound.play({ type: 'move' | 'capture' | 'check' | 'win' })`: 播放系统音效并触发 HapticFeedback，通过 `dartCallNative('Sound.play', ...)` 调用
@@ -191,6 +205,7 @@ FuickJS 在 QuickJS 环境中补齐了 Web 标准 API，通过 Flutter 原生能
 ### 事件与性能
 - **EventTarget / Event / CustomEvent**: 完整 DOM 事件模型（`addEventListener/removeEventListener/dispatchEvent`）
 - **performance**: `performance.now()` 返回自引擎启动以来的高精度毫秒数
+- **navigator**: 标准 `navigator` 对象（`userAgent`、`language`、`platform`、`appVersion`、`onLine` 等），通过 `DeviceInfoService` 自动填充。网络状态变化时自动更新 `onLine`。实现在 `polyfill/navigator.ts`
 
 ### 其他 Polyfill
 - **crypto**:
@@ -204,6 +219,22 @@ FuickJS 在 QuickJS 环境中补齐了 Web 标准 API，通过 Flutter 原生能
 - `console.time(label?)` / `console.timeLog(label?, ...args)` / `console.timeEnd(label?)`
 - `console.group(...args)` / `console.groupCollapsed(...args)` / `console.groupEnd()`（无 UI 折叠，语义等同 group）
 - `console.table(data, columns?)`：输出 ASCII 表格，`data` 支持对象数组 / 普通对象 / 标量数组
+
+**渲染性能计时** (`utils/perf-timing.ts`)
+框架内置 per-page 渲染计时，记录三个关键阶段：
+
+| 阶段 | 说明 |
+| ------ | ------ |
+| `t_js_to_dsl` | JS 收到 render 请求 → DSL 序列化完成 |
+| `t_transfer` | `dartCallNative('UI.renderUI')` 同步 FFI 往返耗时（含 Flutter 侧 createNode 解析） |
+| `t_total` | 从 render 请求到收尾日志的总耗时 |
+
+> 日志格式：`[PerfTiming] page=<id> path=<route> | t_js_to_dsl=<N>ms | t_transfer=<N>ms | t_total=<N>ms`。`report()` 完成后自动清理计时记录。默认通过 `console.log` 输出（已注释），可在 `perf-timing.ts` 中取消注释开启。
+
+**`dartCallNativeAsync` 超时机制** (`polyfill/native-async-timeout.ts`)
+`dartCallNativeAsync(method, args, timeoutMs?)` 的第三个参数提供可选超时（默认 `0` = 无超时）。超时时 reject 并返回 Error（`dartCallNativeAsync("xxx") timed out after Nms`）。实现为 `Promise.race` + `setTimeout`，不阻塞原生调用。
+
+> 默认无超时是刻意的：部分操作（如 `Navigator.push`）等待页面关闭才返回，耗时不可预期。业务侧按需传 `timeoutMs`。
 
 ### 全局别名
 - `window` 指向 `globalThis`

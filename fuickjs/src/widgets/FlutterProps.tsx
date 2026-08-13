@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react';
+import { FLUTTER_PROPS_TYPE } from '../core/constants';
 
 export interface FlutterPropsProps {
   propsKey: string;
@@ -19,6 +20,6 @@ export interface FlutterPropsProps {
 export class FlutterProps extends React.Component<FlutterPropsProps> {
   render(): ReactNode {
     // The renderer will handle this special component type
-    return React.createElement('FlutterProps', { propsKey: this.props.propsKey }, this.props.children);
+    return React.createElement(FLUTTER_PROPS_TYPE, { propsKey: this.props.propsKey }, this.props.children);
   }
 }

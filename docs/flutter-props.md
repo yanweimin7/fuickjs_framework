@@ -130,7 +130,7 @@ export class Scaffold extends React.Component<ScaffoldProps> {
 ```typescript
 // node.ts:210-233
 for (const child of this.children) {
-  if (child.type === 'FlutterProps' || child.type === 'flutter-props') {
+  if (isTransparentType(child.type)) {
     const propsKey = child.props?.propsKey as string;
     if (propsKey) {
       const propChildren = child.children.map((c) => c.toDsl()).filter((c) => c !== null);
@@ -160,9 +160,16 @@ for (const child of this.children) {
 ### 2. `node.ts:_isTransparent()` — 透明节点标记
 
 ```typescript
-// node.ts:89-91
+// core/constants.ts —— JS 侧唯一的透明节点 type 判定，Dart 侧对应 kTransparentNodeTypes
+export const TRANSPARENT_TYPES = ['FlutterProps', 'flutter-props'] as const;
+
+export function isTransparentType(type: unknown): boolean {
+  return type === 'FlutterProps' || type === 'flutter-props';
+}
+
+// node.ts
 private _isTransparent(): boolean {
-  return this.type === 'FlutterProps' || this.type === 'flutter-props';
+  return isTransparentType(this.type);
 }
 ```
 
@@ -189,7 +196,7 @@ private _invalidateParentDslCache() {
 ```typescript
 // PageContainer.ts:511-533
 private processDslChild(processedProps, dslChildren, childDsl) {
-  if (child.type === 'FlutterProps' || child.type === 'flutter-props') {
+  if (isTransparentType(child.type)) {
     const propsKey = child.props?.propsKey;
     // 将内容提升到 processedProps[propsKey]
     // 支持单 child 打平、多 child 合并
@@ -298,8 +305,8 @@ Scaffold (isBoundary)
 Flutter 侧的 `FuickNode._resolveValue()` 也识别 `FlutterProps` 节点：
 
 ```dart
-// fuick_node.dart:68-81
-if (type == 'flutter-props' || type == 'FlutterProps' || type == 'Props') {
+// fuick_node.dart
+if (kTransparentNodeTypes.contains(type)) {
   // 从 children 中提取实际值
   final upgradedChildren = childrenDsl
     .map((c) => _resolveValue(c, manager, depth + 1))

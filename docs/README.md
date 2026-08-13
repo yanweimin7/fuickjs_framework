@@ -61,6 +61,7 @@
 | 文档 | 定位 |
 | --- | --- |
 | [Bundle 动态下发 bundle-delivery.md](./bundle-delivery.md) | Ed25519 验签 + SHA-256 + 状态机 + 回滚 + 图片透明加载 |
+| [页面级分包加载 page-split-loading.md](./page-split-loading.md) | 主包 + 页面 chunk 按需 eval（**技术可行，但当前收益偏小、不建议实施**） |
 
 ### 五、质量与审计
 
@@ -75,12 +76,10 @@
 | [fuickjs_flutter/README.md](../fuickjs_flutter/README.md) | Flutter 端包说明（公开 API 入口） |
 | [fuickjs_flutter/CHANGELOG.md](../fuickjs_flutter/CHANGELOG.md) | 版本记录 |
 
-> **待补文档**：`page-split-loading.md`（页面级分包加载：主包 + 按需 chunk）原计划收录，但对应文档尚未产出，索引中暂时移除该死链。
-
 ## 推荐阅读路线
 
 - **业务 / 新手开发**：`introduction` → `widgets` → `services` → `router` → `i18n`
-- **宿主集成 / 原生扩展**：`services` → `community` → `bundle-delivery` → `fuickjs_flutter/README`
+- **宿主集成 / 原生扩展**：`services` → `community` → `bundle-delivery` → `page-split-loading` → `fuickjs_flutter/README`
 - **引擎 / 框架贡献者**：`fuickjs_dart` → `binary-protocol-v2` → `audit-report`
 
 ## 开发规范

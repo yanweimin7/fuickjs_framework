@@ -1,6 +1,7 @@
 import { Node } from '../core/node';
 import { PageContainer } from '../core/PageContainer';
 import { UIService } from '../services/UIService';
+import { isTransparentType } from '../core/constants';
 import { perfLog } from '../utils/log';
 import { markDslReady, markSendEnd } from '../utils/perf-timing';
 
@@ -68,7 +69,7 @@ export class DiffStrategy {
       for (const node of this.changedNodes) {
         // If a flutter-props node changed, it means its parent (the host component) needs to update
         // to reflect the new property value in its DSL.
-        if ((node.type === 'FlutterProps' || node.type === 'flutter-props') && node.parent) {
+        if (isTransparentType(node.type) && node.parent) {
           normalizedChangedNodes.add(node.parent);
         } else {
           normalizedChangedNodes.add(node);

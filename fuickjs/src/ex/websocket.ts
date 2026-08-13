@@ -1,4 +1,5 @@
 import { Event, EventTarget, EventListener } from './events';
+import { logDebug } from '../utils/log';
 
 // WebSocket ready states
 export const enum WebSocketReadyState {
@@ -131,11 +132,11 @@ export class WebSocket extends EventTarget {
     const key = `_ws_${this._socketId}`;
     const existed = (globalThis as unknown as Record<string, unknown>)[key] !== undefined;
     delete (globalThis as unknown as Record<string, unknown>)[key];
-    console.log(`[WebSocket] _cleanupGlobalRef() socketId=${this._socketId}, key=${key}, existed=${existed}`);
+    logDebug(`[WebSocket] _cleanupGlobalRef() socketId=${this._socketId}, key=${key}, existed=${existed}`);
   }
 
   private async _initConnection(): Promise<void> {
-    console.log(`[WebSocket] _initConnection() socketId=${this._socketId}, url=${this._url}`);
+    logDebug(`[WebSocket] _initConnection() socketId=${this._socketId}, url=${this._url}`);
     try {
       if (typeof dartCallNativeAsync !== 'function') {
         throw new Error('dartCallNativeAsync is not available.');
@@ -144,7 +145,7 @@ export class WebSocket extends EventTarget {
       // Register this socket instance globally so native can send events back
       const globalKey = `_ws_${this._socketId}`;
       (globalThis as unknown as Record<string, unknown>)[globalKey] = this;
-      console.log(`[WebSocket] Registered on globalThis: ${globalKey}`);
+      logDebug(`[WebSocket] Registered on globalThis: ${globalKey}`);
 
       const result = (await dartCallNativeAsync('WebSocket.connect', {
         socketId: this._socketId,
@@ -152,7 +153,7 @@ export class WebSocket extends EventTarget {
         protocols: Array.isArray(this._protocols) ? this._protocols : [this._protocols],
       })) as { success: boolean; protocol?: string; extensions?: string; error?: string };
 
-      console.log(
+      logDebug(
         `[WebSocket] connect result for socketId=${this._socketId}: success=${result.success}, error=${result.error}`,
       );
 
@@ -225,7 +226,7 @@ export class WebSocket extends EventTarget {
 
   // Called by native when the connection is closed
   _handleClose(code: number, reason: string, wasClean: boolean): void {
-    console.log(
+    logDebug(
       `[WebSocket] _handleClose() socketId=${this._socketId}, code=${code}, reason=${reason}, wasClean=${wasClean}`,
     );
     this._readyState = WebSocketReadyState.CLOSED;
@@ -294,13 +295,13 @@ export class WebSocket extends EventTarget {
 
   close(code?: number, reason?: string): void {
     if (this._readyState === WebSocketReadyState.CLOSING || this._readyState === WebSocketReadyState.CLOSED) {
-      console.log(
+      logDebug(
         `[WebSocket] close() called but already closing/closed socketId=${this._socketId}, state=${this._readyState}`,
       );
       return;
     }
 
-    console.log(`[WebSocket] close() socketId=${this._socketId}, code=${code ?? 1000}`);
+    logDebug(`[WebSocket] close() socketId=${this._socketId}, code=${code ?? 1000}`);
     this._readyState = WebSocketReadyState.CLOSING;
 
     // Send close through native service.

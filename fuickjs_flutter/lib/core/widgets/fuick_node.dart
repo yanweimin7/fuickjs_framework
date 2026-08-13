@@ -1,5 +1,12 @@
 import '../utils/extensions.dart';
 
+/// 透明节点（FlutterProps）的 type 字符串。
+///
+/// 这类节点不生成自己的 widget，其 children 会被提升为父节点的命名属性值。
+/// JS 侧的同名常量在 `fuickjs/src/core/constants.ts` (`TRANSPARENT_TYPES`)，
+/// 两侧必须保持一致。
+const Set<String> kTransparentNodeTypes = {'FlutterProps', 'flutter-props'};
+
 class FuickNode {
   final int id;
   String type;
@@ -65,9 +72,7 @@ class FuickNode {
     if (value is Map) {
       final type = value['type'];
       if (type is String && value.containsKey('id')) {
-        if (type == 'flutter-props' ||
-            type == 'FlutterProps' ||
-            type == 'Props') {
+        if (kTransparentNodeTypes.contains(type)) {
           final childrenDsl = value['children'] as List?;
           if (childrenDsl == null || childrenDsl.isEmpty) return null;
           final upgradedChildren = childrenDsl
