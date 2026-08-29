@@ -3,6 +3,8 @@ import 'dart:isolate';
 
 import 'package:easy_isolate/easy_isolate.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fuickjs_flutter/core/engine/isolate_manager.dart';
+import 'package:fuickjs_flutter/core/engine/jscontext_delegate.dart';
 import 'package:fuickjs_flutter/core/engine/worker.dart';
 
 /// init 第一次抛错、第二次成功：验证 ensureInitialized 失败后状态被重置、
@@ -44,6 +46,22 @@ class _AlwaysFailingWorker extends Worker {
   }
 }
 
+class _CapturingWorker extends Worker {
+  MainMessageHandler? capturedMainHandler;
+
+  @override
+  Future<void> init(
+    MainMessageHandler mainHandler,
+    IsolateMessageHandler isolateHandler, {
+    Object? initialMessage,
+    bool queueMode = false,
+    MessageHandler? errorHandler,
+    MessageHandler? exitHandler,
+  }) async {
+    capturedMainHandler = mainHandler;
+  }
+}
+
 FutureOr<void> _dummyEntry(dynamic _, SendPort __, SendErrorFunction ___) {}
 
 void main() {
@@ -52,7 +70,10 @@ void main() {
       final worker = IsolateWorker.forTest(_dummyEntry, worker: _FlakyWorker());
 
       // 第一次：init 抛错，应向上抛出。
-      expect(() => worker.ensureInitialized(), throwsA(isA<Exception>()));
+      await expectLater(
+        worker.ensureInitialized(),
+        throwsA(isA<Exception>()),
+      );
 
       // 第二次：状态已重置，重试应成功（不再永久 hang）。
       await expectLater(worker.ensureInitialized(), completes);
@@ -76,6 +97,75 @@ void main() {
 
       // 紧随其后的一次调用也应被抛错完成（不 hang）。
       await expectLater(worker.ensureInitialized(), throwsA(isA<Exception>()));
+    });
+  });
+
+  group('IsolateWorker Native callback response', () {
+    test('callback 异常通过 replyPort 回传，不会让 worker 永久等待', () async {
+      final backend = _CapturingWorker();
+      final worker = IsolateWorker.forTest(_dummyEntry, worker: backend);
+      await worker.ensureInitialized();
+
+      final delegate = JsContextDelegate('ctx-error', worker: worker);
+      delegate.onCallNativeAsync = (_, __) async {
+        throw StateError('simulated native failure');
+      };
+
+      final replyPort = ReceivePort();
+      final isolatePort = ReceivePort();
+      addTearDown(() {
+        replyPort.close();
+        isolatePort.close();
+      });
+
+      await Future.sync(() => backend.capturedMainHandler!({
+            'contextId': delegate.contextId,
+            'type': 'callNativeAsync',
+            'replyPort': replyPort.sendPort,
+            'payload': {'method': 'Test.fail', 'args': null},
+          }, isolatePort.sendPort));
+
+      final envelope = await replyPort.first.timeout(
+        const Duration(seconds: 1),
+      );
+      expect(
+        () => NativeCallReply.unwrap(envelope),
+        throwsA(
+          isA<RemoteError>().having(
+            (e) => e.toString(),
+            'message',
+            contains('simulated native failure'),
+          ),
+        ),
+      );
+    });
+
+    test('delegate 缺失时也会返回结构化错误', () async {
+      final backend = _CapturingWorker();
+      final worker = IsolateWorker.forTest(_dummyEntry, worker: backend);
+      await worker.ensureInitialized();
+
+      final replyPort = ReceivePort();
+      final isolatePort = ReceivePort();
+      addTearDown(() {
+        replyPort.close();
+        isolatePort.close();
+      });
+
+      await Future.sync(() => backend.capturedMainHandler!({
+            'contextId': 'missing-context',
+            'type': 'callNativeAsync',
+            'replyPort': replyPort.sendPort,
+            'payload': {'method': 'Test.fail', 'args': null},
+          }, isolatePort.sendPort));
+
+      final envelope = await replyPort.first.timeout(
+        const Duration(seconds: 1),
+      );
+      expect(
+        () => NativeCallReply.unwrap(envelope),
+        throwsA(isA<RemoteError>()),
+      );
     });
   });
 }

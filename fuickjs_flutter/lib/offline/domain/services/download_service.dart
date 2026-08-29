@@ -17,19 +17,36 @@ class DownloadService {
   final PackageRepository _repository;
   final OfflineConfig _config;
   final BundleVerifier _verifier;
+  final bool _enableSignatureVerify;
   final Dio _dio;
   final Map<String, CancelToken> _cancelTokens = {};
   final Map<String, double> _progress = {};
+  // 进度节流：按 name 记录上一次回调的进度，增量 <1% 不回调，避免高频打 UI。
+  final Map<String, double> _lastEmittedProgress = {};
+  // 按 name 记录最近一次进度（含终态 1.0 / -1.0），供 pull 查询。
+  final Map<String, double> _progressByName = {};
   bool Function(Package package)? _isInternalChecker;
 
   DownloadService(
     this._repository, {
     required OfflineConfig config,
     required BundleVerifier verifier,
+    bool? enableSignatureVerify,
     Dio? dio,
   })  : _config = config,
         _verifier = verifier,
-        _dio = dio ?? Dio();
+        _enableSignatureVerify = enableSignatureVerify ?? config.enableSignatureVerify,
+        _dio = dio ?? Dio() {
+    // enableSignatureVerify=true 却未配置公钥是配置错误：验签必因无 key 匹配
+    // 而失败，并把正常包误判为"被篡改"删除。这里 fail-fast 早抛，避免静默损坏。
+    if (_enableSignatureVerify && config.signaturePublicKeysB64.isEmpty) {
+      throw ArgumentError(
+        'enableSignatureVerify=true requires signaturePublicKeysB64 to be '
+        'non-empty. Configure signaturePublicKeysB64, or set '
+        'enableSignatureVerify=false.',
+      );
+    }
+  }
 
   void setInternalChecker(bool Function(Package package) checker) {
     _isInternalChecker = checker;
@@ -77,7 +94,7 @@ class DownloadService {
     if (zipFile == null) return null;
 
     // 整包 SHA-256 校验（图片也被覆盖）。
-    final expected = package.integrity;
+    final expected = package.sha256;
     if (expected.isNotEmpty) {
       final actual = await _sha256OfFile(zipFile);
       if (actual.toLowerCase() != expected.toLowerCase()) {
@@ -100,14 +117,21 @@ class DownloadService {
       return null;
     }
 
-    // 代码层验签。
-    final verify = await _verifier.verifyDir(stagingDir);
-    if (!verify.ok) {
-      logger(() => 'verify failed $id: ${verify.reason}');
-      await _safeDeleteDir(stagingDir);
-      return null;
+    // 代码层验签（Ed25519 + 逐代码文件 SHA-256）。
+    // enableSignatureVerify=false 时跳过，仅保留整包 zip SHA-256（传输完整性）。
+    final VerifyResult verify;
+    if (_enableSignatureVerify) {
+      verify = await _verifier.verifyDir(stagingDir);
+      if (!verify.ok) {
+        logger(() => 'verify failed $id: ${verify.reason}');
+        await _safeDeleteDir(stagingDir);
+        return null;
+      }
+      logger(() => 'verify ok: $id');
+    } else {
+      logger(() => 'signature verify disabled, skip code-layer verify: $id');
+      verify = const VerifyResult.success(null);
     }
-    logger(() => 'verify ok: $id');
 
     // minAppVersion 兼容性（manifest 优先，回退 package）。
     final minAppVersion =
@@ -184,6 +208,7 @@ class DownloadService {
     final tmpPath = '${zipFile.path}.tmp';
     final cancelToken = CancelToken();
     _cancelTokens[package.url!] = cancelToken;
+    _lastEmittedProgress.remove(package.name);
     try {
       logger(() => 'Downloading ${package.url}');
       await _dio.download(
@@ -191,12 +216,15 @@ class DownloadService {
         tmpPath,
         cancelToken: cancelToken,
         onReceiveProgress: (received, total) {
-          _progress[package.url!] = total > 0 ? received / total : 0;
+          final progress = total > 0 ? received / total : 0.0;
+          _progress[package.url!] = progress;
+          _emitProgress(package.name, progress);
         },
       );
       // 下载完成才 rename 到最终路径，避免半包被当成完整包。
       await File(tmpPath).rename(zipFile.path);
       logger(() => 'Download completed: ${package.url}');
+      _emitProgress(package.name, 1.0);
       return zipFile;
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) {
@@ -204,16 +232,35 @@ class DownloadService {
       } else {
         logger(() => 'Download failed: ${package.url}, ${e.message}');
       }
+      _emitProgress(package.name, -1.0);
       await _safeDelete(File(tmpPath));
       return null;
     } catch (e) {
       logger(() => 'Download error: ${package.url}, $e');
+      _emitProgress(package.name, -1.0);
       await _safeDelete(File(tmpPath));
       return null;
     } finally {
       _cancelTokens.remove(package.url!);
       _progress.remove(package.url!);
+      _lastEmittedProgress.remove(package.name);
     }
+  }
+
+  /// 进度透出（节流）：进度增量 <1% 时跳过；终止态（1.0 / -1.0）恒透出。
+  void _emitProgress(String name, double progress) {
+    _progressByName[name] = progress;
+    final cb = _config.onDownloadProgress;
+    if (cb == null) return;
+    final last = _lastEmittedProgress[name];
+    final isTerminal = progress >= 1.0 || progress < 0;
+    if (!isTerminal &&
+        last != null &&
+        (progress - last).abs() < 0.01) {
+      return;
+    }
+    _lastEmittedProgress[name] = progress;
+    cb(name, progress);
   }
 
   String _zipPath(Package package) => p.join(
@@ -276,6 +323,10 @@ class DownloadService {
   }
 
   double getProgress(String url) => _progress[url] ?? 0;
+
+  /// 按 bundle name 查询最近一次下载进度（含终态 1.0 / -1.0）。
+  /// 未下载过返回 0。仅供需要 pull 语义的接入方（如进度条首次进入时读取）。
+  double getProgressByName(String name) => _progressByName[name] ?? 0;
 
   bool isDownloading(String url) => _cancelTokens.containsKey(url);
 }

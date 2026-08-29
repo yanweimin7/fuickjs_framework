@@ -1,10 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:synchronized/synchronized.dart';
 
 import '../../util/logger.dart';
+import '../entities/bundle_manifest.dart';
 import '../entities/package.dart';
 import '../repositories/package_repository.dart';
+import '../services/bundle_verifier.dart';
 import '../services/bundle_verify_isolate.dart';
 import '../value_objects/package_registry.dart';
 
@@ -17,6 +22,15 @@ class PackageService {
   /// 后台验签 Future（fire-and-forget）。测试可 await 它等待验证完成。
   /// 生产代码通常忽略。
   Future<void>? _bgVerifyFuture;
+
+  /// 验签内容指纹缓存：dir → 指纹。指纹由参与验签文件的 `path:mtime:size`
+  /// 拼接而成。命中且该指纹来自一次**通过**的验签时，on-open 跳过 isolate 重验
+  /// （单次验签 ~100-300ms，稳态下每次打开省掉这笔开销）。
+  ///
+  /// 只存内存不落盘：进程重启后 registry 加载会触发 background verify 重新验签，
+  /// 首开仍走完整验签，之后命中。key 是唯一目录（含 name-version-sha256），
+  /// 目录被删后旧 entry 只会因路径不匹配而自然失效，无脏数据风险。
+  final Map<String, String> _verifiedFingerprint = {};
 
   /// _registry 修改互斥锁。
   ///
@@ -61,6 +75,24 @@ class PackageService {
 
   Package? getActivePackage(String name) => _registry.activeOf(name);
   Package? getStagedPackage(String name) => _registry.stagedOf(name);
+
+  /// 返回 remote 中 name 匹配、mustBeUpdated=true 且 ≠ 当前 active 的目标包；
+  /// 无则返回 null（供 Offline 打开 bundle 时做强制更新）。
+  ///
+  /// 判定依据仅依赖内存态（_remotePackages / _registry），不触发 IO。
+  ///
+  /// 内置包（internal）恒豁免：即使内置 bundles.json 里某包被标了
+  /// mustBeUpdated=true 也不触发强制更新——mustBeUpdated 是**远程下发**的强制
+  /// 更新语义，只在 remote 元数据里有效；内置包是兜底资产，不应弹出强制更新。
+  /// （无远程配置时 _remotePackages 会被降级为 internalPackages，此时也不应
+  /// 触发，故此处显式排除 isInternal。）
+  Package? findForcedUpdateTarget(String name) {
+    final active = _registry.activeOf(name);
+    return _remotePackages
+        .where((p) => p.name == name && p.mustBeUpdated && !isInternal(p))
+        .where((p) => active == null || !active.isSameVersion(p))
+        .firstOrNull;
+  }
 
   Future<void> init() async {
     if (_initialized) return;
@@ -174,6 +206,10 @@ class PackageService {
     for (final r in results) {
       if (r.ok) {
         kept.add(r.pkg);
+        // 后台验签通过也记录指纹：若它先于 on-open 完成，首开即可命中短路。
+        final dir = _repository.getPackageDir(r.pkg);
+        final fp = await _computeVerifyFingerprint(dir);
+        if (fp != null) _verifiedFingerprint[dir] = fp;
       } else {
         failures.add(r.pkg);
       }
@@ -210,11 +246,67 @@ class PackageService {
     return _withRegistryLock(() => _doVerifyOnOpen(pkg, dir));
   }
 
+  /// 计算 [dir] 的验签内容指纹：拼接参与验签文件的 `path:mtime:size`。
+  ///
+  /// 参与验签的文件清单以 [BundleVerifier] 为单一数据源：
+  /// `manifest.json`、`manifest.sig`、以及 `manifest.files` 中所有非 `.qjc`
+  /// 的代码文件（`.qjc` 字节码 sha 不固定、不参与验签，故也不参与指纹——
+  /// BundleCompiler 后台重编 qjc 不应触发重验）。
+  ///
+  /// 读不到 / 解析不了 manifest 返回 null（调用方应视为"指纹未知"，强制重验）。
+  Future<String?> _computeVerifyFingerprint(String dir) async {
+    final List<String> relPaths;
+    try {
+      final map = jsonDecode(
+        await File(p.join(dir, BundleVerifier.manifestFileName)).readAsString(),
+      ) as Map<String, dynamic>;
+      final manifest = BundleManifest.fromJson(map);
+      relPaths = [
+        BundleVerifier.manifestFileName,
+        BundleVerifier.manifestSigFileName,
+        for (final f in manifest.files)
+          if (!BundleVerifier.isVerificationExcluded(f.path)) f.path,
+      ];
+    } catch (_) {
+      return null;
+    }
+
+    final buffer = StringBuffer();
+    for (final rel in relPaths) {
+      final f = File(p.join(dir, rel));
+      try {
+        final st = await f.stat();
+        buffer
+          ..write(rel)
+          ..write(':')
+          ..write(st.modified.microsecondsSinceEpoch)
+          ..write(':')
+          ..write(st.size)
+          ..write(';');
+      } catch (_) {
+        buffer..write(rel)..write(':MISSING;');
+      }
+    }
+    return buffer.toString();
+  }
+
   Future<Package?> _doVerifyOnOpen(Package pkg, String dir) async {
     final isolate = _verifyIsolate;
     if (isolate == null) return pkg; // 未配置验签 → 信任上层
+
+    // 指纹短路：参与验签的文件 mtime+size 未变，且上次已验签通过 → 跳过重验。
+    final fingerprint = await _computeVerifyFingerprint(dir);
+    if (fingerprint != null && _verifiedFingerprint[dir] == fingerprint) {
+      return pkg;
+    }
+
     final v = await isolate.verify(dir);
-    if (v.ok) return pkg;
+    if (v.ok) {
+      if (fingerprint != null) _verifiedFingerprint[dir] = fingerprint;
+      return pkg;
+    }
+    // 验签失败：清掉可能残留的缓存，并走删包路径。
+    _verifiedFingerprint.remove(dir);
     logger(() =>
         '[P0-3 on-open] Reject tampered package: ${pkg.versionShasumName} '
         '(${v.reason})');

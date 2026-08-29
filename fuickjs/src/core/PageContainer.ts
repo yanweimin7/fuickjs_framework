@@ -313,13 +313,15 @@ export class PageContainer {
     const i = parent.children.indexOf(child);
     if (i >= 0) parent.children.splice(i, 1);
     parent.invalidateDslCache(); // Invalidate parent cache
-    child.destroy();
 
     if (this.incrementalMode) {
       this.recordRemoval(parent, child);
     } else {
       this.markChanged(parent);
     }
+    // recordRemoval 处理 FlutterProps 透明节点时需要沿 child.parent 找到宿主节点，
+    // 因此必须在 destroy() 切断 parent/container 反向链之前记录变更。
+    child.destroy();
   }
 
   appendChildToContainer(child: Node) {
@@ -413,8 +415,8 @@ export class PageContainer {
       );
       return null;
     }
-    // 循环引用检测：业务代码可能在 props/数组中放回自身。WeakSet 仅在递归路径上记录，
-    // 退出分支不需要清理。仅对象/数组进入；string/number 不触发。
+    // 循环引用检测：业务代码可能在 props/数组中放回自身。WeakSet 仅记录当前
+    // 递归路径，并在分支退出时清理；合法的共享对象/Element 可在兄弟分支复用。
     if (typeof element === 'object' && element !== null) {
       if (!visited) visited = new WeakSet();
       if (visited.has(element as object)) {
@@ -422,8 +424,22 @@ export class PageContainer {
         return null;
       }
       visited.add(element as object);
+      try {
+        return this.elementToDslUnchecked(element, depth, visited);
+      } finally {
+        // visited 表示当前递归路径而不是全局去重集合；合法 DAG 可在兄弟分支复用。
+        visited.delete(element as object);
+      }
     }
 
+    return this.elementToDslUnchecked(element, depth, visited);
+  }
+
+  private elementToDslUnchecked(
+    element: React.ReactNode,
+    depth: number,
+    visited?: WeakSet<object>,
+  ): unknown {
     let currentElement: React.ReactNode = element;
 
     while (true) {
@@ -577,6 +593,10 @@ export class PageContainer {
     // Case 1: 基础类型或空值直接返回
     if (!props || typeof props !== 'object') return props;
 
+    // React Element 交给 elementToDsl 统一登记 visited。若先在这里 add，
+    // elementToDsl 会立刻把同一个 Element 误判为循环引用并返回 null。
+    if (React.isValidElement(props)) return this.elementToDsl(props, depth + 1, visited);
+
     // 循环引用检测：业务可能在 props 嵌套对象里放回自身，递归会打爆栈或无限循环。
     if (!visited) visited = new WeakSet();
     if (visited.has(props as object)) {
@@ -586,11 +606,22 @@ export class PageContainer {
       return null;
     }
     visited.add(props as object);
+    try {
+      return this.processPropsUnchecked(nodeId, props, nodeType, path, depth, visited);
+    } finally {
+      // 仅保留当前递归路径，避免共享样式对象在兄弟属性中被误判为循环引用。
+      visited.delete(props as object);
+    }
+  }
 
-    // Case 2: 如果属性值是一个 React 元素，将其转换为 DSL 结构
-    // 例如：AppBar 的 title 属性传入了一个 <Text> 组件
-    if (React.isValidElement(props)) return this.elementToDsl(props, depth + 1, visited);
-
+  private processPropsUnchecked(
+    nodeId: number,
+    props: object,
+    nodeType: string | undefined,
+    path: (string | number)[],
+    depth: number,
+    visited: WeakSet<object>,
+  ): unknown {
     // Case 3: 处理数组，递归转换数组中的每个元素
     if (Array.isArray(props)) {
       return props.map((item, index) => {

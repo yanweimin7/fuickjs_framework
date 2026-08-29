@@ -28,17 +28,12 @@ class Package {
   final String name;
   final String version;
 
-  /// 整包 SHA-256（主完整性哈希，必填）。
+  /// 整包 SHA-256（主完整性哈希，必填，**不能为空**）。
   ///
-  /// P0-2 加固：删除 MD5 兑底。bundles.json 里的 package 记录必须含 sha256，
-  /// 否则会抛异常。这避免了攻击者注入无 sha256 的 remote package 后，
-  /// 绕过 SHA-256 走 MD5 的历史错误路径。
-  final String? sha256;
-
-  /// 历史字段：MD5。不再作为完整性计算（仅作为调试信息保留）。
-  /// 若 sha256 缺失，本字段不作为兑底，直接抛异常。
-  @Deprecated('MD5 no longer used for integrity. Provide sha256 instead.')
-  final String shasum;
+  /// P0-2 加固：删除 MD5 兑底。字段为非空 `String`，缺失/空 sha256 的包在
+  /// [Package.fromJson] 即被抛异常拦截，**无法进入内存**——「缺 sha256」在编译期
+  /// 就不可表示，取代旧的可空字段 + 运行时抛 `StateError` 的 `integrity` getter。
+  final String sha256;
 
   final String? url;
   final bool mustBeUpdated;
@@ -53,8 +48,7 @@ class Package {
   const Package({
     required this.name,
     required this.version,
-    this.sha256,
-    this.shasum = '',
+    required this.sha256,
     this.url,
     this.mustBeUpdated = false,
     this.timestamp,
@@ -62,22 +56,8 @@ class Package {
     this.state = PackageState.active,
   });
 
-  /// 完整性哈希：仅 sha256。不提供兑底。
-  ///
-  /// 缺失 sha256 是配置错误：要么宿主配置不完整，要么被攻击者伪造了一个不含
-  /// sha256 的 remote package。两种情况都不应静默装上。
-  String get integrity {
-    if (sha256 == null || sha256!.isEmpty) {
-      throw StateError(
-        'Package "$name@$version" has no sha256. P0-2: SHA-256 is mandatory, '
-        'MD5 (shasum) fallback has been removed. Reject this package.',
-      );
-    }
-    return sha256!;
-  }
-
   /// 全局唯一身份标识 / 目录名：`<name>-<version>-<hash>`（日志与路径均可区分 bundle）。
-  String get versionShasumName => '$name-$version-$integrity';
+  String get versionShasumName => '$name-$version-$sha256';
 
   /// 同 bundle 下版本+完整性是否相同（name 已含在 [versionShasumName] 中）。
   bool isSameVersion(Package other) =>
@@ -92,11 +72,17 @@ class Package {
     if (version == null || version.isEmpty) {
       throw ArgumentError('Package version is required');
     }
+    final sha256 = json['sha256'] as String?;
+    if (sha256 == null || sha256.isEmpty) {
+      throw ArgumentError(
+        'Package "$name@$version" has no sha256. P0-2: SHA-256 is mandatory, '
+        'MD5 (shasum) fallback has been removed. Reject this package.',
+      );
+    }
     return Package(
       name: name,
       version: version,
-      sha256: json['sha256'] as String?,
-      shasum: (json['shasum'] as String?) ?? '',
+      sha256: sha256,
       url: json['url'] as String?,
       mustBeUpdated: json['mustBeUpdated'] as bool? ?? false,
       timestamp: json['timeStamp'] as int? ?? json['timestamp'] as int?,
@@ -105,12 +91,24 @@ class Package {
     );
   }
 
+  /// 容错解析：任一字段非法（缺 name/version/sha256 等）返回 null 而非抛异常。
+  ///
+  /// 供批量解析入口（registry / internal / remote 列表）使用，避免一个坏包拖垮
+  /// 整批列表——例如攻击者往 registry.json 注入一个缺 sha256 的包，不应导致
+  /// 其余正常包一起丢失。单包校验语义（抛异常）见 [Package.fromJson]。
+  static Package? tryFromJson(Map<String, dynamic> json) {
+    try {
+      return Package.fromJson(json);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'name': name,
       'version': version,
       'sha256': sha256,
-      'shasum': shasum,
       'url': url,
       'mustBeUpdated': mustBeUpdated,
       'timeStamp': timestamp,
@@ -123,7 +121,6 @@ class Package {
     String? name,
     String? version,
     String? sha256,
-    String? shasum,
     String? url,
     bool? mustBeUpdated,
     int? timestamp,
@@ -134,7 +131,6 @@ class Package {
       name: name ?? this.name,
       version: version ?? this.version,
       sha256: sha256 ?? this.sha256,
-      shasum: shasum ?? this.shasum,
       url: url ?? this.url,
       mustBeUpdated: mustBeUpdated ?? this.mustBeUpdated,
       timestamp: timestamp ?? this.timestamp,
@@ -149,9 +145,9 @@ class Package {
       other is Package &&
           name == other.name &&
           version == other.version &&
-          integrity == other.integrity &&
+          sha256 == other.sha256 &&
           url == other.url;
 
   @override
-  int get hashCode => Object.hash(name, version, integrity, url);
+  int get hashCode => Object.hash(name, version, sha256, url);
 }

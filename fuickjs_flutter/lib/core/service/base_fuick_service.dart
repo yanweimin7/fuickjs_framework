@@ -1,4 +1,4 @@
-import 'package:fjs_engine/core/jscontext_interface.dart';
+import 'package:fjs_engine/core/js_bridge.dart';
 
 import '../container/fuick_app_controller.dart';
 import '../logger.dart';
@@ -16,12 +16,12 @@ abstract class BaseFuickService {
   String get name;
   final Map<String, AsyncMethodHandler> asyncMethods = {};
 
-  late IQuickJsContext ctx;
+  late JsBridge ctx;
   FuickAppController? controller;
   bool _isDisposed = false;
   bool get isDisposed => _isDisposed;
 
-  void init(IQuickJsContext context, FuickAppController? appController) {
+  void init(JsBridge context, FuickAppController? appController) {
     ctx = context;
     controller = appController;
     _isDisposed = false;

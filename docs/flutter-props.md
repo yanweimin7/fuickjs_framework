@@ -248,6 +248,11 @@ public recordInsert(parent: Node, child: Node, index: number) {
 }
 ```
 
+删除 `FlutterProps` 透明节点本身时，增量策略必须在节点销毁前记录 removal。记录过程需要
+沿透明节点的 `parent` 找到实体宿主，并在宿主剩余 children 中重新计算该 `propsKey`：
+没有剩余内容时下发 `null`，避免 Flutter 继续显示已经移除的命名槽位。节点销毁随后再
+清理回调、缓存和 parent/container 反向引用。
+
 ### 4c. `recordHostUpdateFromFlutterProps()` — 核心递归冒泡逻辑
 
 ```typescript

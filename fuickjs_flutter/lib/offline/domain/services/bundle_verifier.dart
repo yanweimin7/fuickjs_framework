@@ -35,10 +35,29 @@ class BundleVerifier {
   /// 内置公钥，按 keyId → base64(公钥原始 32 字节) 映射；支持多把轮换。
   final Map<String, String> _publicKeysB64;
 
-  BundleVerifier({required Map<String, String> publicKeysB64})
-      : _publicKeysB64 = Map.unmodifiable(publicKeysB64) {
+  /// bundle 目录内代码层验签协议固定文件名（单一数据源）。
+  ///
+  /// 任何需要「验签覆盖哪些文件」的代码（如 [PackageService] 的指纹计算）
+  /// 都应从这里取，不要散落硬编码 `manifest.json` / `manifest.sig` 字符串。
+  static const String manifestFileName = 'manifest.json';
+  static const String manifestSigFileName = 'manifest.sig';
+
+  /// 判断某个代码文件是否被排除在验签（及指纹）之外。
+  ///
+  /// 仅 `.qjc`（本地编译的 QuickJS 字节码）被排除：其 sha256 不固定、本就不
+  /// 参与验签（见 [BundleVerifier._verifyDirImpl] 的逐文件 SHA-256 循环）。
+  /// 指纹计算应与这里保持同一判定，避免 BundleCompiler 后台重编 qjc 触发重验。
+  static bool isVerificationExcluded(String path) => path.endsWith('.qjc');
+
+  BundleVerifier({
+    required Map<String, String> publicKeysB64,
+    bool allowEmptyKeys = false,
+  }) : _publicKeysB64 = Map.unmodifiable(publicKeysB64) {
     // P0-6 强约束：未配置任何公钥 → 拒绝构造，从源头避免"无密钥跳过签"路径。
-    if (_publicKeysB64.isEmpty) {
+    // allowEmptyKeys=true 仅在显式关闭代码层验签（enableSignatureVerify=false）
+    // 时由 Offline 传入：此时允许空公钥构造，verifyDir 会因无 key 匹配而返回
+    // failure，但调用方已不依赖其返回值。
+    if (!allowEmptyKeys && _publicKeysB64.isEmpty) {
       throw ArgumentError(
         'BundleVerifier requires at least one public key. '
         'P0-1/P0-6: signature verification is mandatory and cannot be disabled.',
@@ -60,7 +79,7 @@ class BundleVerifier {
   }
 
   Future<VerifyResult> _verifyDirImpl(String dir) async {
-    final manifestFile = File(p.join(dir, 'manifest.json'));
+    final manifestFile = File(p.join(dir, manifestFileName));
     if (!await manifestFile.exists()) {
       return const VerifyResult.failure('manifest.json missing');
     }
@@ -77,7 +96,7 @@ class BundleVerifier {
     }
 
     // P0-1：manifest.sig 现在是必填，删除 "hasPublicKey 跳过" 分支。
-    final sigFile = File(p.join(dir, 'manifest.sig'));
+    final sigFile = File(p.join(dir, manifestSigFileName));
     if (!await sigFile.exists()) {
       return const VerifyResult.failure(
         'manifest.sig missing (P0-1: signature is mandatory)',
@@ -102,7 +121,7 @@ class BundleVerifier {
       // qjc 是 QuickJS 字节码,可能是本地编译的(引擎版本升级后 BundleCompiler
       // 重新编译生成),sha256 不固定,不参与验签。安全考量:qjc 被篡改不会执行
       // 恶意代码——字节码格式不匹配时引擎加载失败 → 回退到已验签的 bundle.js。
-      if (f.path.endsWith('.qjc')) continue;
+      if (isVerificationExcluded(f.path)) continue;
       final file = File(p.join(dir, f.path));
       if (!await file.exists()) {
         return VerifyResult.failure('code file missing: ${f.path}');

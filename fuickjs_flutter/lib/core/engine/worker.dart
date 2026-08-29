@@ -27,7 +27,8 @@ class IsolateWorker {
   /// 无需真正 spawn isolate。
   @visibleForTesting
   factory IsolateWorker.forTest(
-    FutureOr<void> Function(dynamic, SendPort, SendErrorFunction) isolateEntry, {
+    FutureOr<void> Function(dynamic, SendPort, SendErrorFunction)
+        isolateEntry, {
     Worker? worker,
   }) =>
       IsolateWorker._(isolateEntry, worker);
@@ -36,8 +37,18 @@ class IsolateWorker {
       _isolateEntry;
 
   final Worker _worker;
+
+  static Completer<void> _newReadyCompleter() {
+    final completer = Completer<void>();
+    // 首个 init 调用方直接 await _worker.init 并接收 rethrow；只有并发 join 者
+    // 会监听 ready.future。预挂一个 error handler，避免没有 join 者时
+    // completeError 变成未处理异步错误，同时不影响其他监听者收到同一异常。
+    completer.future.ignore();
+    return completer;
+  }
+
   // 非 final：init 失败时需要换一个新的 Completer 以允许后续重试。
-  Completer<void> _ready = Completer<void>();
+  Completer<void> _ready = _newReadyCompleter();
   bool _initialized = false;
   // 并发 join 守卫：避免两个调用方同时通过 _initialized 判断而重复 init。
   bool _initializing = false;
@@ -59,7 +70,7 @@ class IsolateWorker {
       // join 者（已在 await 旧 _ready.future）永久 hang；本调用方通过 rethrow 报错。
       _initializing = false;
       final old = _ready;
-      _ready = Completer<void>();
+      _ready = _newReadyCompleter();
       old.completeError(e);
       rethrow;
     }
@@ -114,23 +125,27 @@ class IsolateWorker {
         completer?.complete(payload);
       }
     } else if (type == 'callNative' || type == 'callNativeAsync') {
-      if (contextId == null) return;
-      final delegate = _delegates[contextId];
-      if (delegate == null) return;
-
-      final method = payload['method'];
-      final args = payload['args'];
       final replyPort = data['replyPort'] as SendPort?;
+      try {
+        if (contextId == null) {
+          throw StateError('Native call is missing contextId');
+        }
+        final delegate = _delegates[contextId];
+        if (delegate == null) {
+          throw StateError('Native call context not found: $contextId');
+        }
 
-      final callback = (type == 'callNative')
-          ? delegate.onCallNative
-          : delegate.onCallNativeAsync;
-
-      if (callback != null) {
-        final result = await callback(method, args);
-        replyPort?.send(result);
-      } else {
-        replyPort?.send(null);
+        final method = payload['method'];
+        final args = payload['args'];
+        final callback = (type == 'callNative')
+            ? delegate.onCallNative
+            : delegate.onCallNativeAsync;
+        final result = callback == null ? null : await callback(method, args);
+        replyPort?.send(NativeCallReply.success(result));
+      } catch (e, s) {
+        // replyPort 是 worker 侧这次 Native 调用的唯一完成通道；异常也必须回包，
+        // 否则 ReceivePort.first 和 JS Promise 都会永久 pending。
+        replyPort?.send(NativeCallReply.failure(e, s));
       }
     }
   }

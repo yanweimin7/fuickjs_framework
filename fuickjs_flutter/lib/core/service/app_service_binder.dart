@@ -1,4 +1,4 @@
-import 'package:fjs_engine/core/jscontext_interface.dart';
+import 'package:fjs_engine/core/js_bridge.dart';
 
 import '../container/fuick_app_controller.dart';
 import '../logger.dart';
@@ -19,7 +19,7 @@ class AppServiceBinder {
   List<String> _registeredAsyncNames = const [];
 
   void init(
-    IQuickJsContext ctx,
+    JsBridge ctx,
     FuickAppController? controller, {
     List<Type>? allowedServices,
     Future<dynamic> Function(String, dynamic)? fallbackAsync,

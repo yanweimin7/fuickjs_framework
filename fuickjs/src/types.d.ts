@@ -36,6 +36,24 @@ declare global {
   var fuickjs: FuickJS;
   var queueMicrotask: (fn: () => void) => void;
 
+  /**
+   * 引擎在 eval 业务代码前注入的当前 bundle 标识。
+   * @see fuickjs_flutter/lib/core/engine/fuick_app_context.dart#_injectBundleGlobals
+   */
+  interface FuickBundleInfo {
+    /** bundle 名（对应 manifest.name / Package.name）。 */
+    name: string;
+    /** semver 版本；内置 assets / debug payload 场景为 null。 */
+    version: string | null;
+    /** 整包 SHA-256 完整性哈希；内置 assets / debug 场景为 null。 */
+    sha256: string | null;
+    /** 动态包解压根目录绝对路径；内置 assets 时为 null。 */
+    root: string | null;
+    /** 框架层（Flutter）版本，对应 fuickjs_flutter 的 version。 */
+    frameworkVersion: string;
+  }
+  var __FUICK_BUNDLE__: FuickBundleInfo | undefined;
+
   // Extend globalThis
   interface Object {
     fuickjs: FuickJS;

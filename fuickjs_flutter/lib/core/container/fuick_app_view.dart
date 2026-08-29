@@ -18,6 +18,17 @@ class FuickAppView extends StatefulWidget {
   final String? debugBusinessCode;
   final Map<String, dynamic>? sourceMap;
   final String? cachedBundleRoot;
+
+  /// Web 专用：bundle 的 URL（经 `<script src>` 加载）。native 忽略。
+  final String? bundleUrl;
+
+  /// Web 专用：Worker 入口脚本 URL（fuickjs `dist/worker/entry.js` 的部署产物）。
+  ///
+  /// 传了就把 React + DSL 生成放进 Web Worker，让出浏览器主线程；浏览器不支持
+  /// Worker、脚本取不到或握手超时都会**自动回退**到主线程渲染，不影响可用性。
+  /// 留空即始终主线程。native 忽略。详见 docs/flutter-web-support.md §6。
+  final String? workerUrl;
+
   final String? initialRoute;
   final Map<String, dynamic>? initialParams;
   final FuickPageTransition pageTransition;
@@ -35,6 +46,8 @@ class FuickAppView extends StatefulWidget {
     this.debugBusinessCode,
     this.sourceMap,
     this.cachedBundleRoot,
+    this.bundleUrl,
+    this.workerUrl,
     this.initialRoute,
     this.initialParams,
     this.pageTransition = FuickPageTransition.cupertino,
@@ -105,6 +118,8 @@ class _FuickAppViewState extends State<FuickAppView> {
         sourceMap: widget.sourceMap,
         cachedBundleRoot: widget.cachedBundleRoot,
         useAotCode: widget.useAotCode,
+        bundleUrl: widget.bundleUrl,
+        workerUrl: widget.workerUrl,
       );
       FuickAppContextManager().registerContext(widget.appName, appContext!);
     } else {

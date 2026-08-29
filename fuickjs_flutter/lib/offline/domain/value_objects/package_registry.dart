@@ -37,9 +37,15 @@ class PackageRegistry {
   factory PackageRegistry.fromJson(Map<String, dynamic> json) {
     List<Package> parse(String key) {
       final list = json[key] as List<dynamic>? ?? const [];
-      return list
-          .map((e) => Package.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final result = <Package>[];
+      for (final e in list) {
+        // 容错：单个坏包（缺 name/version/sha256 等）跳过，不拖垮整批。
+        if (e is Map<String, dynamic>) {
+          final pkg = Package.tryFromJson(e);
+          if (pkg != null) result.add(pkg);
+        }
+      }
+      return result;
     }
 
     return PackageRegistry(

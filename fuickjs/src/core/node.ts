@@ -11,13 +11,12 @@ const ABSOLUTE_ASSET_RE = /^(https?:\/\/|file:\/\/|data:|\/)/i;
  * 将 bundle 内相对图片路径透明解析为 file://<root>/assets/<src>。
  * - 业务照写相对路径（如 "images/logo.png"），无需任何 API。
  * - 无动态包（root 缺失）时原样返回，由 Flutter 走 Image.asset 兜底。
- * 数据源：引擎在 eval 前注入的 globalThis.__FUICK_BUNDLE__ = { name, root }。
+ * 数据源：引擎在 eval 前注入的 globalThis.__FUICK_BUNDLE__ = { name, version, sha256, root, frameworkVersion }。
  */
 function resolveBundleAssetPath(src: unknown): unknown {
   if (typeof src !== 'string' || src.length === 0) return src;
   if (ABSOLUTE_ASSET_RE.test(src)) return src;
-  const bundle = (globalThis as unknown as { __FUICK_BUNDLE__?: { root?: unknown } }).__FUICK_BUNDLE__;
-  const root = bundle && bundle.root;
+  const root = __FUICK_BUNDLE__?.root;
   if (!root || typeof root !== 'string') return src;
   const rel = src.replace(/^\.?\//, '');
   return `file://${root}/assets/${rel}`;

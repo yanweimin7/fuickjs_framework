@@ -1,4 +1,4 @@
-import 'package:fjs_engine/core/jscontext_interface.dart';
+import 'package:fjs_engine/core/js_bridge.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../engine/fuick_js_proxy.dart';
@@ -19,7 +19,7 @@ int get nextPageId {
 WidgetFactory widgetFactory = WidgetFactory();
 
 class FuickAppController {
-  final IQuickJsContext ctx;
+  final JsBridge ctx;
   late final FuickJsProxy jsProxy;
 
   late final FuickNavigationDelegate navigation;

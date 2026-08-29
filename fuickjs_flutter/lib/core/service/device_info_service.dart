@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +7,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../logger.dart';
 import 'base_fuick_service.dart';
+import 'platform_info_web.dart'
+    if (dart.library.io) 'platform_info_native.dart';
 
+/// 平台标识（os / osVersion / locale / isXxx）按平台拆到 [PlatformInfo]：
+/// native 走 `dart:io Platform`（保留真实系统版本与 ohos 等取值），
+/// Web 走 `defaultTargetPlatform` + `PlatformDispatcher`。
 class DeviceInfoService extends BaseFuickService {
   @override
   String get name => 'DeviceInfo';
@@ -21,18 +25,18 @@ class DeviceInfoService extends BaseFuickService {
       final size = window.physicalSize / window.devicePixelRatio;
 
       return {
-        'os': Platform.operatingSystem,
-        'osVersion': Platform.operatingSystemVersion,
-        'locale': Platform.localeName,
+        'os': PlatformInfo.osName,
+        'osVersion': PlatformInfo.osVersion,
+        'locale': PlatformInfo.localeName,
         'screenWidth': size.width,
         'screenHeight': size.height,
         'pixelRatio': window.devicePixelRatio,
-        'isAndroid': Platform.isAndroid,
-        'isIOS': Platform.isIOS,
-        'isMacOS': Platform.isMacOS,
-        'isWindows': Platform.isWindows,
-        'isLinux': Platform.isLinux,
-        'isFuchsia': Platform.isFuchsia,
+        'isAndroid': PlatformInfo.isAndroid,
+        'isIOS': PlatformInfo.isIOS,
+        'isMacOS': PlatformInfo.isMacOS,
+        'isWindows': PlatformInfo.isWindows,
+        'isLinux': PlatformInfo.isLinux,
+        'isFuchsia': PlatformInfo.isFuchsia,
       };
     });
 

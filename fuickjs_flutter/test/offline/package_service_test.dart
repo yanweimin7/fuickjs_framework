@@ -1,12 +1,13 @@
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fuickjs_flutter/offline/domain/entities/package.dart';
 import 'package:fuickjs_flutter/offline/domain/repositories/package_repository.dart';
-import 'package:fuickjs_flutter/offline/domain/services/bundle_verifier.dart';
 import 'package:fuickjs_flutter/offline/domain/services/bundle_verify_isolate.dart';
 import 'package:fuickjs_flutter/offline/domain/services/package_service.dart';
 import 'package:fuickjs_flutter/offline/domain/value_objects/package_registry.dart';
+import 'package:path/path.dart' as p;
 
 class MockPackageRepository implements PackageRepository {
   PackageRegistry _registry = const PackageRegistry();
@@ -229,6 +230,71 @@ void main() {
       expect(service.isInternal(pkg('app', '1.0.0', 'h1')), true);
       expect(service.isInternal(pkg('app', '2.0.0', 'h2')), false);
     });
+
+    group('findForcedUpdateTarget', () {
+      test('returns null when no mustBeUpdated remote', () async {
+        service.setRemotePackages([pkg('app', '2.0.0', 'h2')]);
+        expect(service.findForcedUpdateTarget('app'), isNull);
+      });
+
+      test('returns mustBeUpdated remote when != active', () async {
+        repo.seedRegistry(PackageRegistry(
+          active: [
+            pkg('app', '1.0.0', 'h1').copyWith(state: PackageState.active)
+          ],
+        ));
+        await service.init();
+        service.setRemotePackages([
+          pkg('app', '2.0.0', 'h2').copyWith(mustBeUpdated: true),
+        ]);
+        final target = service.findForcedUpdateTarget('app');
+        expect(target, isNotNull);
+        expect(target!.version, '2.0.0');
+      });
+
+      test('returns null when mustBeUpdated == active', () async {
+        repo.seedRegistry(PackageRegistry(
+          active: [
+            pkg('app', '2.0.0', 'h2').copyWith(state: PackageState.active)
+          ],
+        ));
+        await service.init();
+        service.setRemotePackages([
+          pkg('app', '2.0.0', 'h2').copyWith(mustBeUpdated: true),
+        ]);
+        expect(service.findForcedUpdateTarget('app'), isNull);
+      });
+
+      test('ignores mustBeUpdated packages of other names', () async {
+        repo.seedRegistry(PackageRegistry(
+          active: [
+            pkg('app', '1.0.0', 'h1').copyWith(state: PackageState.active)
+          ],
+        ));
+        await service.init();
+        service.setRemotePackages([
+          pkg('other', '9.0.0', 'h9').copyWith(mustBeUpdated: true),
+        ]);
+        expect(service.findForcedUpdateTarget('app'), isNull);
+      });
+
+      test('ignores internal package even when mustBeUpdated=true', () async {
+        repo.seedRegistry(PackageRegistry(
+          active: [
+            pkg('app', '1.0.0', 'h1').copyWith(state: PackageState.active)
+          ],
+        ));
+        await service.init();
+        // 内置包也被标了 mustBeUpdated=true → 仍不应触发强制更新。
+        service.setInternalPackages([
+          pkg('app', '2.0.0', 'h2').copyWith(mustBeUpdated: true),
+        ]);
+        // 无远程配置时 _remotePackages 降级为 internalPackages（模拟 Offline
+        // _fetchRemotePackages 里 result==null 的分支）。
+        service.setRemotePackages(service.internalPackages);
+        expect(service.findForcedUpdateTarget('app'), isNull);
+      });
+    });
   });
 
   group('P0-3 parallel re-verification', () {
@@ -395,40 +461,53 @@ void main() {
       expect(repo.deleted.toSet(),
           pkgList.map((p) => p.versionShasumName).toSet());
     });
+  });
 
-    test('regression: package without sha256 does not crash background verify',
-        () async {
-      // P0-1 修复前:Package.integrity 在 sha256=null 时抛 StateError,
-      // _reverifyOrDrop 内 getPackageDir(pkg) → versionShasumName → integrity
-      // 抛异常,Future.wait 整体 reject,_bgVerifyFuture 变 error future,
-      // 且 registry 不被清理(问题包一直留在 active)。
-      //
-      // 修复后:单包 try/catch,失败视为 ok:false,整轮 bg verify 正常完成,
-      // 问题包被 drop。其他正常包也不受影响。
-      final normalPkg = mkPkg('good', '1.0.0', 'h-good');
-      await makeBundleDir(normalPkg.versionShasumName);
+  group('P0-3 on-open verify: mtime fingerprint cache', () {
+    // 与 fixture 配对的真实公钥 + keyId（fixture 内 manifest 的 keyId='key-test'）。
+    const pubB64 = 'BpbpV8DqQE0NGgiXalTMOpBApQaDObu8byjy7Pftrps=';
+    const keyId = 'key-test';
+    const fixtureZip = 'test/offline/fixtures/test_bundle-1.0.0.zip';
 
-      // 故意构造一个无 sha256 的包(模拟攻击者改 registry.json 注入)。
-      final badPkg = Package(
-        name: 'bad',
+    late Directory tmp;
+    late MockPackageRepository repo;
+    late PackageService service;
+    late BundleVerifyIsolate verifyIsolate;
+
+    setUp(() async {
+      tmp = await Directory.systemTemp.createTemp('fuick-p03-cache-');
+      verifyIsolate = await BundleVerifyIsolate.create({keyId: pubB64});
+      repo = MockPackageRepository();
+      service =
+          PackageService(repo, retainVersions: 2, verifyIsolate: verifyIsolate);
+    });
+
+    tearDown(() async {
+      await verifyIsolate.dispose();
+      if (await tmp.exists()) await tmp.delete(recursive: true);
+    });
+
+    test('skip re-verify when unchanged; re-verify when tampered', () async {
+      final dir = p.join(tmp.path, 'bundle');
+      await _extractZip(File(fixtureZip), dir);
+      final pkg = Package(
+        name: 'test_bundle',
         version: '1.0.0',
-        sha256: null, // ← 关键:触发 integrity 抛 StateError
+        sha256: 'h1',
         state: PackageState.active,
       );
 
-      repo.seedRegistry(PackageRegistry(active: [normalPkg, badPkg]));
+      // 首次：无缓存，走完整验签，通过。
+      expect(await service.verifyOnOpen(pkg, dir), isNotNull);
 
-      await service.init();
-      // 修复前:这一行会接到 StateError(bg verify 整轮崩溃)。
-      // 修复后:正常完成,两个包都被 drop(normal 验签失败,bad 异常容错)。
-      await service.backgroundVerifyDone;
+      // 第二次：文件 mtime+size 未变，命中指纹短路，跳过 isolate 重验，仍通过。
+      expect(await service.verifyOnOpen(pkg, dir), isNotNull);
 
-      expect(service.activePackages, isEmpty,
-          reason: 'bad pkg should be dropped, not crash whole bg verify');
-      // bad 包虽然 deletePackage 时也会因 versionShasumName 抛 StateError,
-      // 但 _reverifyOrDrop 内 try/catch 兜底,不会让整轮崩。
-      // normal 包的目录被正常删(deletePackage 调用 1 次)。
-      expect(repo.deleted, contains(normalPkg.versionShasumName));
+      // 篡改代码文件 → mtime 变化 → 指纹失效 → 重验 → 检出篡改 → 拒绝。
+      final code = File(p.join(dir, 'bundle.js'));
+      await code.writeAsString('var hacked = 1;');
+      expect(await service.verifyOnOpen(pkg, dir), isNull);
+      expect(repo.deleted, contains(pkg.versionShasumName));
     });
   });
 
@@ -534,4 +613,20 @@ void main() {
       expect(svc.stagedPackages.map((p) => p.name), containsAll(['a', 'b']));
     });
   });
+}
+
+Future<void> _extractZip(File zipFile, String outputPath) async {
+  final bytes = await zipFile.readAsBytes();
+  final archive = ZipDecoder().decodeBytes(bytes);
+  for (final file in archive.files) {
+    if (file.isSymbolicLink) continue;
+    final filePath = p.join(outputPath, p.normalize(file.name));
+    if (!file.isFile) {
+      await Directory(filePath).create(recursive: true);
+      continue;
+    }
+    final outFile = File(filePath);
+    await outFile.parent.create(recursive: true);
+    await outFile.writeAsBytes(file.content as List<int>);
+  }
 }

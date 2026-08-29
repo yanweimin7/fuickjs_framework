@@ -63,7 +63,9 @@ class _MemoryMonitorOverlayState extends State<MemoryMonitorOverlay> {
     _fetching = true;
     try {
       final ctx = FuickAppContextManager().getContext(widget.appName)?.ctx;
-      if (ctx == null) return;
+      // Web 端 ctx 是 HostJsContext（非引擎上下文），无 runGC/computeMemoryUsage；
+      // 本浮层是 QuickJS 内存监控，Web 上直接跳过。
+      if (ctx is! IQuickJsContext) return;
       // 采样前先 GC,确保测到的是真实可达对象而非待回收垃圾。
       await ctx.runGC();
       final usage = await ctx.computeMemoryUsage();

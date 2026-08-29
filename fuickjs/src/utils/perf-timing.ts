@@ -3,7 +3,7 @@
  * 打出一条合并的 [PerfTiming] 日志：
  *
  * 阶段1 t_js_to_dsl: JS 收到 render 请求 → DSL 序列化完成（toDsl 结束）
- * 阶段2 t_transfer:    dartCallNative('UI.renderUI') 同步 FFI 往返耗时
+ * 阶段2 t_transfer:    dartCallNativeAsync('UI.renderUI') 的投递耗时
  *                     （此阶段内包含了 Flutter 侧的 createNode 解析时间）
  * 阶段3 t_flutter:     Flutter 侧 FuickPageView._handleRenderDsl 的 buildNode 耗时
  *

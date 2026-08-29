@@ -236,6 +236,13 @@ FuickJS 在 QuickJS 环境中补齐了 Web 标准 API，通过 Flutter 原生能
 
 > 默认无超时是刻意的：部分操作（如 `Navigator.push`）等待页面关闭才返回，耗时不可预期。业务侧按需传 `timeoutMs`。
 
+**跨 isolate 错误回传**
+
+worker isolate 转发 Native Service 调用时，主 isolate 始终通过结构化 envelope 回复：
+成功携带返回值，callback 同步或异步抛错则携带 error/stack。worker 将错误还原为 Future
+异常，最终 reject JS Promise；delegate 已注销或 contextId 缺失也走同一错误通道。
+`ReceivePort` 在成功和失败后都会关闭，避免异常路径永久等待并泄漏端口。
+
 ### 全局别名
 - `window` 指向 `globalThis`
 - `self` 指向 `globalThis`

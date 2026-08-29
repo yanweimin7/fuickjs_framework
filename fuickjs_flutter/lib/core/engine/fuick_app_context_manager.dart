@@ -1,7 +1,8 @@
 import '../logger.dart';
 import 'fuick_app_context.dart';
+import 'prewarm_page_config.dart';
 
-export 'fuick_app_context.dart' show PrewarmPageConfig;
+export 'prewarm_page_config.dart' show PrewarmPageConfig;
 
 class FuickAppContextManager {
   static final FuickAppContextManager _instance =

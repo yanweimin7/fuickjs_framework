@@ -28,7 +28,7 @@ class Offline {
   static late CleanService cleanService;
   static late BundleVerifier verifier;
   static late RemotePackagesVerifier remotePackagesVerifier;
-  static late BundleVerifyIsolate verifyIsolate;
+  static BundleVerifyIsolate? verifyIsolate;
 
   static bool _initialized = false;
 
@@ -42,6 +42,17 @@ class Offline {
   /// 等待初始化完成。init 进行中则 join 同一 Future；init 从未调用则返回
   /// 已完成的 Future（调用方仍需检查 _initialized 判断 init 是否成功过）。
   static Future<void> get whenInitialized => _initFuture ?? Future.value();
+
+  /// 远程包列表首次就绪（`setRemotePackages` 已写入）的信号。
+  ///
+  /// `_syncAndClean` 是 fire-and-forget，冷启动首次 promoteAndGetRoot 通常早于
+  /// 远程列表落地，而强制更新只看内存态 → 不等信号的话首启必然判成"无强制更新"。
+  /// 只覆盖"列表就绪"，不含随后的下载。
+  static Completer<void>? _remoteListReady;
+
+  /// 按 name 合并进行中的强制更新：并发打开同一 bundle 时只征询一次用户、
+  /// 只跑一遍下载与提升。
+  static final Map<String, Future<void>> _forcedUpdateInflight = {};
 
   static Future<void> init(OfflineConfig cfg) {
     if (_initialized) return Future.value();
@@ -58,7 +69,8 @@ class Offline {
     config = cfg;
 
     // P0-6 启动期硬约束：未配置公钥直接拒绝（避免后续 BundleVerifier 构造失败）。
-    if (config.signaturePublicKeysB64.isEmpty) {
+    // 仅当开启代码层验签（enableSignatureVerify）时才强制要求公钥。
+    if (config.enableSignatureVerify && config.signaturePublicKeysB64.isEmpty) {
       throw StateError(
         'OfflineConfig.signaturePublicKeysB64 is required and cannot be empty. '
         'P0-1/P0-6: Ed25519 signature verification is mandatory.',
@@ -72,13 +84,18 @@ class Offline {
     packageRepository = LocalPackageRepository(fileStorage);
     await packageRepository.init();
 
-    verifier = BundleVerifier(publicKeysB64: config.signaturePublicKeysB64);
+    verifier = BundleVerifier(
+      publicKeysB64: config.signaturePublicKeysB64,
+      allowEmptyKeys: !config.enableSignatureVerify,
+    );
     remotePackagesVerifier = RemotePackagesVerifier(verifier);
 
     // 启动验签 isolate（主 isolate 立即返回，可并行做其他启动工作）。
-    verifyIsolate = await BundleVerifyIsolate.create(
-      config.signaturePublicKeysB64,
-    );
+    // 关闭代码层验签时不创建 isolate，PackageService 对 verifyIsolate==null
+    // 天然跳过后台重新验签与 on-open 验签。
+    verifyIsolate = config.enableSignatureVerify
+        ? await BundleVerifyIsolate.create(config.signaturePublicKeysB64)
+        : null;
 
     packageService = PackageService(
       packageRepository,
@@ -92,6 +109,7 @@ class Offline {
       packageRepository,
       config: config,
       verifier: verifier,
+      enableSignatureVerify: config.enableSignatureVerify,
     );
     downloadService.setInternalChecker(packageService.isInternal);
     cleanService = CleanService(packageRepository);
@@ -110,6 +128,7 @@ class Offline {
     _initialized = true;
 
     // 远程同步 + 下载缓存清理后台进行，不阻塞启动。
+    _remoteListReady ??= Completer<void>();
     unawaited(_syncAndClean());
   }
 
@@ -135,8 +154,11 @@ class Offline {
       );
       final map = jsonDecode(json) as Map<String, dynamic>;
       final list = map['packages'] as List<dynamic>? ?? [];
-      final packages =
-          list.map((e) => Package.fromJson(e as Map<String, dynamic>)).toList();
+      final packages = list
+          .whereType<Map<String, dynamic>>()
+          .map((e) => Package.tryFromJson(e))
+          .whereType<Package>()
+          .toList();
       packageService.setInternalPackages(packages);
       logger(() => 'Internal packages loaded: ${packages.length}');
     } catch (e) {
@@ -180,14 +202,19 @@ class Offline {
         await fileStorage.writeRemotePackages(jsonEncode(rawMap));
         final list = rawMap['packages'] as List<dynamic>? ?? const [];
         remotePackages = list
-            .map((e) => Package.fromJson(e as Map<String, dynamic>))
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Package.tryFromJson(e))
+            .whereType<Package>()
             .toList();
       } else {
-        // 无远程配置时，以内置包作为"远程"基准。
-        // 若 active 的 sha256 与内置不一致，会触发重新解压。
-        remotePackages = packageService.internalPackages;
+        // `offlinePackagesGetter` 返回 null（无远程配置 / 网络失败但未抛异常）：
+        // 优先回退上次成功落盘的 remote 缓存（latest.json），无缓存再兜底内置包。
+        // 这样网络抖动时不会把上次已 active 的远程包误判为 removed 而删掉。
+        remotePackages = await _loadCachedRemotePackages();
       }
       packageService.setRemotePackages(remotePackages);
+      // 列表已落内存即可放行强制更新判定，不必等下面的下载/提升跑完。
+      _signalRemoteListReady();
 
       final syncResult = syncService.sync(
         remote: remotePackages,
@@ -217,7 +244,42 @@ class Offline {
       }
     } catch (e) {
       logger(() => 'Failed to fetch remote packages: $e');
+    } finally {
+      // 失败也要放行等待方：拉不到远程就等同于"无强制更新"，不能把打开挂住。
+      _signalRemoteListReady();
     }
+  }
+
+  /// 读取上次成功拉取并落盘的 remote 列表（latest.json）作为兜底。
+  ///
+  /// 网络失败 / `offlinePackagesGetter` 返回 null 时调用：优先用缓存，让 sync
+  /// 不会把上次已 active 的远程包误判为 removed 删掉。无缓存（文件不存在、解析
+  /// 失败、或 packages 为空）时退化为内置包列表。
+  static Future<List<Package>> _loadCachedRemotePackages() async {
+    try {
+      final content = await fileStorage.readRemotePackages();
+      if (content.isNotEmpty) {
+        final map = jsonDecode(content) as Map<String, dynamic>;
+        final list = map['packages'] as List<dynamic>? ?? const [];
+        final cached = list
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Package.tryFromJson(e))
+            .whereType<Package>()
+            .toList();
+        if (cached.isNotEmpty) {
+          logger(() => 'Reuse cached remote packages: ${cached.length}');
+          return cached;
+        }
+      }
+    } catch (e) {
+      logger(() => 'Failed to read cached remote packages: $e');
+    }
+    return packageService.internalPackages;
+  }
+
+  static void _signalRemoteListReady() {
+    final c = _remoteListReady;
+    if (c != null && !c.isCompleted) c.complete();
   }
 
   static Future<void> refresh() async {
@@ -237,6 +299,24 @@ class Offline {
     return _dirIfExists(active);
   }
 
+  /// 当前 active 包元数据（不触发提升）；无则 null。
+  ///
+  /// 供引擎注入 bundle 标识（name/version/sha256）到 JS 侧。仅返回 registry
+  /// 中的元数据，不做任何 IO/验签——验签已在 [promoteAndGetRoot] 打开路径完成。
+  static Future<Package?> getActivePackage(String name) async {
+    await whenInitialized;
+    if (!_initialized) return null;
+    return packageService.getActivePackage(name);
+  }
+
+  /// 按 bundle name 查询最近一次下载进度（0.0~1.0；1.0=完成，-1.0=失败/取消）。
+  /// 未下载过返回 0。pull 语义，供接入方进度条首帧读取；实时更新建议配
+  /// [OfflineConfig.onDownloadProgress] 回调（push）。
+  static double getDownloadProgress(String name) {
+    if (!_initialized) return 0;
+    return downloadService.getProgressByName(name);
+  }
+
   /// 下次打开生效：提升 staged → active，并确保目标包已解压；返回 root（无则 null）。
   ///
   /// P0-3 on-open：返回 dir 前在子 isolate 做最后一道验签。
@@ -245,6 +325,10 @@ class Offline {
   static Future<String?> promoteAndGetRoot(String name) async {
     await whenInitialized;
     if (!_initialized) return null;
+
+    // 强制更新：remote 存在 mustBeUpdated 且 ≠ 当前 active 时，同步等待下载
+    // 并强制用新版本；下载失败回退旧 active（不阻断加载）。
+    await _ensureForcedUpdate(name);
 
     var active = await packageService.promoteStaged(name);
     active ??= packageService.getActivePackage(name);
@@ -280,6 +364,86 @@ class Offline {
       return rebuiltDir;
     }
     return dir;
+  }
+
+  /// mustBeUpdated 包：征询用户后（若配置了 [OfflineConfig.onForcedUpdateConfirm]）
+  /// 同步下载并提升为 active。拒绝或下载/提升失败回退旧 active（不阻断）。
+  ///
+  /// 同 name 并发去重：两个页面同时打开同一 bundle 时共享同一个 Future，
+  /// 确认回调只会被调用一次。
+  static Future<void> _ensureForcedUpdate(String name) {
+    final existing = _forcedUpdateInflight[name];
+    if (existing != null) return existing;
+    final f = _doEnsureForcedUpdate(name);
+    _forcedUpdateInflight[name] = f;
+    f.whenComplete(() => _forcedUpdateInflight.remove(name));
+    return f;
+  }
+
+  /// 在 promoteAndGetRoot 打开 bundle 前调用，实现"强制更新"语义：remote 中
+  /// 存在 mustBeUpdated=true 且版本 ≠ 当前 active 时，先征询用户，同意才下载。
+  /// minAppVersion 由 preparePackage 内部兜底（不满足返回 null → 回退旧版）。
+  ///
+  /// 全程不抛：任何异常（确认回调抛错、提升失败等）都退化为"用旧 active"，
+  /// 强制更新不能反过来把 bundle 打不开。
+  static Future<void> _doEnsureForcedUpdate(String name) async {
+    try {
+      // 冷启动时远程列表可能还没落地，先短暂等待，否则必然判成"无强制更新"。
+      await _awaitRemoteList();
+
+      final forced = packageService.findForcedUpdateTarget(name);
+      if (forced == null) return;
+
+      // 征询用户：未配置确认回调视为同意（默认行为，与既有强制更新语义一致）。
+      final confirm = config.onForcedUpdateConfirm;
+      if (confirm != null) {
+        final ok = await confirm(name, forced.version);
+        if (!ok) {
+          logger(() =>
+              'Forced update declined by user for $name, use current active');
+          return; // 拒绝 → 跳过本次强制更新，后续流程继续用本地 active。
+        }
+      }
+
+      logger(() => 'Forced update for $name: ${forced.versionShasumName}');
+      // in-flight 去重：若后台 sync 已在下载该包，直接 join 其 Future。
+      // 超时只放弃等待，不取消下载：后台跑完照样 staged，下次打开生效。
+      final Package? ready;
+      try {
+        ready = await downloadService
+            .preparePackage(forced)
+            .timeout(config.forcedUpdateTimeout);
+      } on TimeoutException {
+        logger(() => 'Forced update timed out for $name after '
+            '${config.forcedUpdateTimeout.inSeconds}s, fallback to old active');
+        return;
+      }
+      if (ready == null) {
+        logger(() => 'Forced update failed for $name, fallback to old active');
+        return;
+      }
+      await packageService.applyReady([ready]);
+      // 失败（如 mustBeUpdated 非 remote 最新被 _isStagedPromotable 丢弃）时
+      // 静默回退旧 active。
+      await packageService.promoteStaged(name);
+    } catch (e) {
+      logger(() => 'Forced update error for $name: $e, use current active');
+    }
+  }
+
+  /// 等远程列表就绪，最多 [OfflineConfig.forcedUpdateRemoteWait]。
+  /// 超时 / 未启动同步 / 配置为零都直接返回，由调用方按"无强制更新"继续。
+  static Future<void> _awaitRemoteList() async {
+    final wait = config.forcedUpdateRemoteWait;
+    if (wait <= Duration.zero) return;
+    final c = _remoteListReady;
+    if (c == null || c.isCompleted) return;
+    try {
+      await c.future.timeout(wait);
+    } on TimeoutException {
+      logger(() => 'Remote package list not ready in ${wait.inMilliseconds}ms, '
+          'skip forced update check');
+    }
   }
 
   static Future<Package?> _ensureBuiltinActive(String name) async {

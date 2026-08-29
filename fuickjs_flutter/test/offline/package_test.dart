@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fuickjs_flutter/offline/domain/entities/package.dart';
+import 'package:fuickjs_flutter/offline/domain/value_objects/package_registry.dart';
 
 void main() {
   group('Package', () {
@@ -116,23 +117,42 @@ void main() {
         expect(() => Package.fromJson(<String, dynamic>{}), throwsArgumentError);
       });
 
-      test('integrity returns sha256', () {
-        final pkg = Package.fromJson({
-          'name': 'p',
-          'version': '1.0.0',
-          'sha256': 'deadbeef',
-        });
-        expect(pkg.integrity, 'deadbeef');
-        expect(pkg.versionShasumName, 'p-1.0.0-deadbeef');
+      test('P0-2: fromJson throws when sha256 missing (no MD5 fallback)', () {
+        expect(
+          () => Package.fromJson({
+            'name': 'p',
+            'version': '1.0.0',
+            'shasum': 'legacy-md5',
+          }),
+          throwsArgumentError,
+        );
       });
 
-      test('P0-2: integrity throws when sha256 missing (no MD5 fallback)', () {
-        final pkg = Package.fromJson({
-          'name': 'p',
-          'version': '1.0.0',
-          'shasum': 'legacy-md5',
-        });
-        expect(() => pkg.integrity, throwsStateError);
+      test('P0-2: fromJson throws when sha256 empty', () {
+        expect(
+          () => Package.fromJson({
+            'name': 'p',
+            'version': '1.0.0',
+            'sha256': '',
+          }),
+          throwsArgumentError,
+        );
+      });
+
+      test('tryFromJson returns null on invalid package', () {
+        expect(Package.tryFromJson(<String, dynamic>{}), isNull);
+        expect(
+          Package.tryFromJson({'name': 'p', 'version': '1.0.0'}),
+          isNull,
+        );
+        expect(
+          Package.tryFromJson({
+            'name': 'p',
+            'version': '1.0.0',
+            'sha256': 'abc',
+          }),
+          isNotNull,
+        );
       });
     });
 
@@ -211,6 +231,36 @@ void main() {
 
         expect(pkg1, isNot(equals(pkg2)));
       });
+    });
+  });
+
+  group('PackageRegistry.fromJson tolerant parsing', () {
+    test('skips a bad package (missing sha256), keeps the good ones', () {
+      final registry = PackageRegistry.fromJson({
+        'active': [
+          {'name': 'good', 'version': '1.0.0', 'sha256': 'abc'},
+          {'name': 'bad', 'version': '1.0.0', 'shasum': 'legacy-md5'},
+        ],
+        'staged': <Map<String, dynamic>>[],
+        'history': <Map<String, dynamic>>[],
+      });
+
+      expect(registry.active.length, 1);
+      expect(registry.active.single.name, 'good');
+    });
+
+    test('ignores non-map entries', () {
+      final registry = PackageRegistry.fromJson({
+        'active': [
+          'not-a-map',
+          {'name': 'good', 'version': '1.0.0', 'sha256': 'abc'},
+        ],
+        'staged': <Map<String, dynamic>>[],
+        'history': <Map<String, dynamic>>[],
+      });
+
+      expect(registry.active.length, 1);
+      expect(registry.active.single.name, 'good');
     });
   });
 }

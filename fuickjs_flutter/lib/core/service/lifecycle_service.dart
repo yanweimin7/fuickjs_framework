@@ -1,4 +1,4 @@
-import 'package:fjs_engine/core/jscontext_interface.dart';
+import 'package:fjs_engine/core/js_bridge.dart';
 import 'package:flutter/material.dart';
 
 import '../container/fuick_app_controller.dart';
@@ -26,7 +26,7 @@ class LifecycleService extends BaseFuickService with WidgetsBindingObserver {
   }
 
   @override
-  void init(IQuickJsContext context, FuickAppController? appController) {
+  void init(JsBridge context, FuickAppController? appController) {
     super.init(context, appController);
     WidgetsBinding.instance.addObserver(this);
   }

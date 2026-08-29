@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fuickjs_flutter/core/widgets/parsers/image_parser.dart';
+import 'package:fuickjs_flutter/core/widgets/parsers/safe_center_slice_image.dart';
 import 'package:fuickjs_flutter/core/widgets/widget_factory.dart';
 
 void main() {

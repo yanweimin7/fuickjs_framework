@@ -1,7 +1,7 @@
-import 'package:fjs_engine/core/jscontext_interface.dart';
+import 'package:fjs_engine/core/js_bridge.dart';
 
 class FuickJsProxy {
-  final IQuickJsContext ctx;
+  final JsBridge ctx;
 
   FuickJsProxy(this.ctx);
 

@@ -14,9 +14,9 @@ void main() {
 
     test('should create with provided lists', () {
       const result = SyncResult(
-        added: [Package(name: 'pkg1', version: '1.0.0', shasum: 'aaa')],
-        updated: [Package(name: 'pkg2', version: '2.0.0', shasum: 'bbb')],
-        removed: [Package(name: 'pkg3', version: '3.0.0', shasum: 'ccc')],
+        added: [Package(name: 'pkg1', version: '1.0.0', sha256: 'aaa')],
+        updated: [Package(name: 'pkg2', version: '2.0.0', sha256: 'bbb')],
+        removed: [Package(name: 'pkg3', version: '3.0.0', sha256: 'ccc')],
       );
 
       expect(result.added.length, 1);
@@ -32,21 +32,21 @@ void main() {
 
       test('should return true when there are added packages', () {
         final result = SyncResult(
-          added: [Package(name: 'pkg1', version: '1.0.0', shasum: 'aaa')],
+          added: [Package(name: 'pkg1', version: '1.0.0', sha256: 'aaa')],
         );
         expect(result.hasChanges, true);
       });
 
       test('should return true when there are updated packages', () {
         final result = SyncResult(
-          updated: [Package(name: 'pkg1', version: '1.0.0', shasum: 'aaa')],
+          updated: [Package(name: 'pkg1', version: '1.0.0', sha256: 'aaa')],
         );
         expect(result.hasChanges, true);
       });
 
       test('should return true when there are removed packages', () {
         final result = SyncResult(
-          removed: [Package(name: 'pkg1', version: '1.0.0', shasum: 'aaa')],
+          removed: [Package(name: 'pkg1', version: '1.0.0', sha256: 'aaa')],
         );
         expect(result.hasChanges, true);
       });
@@ -61,16 +61,16 @@ void main() {
       test('should return sum of all changes', () {
         final result = SyncResult(
           added: [
-            Package(name: 'pkg1', version: '1.0.0', shasum: 'aaa'),
-            Package(name: 'pkg2', version: '1.0.0', shasum: 'bbb'),
+            Package(name: 'pkg1', version: '1.0.0', sha256: 'aaa'),
+            Package(name: 'pkg2', version: '1.0.0', sha256: 'bbb'),
           ],
           updated: [
-            Package(name: 'pkg3', version: '1.0.0', shasum: 'ccc'),
+            Package(name: 'pkg3', version: '1.0.0', sha256: 'ccc'),
           ],
           removed: [
-            Package(name: 'pkg4', version: '1.0.0', shasum: 'ddd'),
-            Package(name: 'pkg5', version: '1.0.0', shasum: 'eee'),
-            Package(name: 'pkg6', version: '1.0.0', shasum: 'fff'),
+            Package(name: 'pkg4', version: '1.0.0', sha256: 'ddd'),
+            Package(name: 'pkg5', version: '1.0.0', sha256: 'eee'),
+            Package(name: 'pkg6', version: '1.0.0', sha256: 'fff'),
           ],
         );
 
@@ -81,12 +81,12 @@ void main() {
     group('copyWith', () {
       test('should copy with new added list', () {
         const original = SyncResult(
-          added: [Package(name: 'pkg1', version: '1.0.0', shasum: 'aaa')],
+          added: [Package(name: 'pkg1', version: '1.0.0', sha256: 'aaa')],
         );
 
         final copied = original.copyWith(
           added: [
-            Package(name: 'pkg2', version: '2.0.0', shasum: 'bbb'),
+            Package(name: 'pkg2', version: '2.0.0', sha256: 'bbb'),
           ],
         );
 
@@ -98,12 +98,12 @@ void main() {
 
       test('should preserve original values when not specified', () {
         const original = SyncResult(
-          added: [Package(name: 'pkg1', version: '1.0.0', shasum: 'aaa')],
-          updated: [Package(name: 'pkg2', version: '2.0.0', shasum: 'bbb')],
+          added: [Package(name: 'pkg1', version: '1.0.0', sha256: 'aaa')],
+          updated: [Package(name: 'pkg2', version: '2.0.0', sha256: 'bbb')],
         );
 
         final copied = original.copyWith(
-          removed: [Package(name: 'pkg3', version: '3.0.0', shasum: 'ccc')],
+          removed: [Package(name: 'pkg3', version: '3.0.0', sha256: 'ccc')],
         );
 
         expect(copied.added.length, 1);

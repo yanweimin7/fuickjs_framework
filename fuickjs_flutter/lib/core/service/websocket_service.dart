@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../logger.dart';
@@ -12,6 +13,10 @@ import 'base_fuick_service.dart';
 class WebSocketService extends BaseFuickService {
   @override
   String get name => 'WebSocket';
+
+  /// 本服务为 native 专用：内部用 [IQuickJsContext.eval] 把消息推给 JS 侧的
+  /// `_ws_$socketId` 处理器。ctx 字段类型为窄接口 [JsBridge]，这里窄化回引擎接口。
+  IQuickJsContext get _engine => ctx as IQuickJsContext;
 
   bool _isDisposed = false;
 
@@ -127,7 +132,7 @@ class WebSocketService extends BaseFuickService {
       final jsCode = isBinary
           ? '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleMessage) { socket._handleMessage(base64ToArrayBuffer($encodedData)); } })();'''
           : '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleMessage) { socket._handleMessage($encodedData); } })();''';
-      ctx.eval(jsCode);
+      _engine.eval(jsCode);
     } catch (e, s) {
       logger.e('[WebSocketService] Error handling message: $e\n$s');
     }
@@ -148,7 +153,7 @@ class WebSocketService extends BaseFuickService {
       final encodedReason = jsonEncode(closeReason);
       final jsCode =
           '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleClose) { socket._handleClose($closeCode, $encodedReason, $wasClean); } delete globalThis["$jsHandler"]; })();''';
-      ctx.eval(jsCode);
+      _engine.eval(jsCode);
 
       // Clean up
       _cleanupSocket(socketId);
@@ -164,7 +169,7 @@ class WebSocketService extends BaseFuickService {
       final jsHandler = '_ws_$socketId';
       final jsCode =
           '''(function() { var socket = globalThis["$jsHandler"]; if (socket && socket._handleError) { socket._handleError(); } })();''';
-      ctx.eval(jsCode);
+      _engine.eval(jsCode);
     } catch (e, s) {
       logger.e('[WebSocketService] Error handling error event: $e\n$s');
     }
@@ -351,7 +356,7 @@ class WebSocketService extends BaseFuickService {
         jsCode =
             '(function(){ var s=globalThis["$jsGlobal"]; if(s&&s.$method) s.$method($encodedClientId); })();';
       }
-      ctx.eval(jsCode);
+      _engine.eval(jsCode);
     } catch (e, s) {
       logger.e('[WebSocketService] _fireServerEvent error: $e\n$s');
     }

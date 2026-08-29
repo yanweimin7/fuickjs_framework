@@ -12,7 +12,7 @@ void main() {
     });
 
     Package pkg(String name, String version, String hash, {String? url}) {
-      // P0-2: 必填 sha256，旧 shasum 字段已废弃，测试统一改用 sha256。
+      // P0-2: 必填 sha256，历史 shasum 字段已删除，测试统一改用 sha256。
       return Package(name: name, version: version, sha256: hash, url: url);
     }
 
@@ -113,7 +113,7 @@ void main() {
       });
 
       group('internal package priority', () {
-        test('should prefer internal package when version and shasum match',
+        test('should prefer internal package when version and sha256 match',
             () {
           final result = run(
             remote: [

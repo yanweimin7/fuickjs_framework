@@ -13,6 +13,37 @@ import '../service/file_system_service.dart';
 import '../service/timer_service.dart';
 import 'engine.dart';
 
+/// 主 isolate 执行 Native Service 后发回 worker isolate 的结构化响应。
+///
+/// 使用固定 envelope，避免 callback 抛错时 replyPort 无响应，导致 worker 侧
+/// `ReceivePort.first` 与对应 JS Promise 永久挂起。
+class NativeCallReply {
+  static const String _marker = '__fuick_native_call_reply__';
+
+  static Map<String, dynamic> success(dynamic value) => {
+        _marker: true,
+        'ok': true,
+        'value': value,
+      };
+
+  static Map<String, dynamic> failure(Object error, StackTrace stackTrace) => {
+        _marker: true,
+        'ok': false,
+        'error': error.toString(),
+        'stack': stackTrace.toString(),
+      };
+
+  static dynamic unwrap(dynamic response) {
+    // 兼容旧端直接返回业务值的格式。
+    if (response is! Map || response[_marker] != true) return response;
+    if (response['ok'] == true) return response['value'];
+    throw RemoteError(
+      response['error']?.toString() ?? 'Native call failed',
+      response['stack']?.toString() ?? '',
+    );
+  }
+}
+
 // ─── Generic IsolateHandler ────────────────────────────────────────────────
 
 class IsolateHandler {
@@ -25,9 +56,11 @@ class IsolateHandler {
   IsolateHandler(this.mainSendPort, this.contextFactory);
 
   Future<dynamic> _waitForResponse(ReceivePort port) async {
-    final result = await port.first;
-    port.close();
-    return result;
+    try {
+      return NativeCallReply.unwrap(await port.first);
+    } finally {
+      port.close();
+    }
   }
 
   void handleMessage(

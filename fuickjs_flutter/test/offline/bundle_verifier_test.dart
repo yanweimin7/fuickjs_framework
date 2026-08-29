@@ -39,6 +39,20 @@ void main() {
       );
     });
 
+    test('allowEmptyKeys: true allows empty key set construction', () {
+      final verifier =
+          BundleVerifier(publicKeysB64: const {}, allowEmptyKeys: true);
+      expect(verifier, isNotNull);
+    });
+
+    test('allowEmptyKeys: true with empty keys → verifyDir fails', () async {
+      final verifier =
+          BundleVerifier(publicKeysB64: const {}, allowEmptyKeys: true);
+      final r = await verifier.verifyDir(dir);
+      // 空公钥无 key 可匹配，验签必失败（返回 failure 而非 throw）。
+      expect(r.ok, false);
+    });
+
     test('P0-1: manifest.sig missing → verification fails', () async {
       // 删除 manifest.sig → 验签必失败（不再有"无密钥跳过签"路径）。
       final sig = File(p.join(dir, 'manifest.sig'));

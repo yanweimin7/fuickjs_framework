@@ -299,11 +299,23 @@ export const createHostConfig = (): any => {
     prepareUpdate: () => true,
     commitUpdate: (
       instance: Node,
-      _type: string,
-      oldProps: Record<string, unknown>,
-      newProps: Record<string, unknown>,
-      _internalInstanceHandle: unknown,
+      arg2: unknown,
+      arg3: unknown,
+      arg4: unknown,
+      arg5?: unknown,
     ) => {
+      // React 18 (reconciler 0.29) 调用：
+      //   commitUpdate(instance, updatePayload, type, oldProps, newProps, internalHandle)
+      // React 19 (reconciler 0.33) 调用：
+      //   commitUpdate(instance, type, oldProps, newProps, internalHandle)
+      // 两者第 3 个参数不同：React 18 是 type（string），React 19 是 oldProps（object）。
+      // 用 `typeof arg3 === 'string'` 区分，使同一 hostConfig 兼容两个版本
+      // （见 createHostConfig 头部的 getCurrentEventPriority/getCurrentUpdatePriority 注释）。
+      const oldProps: Record<string, unknown> =
+        (typeof arg3 === 'string' ? arg4 : arg3) as Record<string, unknown>;
+      const newProps: Record<string, unknown> =
+        (typeof arg3 === 'string' ? arg5 : arg4) as Record<string, unknown>;
+
       const result = diffProps(oldProps, newProps);
       if (!result) return;
 
@@ -327,7 +339,6 @@ export const createHostConfig = (): any => {
       }
     },
     commitTextUpdate: (textInstance: Node, _oldText: string, newText: string) => {
-      textInstance.props.text = String(newText);
       if (textInstance.container) {
         textInstance.container.commitTextUpdate(textInstance, newText);
       }

@@ -55,13 +55,13 @@
 | --- | --- |
 | [fuickjs_dart fuickjs_dart.md](./fuickjs_dart.md) | 纯 Dart 动态渲染方案（无 JS 引擎路径） |
 | [二进制协议 v2 binary-protocol-v2.md](./binary-protocol-v2.md) | JS↔Dart 经 FFI 传输 DSL 的序列化层（varint + 字符串表） |
+| [Flutter Web 支持 flutter-web-support.md](./flutter-web-support.md) | 浏览器宿主下用 `JsBridge` + `<script src>` 复用渲染链；含 §6 Web Worker DSL 生产（传 `workerUrl` 开启，不支持时自动回退主线程） |
 
 ### 四、动态下发（Bundle 怎么更新）
 
 | 文档 | 定位 |
 | --- | --- |
-| [Bundle 动态下发 bundle-delivery.md](./bundle-delivery.md) | Ed25519 验签 + SHA-256 + 状态机 + 回滚 + 图片透明加载 |
-| [页面级分包加载 page-split-loading.md](./page-split-loading.md) | 主包 + 页面 chunk 按需 eval（**技术可行，但当前收益偏小、不建议实施**） |
+| [Bundle 动态下发 bundle-delivery.md](./bundle-delivery.md) | Ed25519 验签 + SHA-256 + 状态机 + 回滚 + 图片透明加载；附录含「页面级分包加载（评估：不建议实施）」 |
 
 ### 五、质量与审计
 
@@ -79,8 +79,8 @@
 ## 推荐阅读路线
 
 - **业务 / 新手开发**：`introduction` → `widgets` → `services` → `router` → `i18n`
-- **宿主集成 / 原生扩展**：`services` → `community` → `bundle-delivery` → `page-split-loading` → `fuickjs_flutter/README`
-- **引擎 / 框架贡献者**：`fuickjs_dart` → `binary-protocol-v2` → `audit-report`
+- **宿主集成 / 原生扩展**：`services` → `community` → `bundle-delivery` → `fuickjs_flutter/README`
+- **引擎 / 框架贡献者**：`fuickjs_dart` → `binary-protocol-v2` → `flutter-web-support` → `audit-report`
 
 ## 开发规范
 
@@ -239,8 +239,13 @@ React 组件树被转换为 JSON DSL 发送给 Flutter，Flutter 根据 DSL 构�
 **缓存失效规则**
 
 - 节点 props 变更 → 该节点 DSL 标记 dirty
+- 裸文本 child 变更（如 `<Column>{count}</Column>`）→ 更新 Text 节点并下发增量补丁
 - 子节点增删 → 该节点及父节点缓存失效
 - 失效信号递归向上传播；透明节点（如 `FlutterProps`）自动穿透，确保最近实体 Widget 重新生成 DSL
+
+`processProps` 的循环检测按当前递归路径工作：真正的循环引用会被截断，但同一个样式对象或
+React Element 可以在多个兄弟属性中合法复用。直接作为 host prop 传入的 React Element
+会经 `elementToDsl` 转为 DSL；需要 React 生命周期的命名槽位仍应使用 `FlutterProps`。
 
 **页面级配置**：通过 `usePageConfig({ dslCacheEnabled: false })` 关闭缓存，适用于大量动画或高频更新的页面。
 

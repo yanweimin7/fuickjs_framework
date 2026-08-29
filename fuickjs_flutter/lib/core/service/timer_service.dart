@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:fjs_engine/core/jscontext_interface.dart';
+import 'package:fjs_engine/core/js_bridge.dart';
 import 'package:fuickjs_flutter/core/engine/fuick_js_proxy.dart';
 
 import '../container/fuick_app_controller.dart';
@@ -19,7 +19,7 @@ class TimerService extends SyncFuickService {
   late FuickJsProxy proxy;
 
   @override
-  void init(IQuickJsContext context, FuickAppController? appController) {
+  void init(JsBridge context, FuickAppController? appController) {
     super.init(context, appController);
     proxy = FuickJsProxy(context);
   }

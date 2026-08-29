@@ -4,7 +4,8 @@ import 'clipboard_service.dart';
 import 'console_service.dart';
 import 'device_info_service.dart';
 import 'error_report_service.dart';
-import 'file_system_service.dart';
+import 'file_system_service_web.dart'
+    if (dart.library.io) 'file_system_service.dart';
 import 'native_event_service.dart';
 import 'navigation_service.dart';
 import 'network_service.dart';
@@ -14,7 +15,8 @@ import 'timer_service.dart';
 import 'toast_service.dart';
 import 'ui_service.dart';
 import 'dialog_service.dart';
-import 'websocket_service.dart';
+import 'websocket_service_web.dart'
+    if (dart.library.io) 'websocket_service.dart';
 import 'sound_service.dart';
 
 typedef ServiceBuilder = BaseFuickService Function();
