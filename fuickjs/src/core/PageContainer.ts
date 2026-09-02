@@ -1,5 +1,5 @@
 import React from 'react';
-import { Node, TEXT_TYPE, resolveAssetProps } from './node';
+import { Node, TEXT_TYPE } from './node';
 import { isTransparentType } from './constants';
 import { IncrementalStrategy } from '../strategies/IncrementalStrategy';
 import { DiffStrategy } from '../strategies/DiffStrategy';
@@ -668,14 +668,6 @@ export class PageContainer {
         // Case 8: 基础数据类型 (string, number, boolean) 直接赋值
         processedProps[key] = value;
       }
-    }
-
-    // 资源路径统一解析：processProps 是所有发给 Flutter 的 props 的序列化收口点
-    // （Node.toDsl / IncrementalStrategy.recordUpdate / elementToDsl 均经过这里）。
-    // 仅在节点顶层（path 为空）按组件类型解析登记过的资源 key（如 Image.src），
-    // 把 bundle 内相对路径透明转为 file://<root>/assets/<src>，无需各出口重复处理。
-    if (path.length === 0) {
-      resolveAssetProps(processedProps, nodeType);
     }
     return processedProps;
   }

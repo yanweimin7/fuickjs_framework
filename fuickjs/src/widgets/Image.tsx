@@ -1,5 +1,8 @@
 import React, { ReactNode } from 'react';
 import { WidgetProps } from './types';
+import { resolveBundleAssetPath } from '../core/node';
+
+const IMAGE_ASSET_KEYS = ['src', 'url', 'errorSrc', 'errorUrl'] as const;
 
 export interface ImageProps extends WidgetProps {
   /**
@@ -95,7 +98,17 @@ export interface ImageProps extends WidgetProps {
 
 export class Image extends React.Component<ImageProps> {
   render(): ReactNode {
-    return React.createElement('Image', { ...this.props, isBoundary: false });
+    // 资源相对路径（assets/ 下文件）在组件层统一解析为 file://<root>/assets/<src>，
+    // 发给宿主（host）的 props 即为最终值，toDsl/recordUpdate/elementToDsl 无需再处理。
+    // 三方自定义图片类组件可自行调用 resolveBundleAssetPath 实现同等效果，无需改框架。
+    const hostProps: Record<string, unknown> = { ...this.props, isBoundary: false };
+    for (const key of IMAGE_ASSET_KEYS) {
+      const value = hostProps[key];
+      if (value !== undefined) {
+        hostProps[key] = resolveBundleAssetPath(value);
+      }
+    }
+    return React.createElement('Image', hostProps as ImageProps);
   }
 }
 
