@@ -22,7 +22,8 @@ export class IncrementalStrategy {
       props[key] = val;
     }
 
-    // Use processProps to handle callbacks and conversions
+    // Use processProps to handle callbacks and conversions. 资源相对路径
+    // （如 Image.src）在 processProps 内部按组件类型统一解析为动态包绝对路径。
     const processed = this.container.processProps(node.id, props, node.type);
 
     // OpCode 1: UPDATE (id, props)

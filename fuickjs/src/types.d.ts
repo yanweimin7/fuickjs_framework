@@ -28,9 +28,13 @@ declare global {
     render: (pageId: number, path: string, params: unknown) => void;
     destroy: (pageId: number) => void;
     getItemDSL: (pageId: number, refId: string, index: number) => unknown;
-    notifyLifecycle: (pageId: number, type: string) => void;
+    disposeItem: (pageId: number, refId: string, index: number) => void;
+    notifyLifecycle: (pageId: number, type: 'visible' | 'invisible') => void;
     dispatchEvent: (eventObj: unknown, payload: unknown) => void;
     handleTimer: (id: number) => void;
+    configure: (options: import('./runtime').FuickConfig) => void;
+    getConfig: () => import('./runtime').FuickConfig;
+    i18n: typeof import('./i18n/i18n').i18n;
   }
 
   var fuickjs: FuickJS;

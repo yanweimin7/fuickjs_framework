@@ -13,7 +13,7 @@ const ABSOLUTE_ASSET_RE = /^(https?:\/\/|file:\/\/|data:|\/)/i;
  * - 无动态包（root 缺失）时原样返回，由 Flutter 走 Image.asset 兜底。
  * 数据源：引擎在 eval 前注入的 globalThis.__FUICK_BUNDLE__ = { name, version, sha256, root, frameworkVersion }。
  */
-function resolveBundleAssetPath(src: unknown): unknown {
+export function resolveBundleAssetPath(src: unknown): unknown {
   if (typeof src !== 'string' || src.length === 0) return src;
   if (ABSOLUTE_ASSET_RE.test(src)) return src;
   const root = __FUICK_BUNDLE__?.root;
@@ -22,7 +22,34 @@ function resolveBundleAssetPath(src: unknown): unknown {
   return `file://${root}/assets/${rel}`;
 }
 
-const IMAGE_ASSET_PROP_KEYS = ['src', 'url', 'errorSrc', 'errorUrl'];
+/**
+ * 组件级资源属性注册表：按组件类型列出携带资源路径（相对 assets/ 内文件）的 prop key。
+ * 统一在 PageContainer.processProps（唯一的序列化收口点）里解析，凡新增组件/属性只需
+ * 往这里登记，所有发送路径（Node.toDsl / recordUpdate / elementToDsl）自动生效，
+ * 无需在各自出口重复调用。
+ */
+export const ASSET_PROP_KEYS_BY_TYPE: Record<string, readonly string[]> = {
+  Image: ['src', 'url', 'errorSrc', 'errorUrl'],
+};
+
+/**
+ * 按组件类型把 props 里的资源相对路径解析为 `file://<root>/assets/<src>`。
+ * 仅处理 ASSET_PROP_KEYS_BY_TYPE 登记的 key；nodeType 未登记时原样返回。
+ * @param props 待发送给 Flutter 的 props（原地修改并返回）
+ * @param nodeType 组件类型名（如 'Image'）
+ */
+export function resolveAssetProps(props: Record<string, unknown>, nodeType?: string): Record<string, unknown> {
+  if (!props || typeof props !== 'object') return props;
+  const keys = nodeType ? ASSET_PROP_KEYS_BY_TYPE[nodeType] : undefined;
+  if (keys) {
+    for (const k of keys) {
+      if (props[k] !== undefined) {
+        props[k] = resolveBundleAssetPath(props[k]);
+      }
+    }
+  }
+  return props;
+}
 
 export class Node {
   id: number;
@@ -200,15 +227,6 @@ export class Node {
       string,
       unknown
     >;
-
-    // Image 资源相对路径 → 动态包绝对路径（透明，业务无感）。
-    if (type === 'Image') {
-      for (const k of IMAGE_ASSET_PROP_KEYS) {
-        if (props[k] !== undefined) {
-          props[k] = resolveBundleAssetPath(props[k]);
-        }
-      }
-    }
 
     // Use refId from props if provided
     const refId = this.props?.refId;
