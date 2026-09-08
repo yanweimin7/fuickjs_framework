@@ -310,8 +310,7 @@ class _FuickScopeProvidersState extends State<_FuickScopeProviders> {
       final controller = FuickAppScope.of(context);
       controller?.jsProxy.ctx.invoke('NativeEvent', 'receive', [event, data]);
     } catch (e) {
-      // ignore: avoid_print
-      print('[_FuickScopeProviders] emit $event failed: $e');
+      logger.e('emit $event failed: $e');
     }
   }
 

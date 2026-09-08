@@ -231,8 +231,7 @@ void _isolateMain(_InitMessage init) async {
       } catch (e) {
         // 任何意外错误（如 send 失败）兜底：打印并继续循环，
         // 不杀 isolate。该 req 已丢失，主 isolate 侧有超时兜底。
-        // ignore: avoid_print
-        print('[BundleVerifyIsolate] worker unexpected error (continuing): $e');
+        logger.e('worker unexpected error (continuing): $e');
       }
     }
   }
