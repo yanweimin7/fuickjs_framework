@@ -324,34 +324,22 @@ class Offline {
   /// 验签已通过（await 是同步语义，JS 不会先于验签跑起来）。
   static Future<String?> promoteAndGetRoot(String name) async {
     await whenInitialized;
-    if (!_initialized) {
-      print('[Offline] NOT initialized, returning null for "$name"');
-      return null;
-    }
+    if (!_initialized) return null;
 
-    print('[Offline] promoteAndGetRoot("$name") start');
     // 强制更新：remote 存在 mustBeUpdated 且 ≠ 当前 active 时，同步等待下载
     // 并强制用新版本；下载失败回退旧 active（不阻断加载）。
     await _ensureForcedUpdate(name);
 
     var active = await packageService.promoteStaged(name);
-    print('[Offline] promoteStaged("$name") = ${active?.name}');
     active ??= packageService.getActivePackage(name);
-    print('[Offline] getActivePackage("$name") = ${active?.name}');
 
     // 无 active/staged → 解压内置包兜底（首启、被清理、远程未就绪等皆同一处理）。
     if (active == null) {
-      print('[Offline] No active package, trying _ensureBuiltinActive');
       active = await _ensureBuiltinActive(name);
-      print('[Offline] _ensureBuiltinActive("$name") = ${active?.name}');
     }
-    if (active == null) {
-      print('[Offline] No active package found for "$name", returning null');
-      return null;
-    }
+    if (active == null) return null;
 
     final dir = await _dirIfExists(active);
-    print('[Offline] _dirIfExists = $dir');
     if (dir == null) {
       // active 目录意外缺失 → 兜底重建内置。
       final rebuilt = await _ensureBuiltinActive(name);
