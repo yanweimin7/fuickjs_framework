@@ -121,9 +121,11 @@ class FuickAppContext {
   /// 等待而非静默回退内置；仅在 init 从未成功过时才返回 null（走内置 assets）。
   Future<String?> _resolveBundleRoot() async {
     try {
-      return await Offline.promoteAndGetRoot(appName);
+      final root = await Offline.promoteAndGetRoot(appName);
+      print('[BundleRoot] Offline.promoteAndGetRoot("$appName") = $root');
+      return root;
     } catch (e) {
-      logger.e('resolve bundle root failed: $e');
+      print('[BundleRoot] resolve bundle root failed: $e');
     }
     return null;
   }
@@ -151,6 +153,7 @@ class FuickAppContext {
       'root': root,
       'frameworkVersion': fuickjsFrameworkVersion,
     });
+    print('[BundleRoot] Injecting __FUICK_BUNDLE__: root=$root');
     await _engine.eval('globalThis.__FUICK_BUNDLE__ = $info;',
         returnValue: false);
   }

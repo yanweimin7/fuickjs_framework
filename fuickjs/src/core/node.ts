@@ -20,6 +20,7 @@ export function resolveBundleAssetPath(src: unknown): unknown {
   if (typeof src !== 'string' || src.length === 0) return src;
   if (ABSOLUTE_ASSET_RE.test(src)) return src;
   const root = __FUICK_BUNDLE__?.root;
+  console.log('[resolveBundleAssetPath]', src, 'root=', root);
   if (!root || typeof root !== 'string') return src;
   const rel = src.replace(/^\.?\//, '');
   return `file://${root}/assets/${rel}`;
