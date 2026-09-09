@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
 
+import 'package:fuickjs_flutter/core/logger.dart';
+
 import 'bundle_verifier.dart';
 
 /// 验签请求（主 isolate → 子 isolate）。

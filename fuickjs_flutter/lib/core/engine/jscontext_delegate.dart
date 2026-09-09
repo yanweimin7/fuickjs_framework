@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:fjs_engine/core/jscontext_interface.dart';
 import 'package:fuickjs_flutter/core/engine/worker.dart';
+import 'package:fuickjs_flutter/core/logger.dart';
 
 class JsContextDelegate implements IQuickJsContext {
   final String contextId;
